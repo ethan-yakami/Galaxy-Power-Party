@@ -1,0 +1,14 @@
+{
+  "name": "galaxy-power-party",
+  "version": "1.0.0",
+  "description": "Galaxy Power Party web game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "compression": "^1.7.5",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

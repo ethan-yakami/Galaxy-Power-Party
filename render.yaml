@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: galaxy-power-party
+    runtime: node
+    plan: free
+    region: singapore
+    branch: master
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true

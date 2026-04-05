@@ -1,0 +1,46 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>银河战力党 · 启动台</title>
+    <link rel="stylesheet" href="launcher.css?v=20260403" />
+  </head>
+  <body>
+    <div class="launcherBg" aria-hidden="true">
+      <div class="launcherGlow launcherGlowA"></div>
+      <div class="launcherGlow launcherGlowB"></div>
+    </div>
+
+    <main class="launcherShell">
+      <section class="launcherCard">
+        <p class="launcherSub">GALAXY POWER PARTY</p>
+        <h1>银河战力党</h1>
+        <p class="launcherDesc">从这里打开独立战斗页。点击后会在新标签页进入房间并开始对战。</p>
+
+        <label>
+          玩家名
+          <input id="nameInput" maxlength="20" placeholder="输入你的名字" />
+        </label>
+
+        <div class="launcherActions">
+          <button id="createBtn" class="primaryBtn" type="button">创建房间</button>
+          <button id="aiBtn" type="button">与 AI 对战</button>
+        </div>
+
+        <label>
+          4位房间号
+          <input id="roomCodeInput" maxlength="4" placeholder="例如 1234" />
+        </label>
+
+        <div class="launcherActions">
+          <button id="joinBtn" type="button">加入房间</button>
+        </div>
+
+        <p id="launcherMessage" class="launcherMessage">点击任意按钮后将打开新标签页进行对战。</p>
+      </section>
+    </main>
+
+    <script src="js/launcher.js?v=20260403"></script>
+  </body>
+</html>

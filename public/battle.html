@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>银河战力党 · 战斗页</title>
+    <link rel="stylesheet" href="styles.css?v=20260403" />
+  </head>
+  <body>
+    <div class="bgLayer" aria-hidden="true">
+      <div class="bgGlow bgGlowA"></div>
+      <div class="bgGlow bgGlowB"></div>
+      <div class="bgGrid"></div>
+    </div>
+
+    <main class="appShell">
+      <header class="globalHeader">
+        <div>
+          <p class="brandSub">GALAXY POWER PARTY</p>
+          <h1>银河战力党</h1>
+        </div>
+        <div class="globalHeaderActions">
+          <p id="myId" class="myIdPill">玩家ID：-</p>
+          <button id="backToLauncherBtn" class="secondaryBtn" type="button">返回启动台</button>
+          <button id="docBtn" class="docBtn" type="button">规则文档</button>
+        </div>
+      </header>
+
+      <section id="connectionPanel" class="scene sceneHome">
+        <div class="panel homeCard">
+          <h2>正在进入战斗房间</h2>
+          <div class="connectionStatusRow">
+            <span id="connectionStatusBadge" class="connectionStatusBadge statusConnecting">连接中</span>
+          </div>
+          <p id="launchHint" class="sceneDesc">正在建立连接并自动执行建房/入房...</p>
+          <p id="connectionDetail" class="sceneDesc">请稍候，正在等待服务器欢迎消息。</p>
+          <p id="connectionError" class="connectionError hidden"></p>
+          <div id="connectionActions" class="actions connectionActions">
+            <button id="reconnectBtn" class="secondaryBtn hidden" type="button">重新连接</button>
+            <button id="retryIntentBtn" class="primaryBtn hidden" type="button">重试自动入房</button>
+            <button id="backToLauncherInlineBtn" class="secondaryBtn hidden" type="button">返回启动台</button>
+          </div>
+        </div>
+
+        <section id="msgPanel" class="panel statusPanel">
+          <h3>连接状态</h3>
+          <p id="message">等待连接服务器...</p>
+        </section>
+      </section>
+
+      <section id="roomPanel" class="scene sceneRoom hidden">
+        <div class="roomTopBar panel">
+          <div class="roomIdentity">
+            <span class="roomTag">房间</span>
+            <span id="roomCode" class="roomCodeValue">-</span>
+          </div>
+          <div class="roomTopActions">
+            <button id="leaveBtn" class="danger" type="button">退出房间</button>
+          </div>
+        </div>
+
+        <div class="roomGrid">
+          <aside class="panel roomSide">
+            <h3>房间成员</h3>
+            <ul id="playersList" class="playersList"></ul>
+
+            <div id="lobbyControls" class="lobbyStage">
+              <div id="selectionSummary" class="selectionSummary"></div>
+              <div class="actions">
+                <button id="confirmLoadoutBtn" class="primaryBtn" type="button">确认当前选择</button>
+              </div>
+              <p id="confirmHint" class="confirmHint"></p>
+              <p id="lobbyHint" class="lobbyHint">等待双方完成配置...</p>
+            </div>
+          </aside>
+
+          <section id="lobbyArea" class="panel lobbyMain">
+            <div class="lobbyColumns">
+              <div class="lobbyCol">
+                <h3>选择角色</h3>
+                <div id="characterButtons" class="actions selectGrid"></div>
+              </div>
+              <div class="lobbyCol">
+                <h3>选择曜彩骰</h3>
+                <div id="auroraButtons" class="actions selectGrid"></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="gameArea" class="battleScene hidden">
+            <div class="panel battleTop">
+              <p id="roundInfo" class="roundInfo"></p>
+              <p id="turnInfo" class="turnInfo"></p>
+            </div>
+
+            <div class="battleMain">
+              <div class="panel battleBoard">
+                <section id="enemyZone" class="zone zoneEnemy"></section>
+                <div id="battleCenterScore" class="battleCenterScore">等待行动</div>
+                <section id="selfZone" class="zone zoneSelf"></section>
+              </div>
+
+              <aside id="actionRail" class="panel actionRail"></aside>
+            </div>
+
+            <div class="panel battleBottom">
+              <button id="logToggleBtn" class="secondaryBtn" type="button">展开战斗日志</button>
+              <div id="logDrawer" class="logDrawer">
+                <div id="logBox" class="logBox"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="js/state.js?v=20260403"></script>
+    <script src="js/ui.js?v=20260403"></script>
+    <script src="js/effects.js?v=20260403"></script>
+    <script src="js/dice-ui.js?v=20260403"></script>
+    <script src="js/render.js?v=20260403"></script>
+    <script src="js/connection.js?v=20260403"></script>
+  </body>
+</html>
