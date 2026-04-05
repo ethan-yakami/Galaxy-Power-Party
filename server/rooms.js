@@ -1,5 +1,5 @@
-const WebSocket = require('ws');
-const { CHARACTERS, AURORA_DICE } = require('./characters');
+﻿const WebSocket = require('ws');
+const { CharacterRegistry, AuroraRegistry } = require('./registry');
 
 function send(ws, payload) {
   if (ws.readyState === WebSocket.OPEN) {
@@ -61,12 +61,12 @@ function sanitizeRoom(room, viewerPlayerId) {
         name: p.name,
         characterId: hideLoadout ? null : p.characterId,
         characterName: hideLoadout
-          ? '未公开'
-          : (CHARACTERS[p.characterId] && CHARACTERS[p.characterId].name) || p.characterId,
+          ? '鏈叕寮€'
+          : (CharacterRegistry[p.characterId] && CharacterRegistry[p.characterId].name) || p.characterId,
         auroraDiceId: hideLoadout ? null : p.auroraDiceId,
         auroraDiceName: hideLoadout
           ? null
-          : (AURORA_DICE[p.auroraDiceId] && AURORA_DICE[p.auroraDiceId].name) || null,
+          : (AuroraRegistry[p.auroraDiceId] && AuroraRegistry[p.auroraDiceId].name) || null,
       };
     }),
     game,
@@ -104,14 +104,14 @@ function isAuroraEquipRequired(player) {
 }
 
 function readyToStart(room) {
-  if (room.players.length !== 2) return { ok: false, reason: '等待另一位玩家加入。' };
+  if (room.players.length !== 2) return { ok: false, reason: '绛夊緟鍙︿竴浣嶇帺瀹跺姞鍏ャ€? };
 
   for (const player of room.players) {
-    if (!player.characterId) return { ok: false, reason: `${player.name}尚未选择角色。` };
-    const ch = CHARACTERS[player.characterId];
-    if (!ch) return { ok: false, reason: `${player.name}角色无效。` };
+    if (!player.characterId) return { ok: false, reason: `${player.name}灏氭湭閫夋嫨瑙掕壊銆俙 };
+    const ch = CharacterRegistry[player.characterId];
+    if (!ch) return { ok: false, reason: `${player.name}瑙掕壊鏃犳晥銆俙 };
     if (!player.auroraDiceId) {
-      return { ok: false, reason: `${player.name}尚未装备曜彩骰。` };
+      return { ok: false, reason: `${player.name}灏氭湭瑁呭鏇滃僵楠般€俙 };
     }
   }
 
@@ -149,3 +149,4 @@ module.exports = {
   createNewRoomPlayer,
   pushEffectEvent,
 };
+
