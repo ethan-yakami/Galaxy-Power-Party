@@ -1,4 +1,4 @@
-﻿const WebSocket = require('ws');
+const WebSocket = require('ws');
 const { CharacterRegistry, AuroraRegistry } = require('./registry');
 
 function send(ws, payload) {
@@ -10,60 +10,60 @@ function send(ws, payload) {
 function sanitizeRoom(room, viewerPlayerId) {
   const game = room.game
     ? {
-        status: room.game.status,
-        round: room.game.round,
-        attackerId: room.game.attackerId,
-        defenderId: room.game.defenderId,
-        phase: room.game.phase,
-        rerollsLeft: room.game.rerollsLeft,
-        attackDice: room.game.attackDice,
-        defenseDice: room.game.defenseDice,
-        attackSelection: room.game.attackSelection,
-        defenseSelection: room.game.defenseSelection,
-        attackPreviewSelection: room.game.attackPreviewSelection,
+        status:                room.game.status,
+        round:                 room.game.round,
+        attackerId:            room.game.attackerId,
+        defenderId:            room.game.defenderId,
+        phase:                 room.game.phase,
+        rerollsLeft:           room.game.rerollsLeft,
+        attackDice:            room.game.attackDice,
+        defenseDice:           room.game.defenseDice,
+        attackSelection:       room.game.attackSelection,
+        defenseSelection:      room.game.defenseSelection,
+        attackPreviewSelection:  room.game.attackPreviewSelection,
         defensePreviewSelection: room.game.defensePreviewSelection,
-        attackValue: room.game.attackValue,
-        defenseValue: room.game.defenseValue,
-        attackPierce: room.game.attackPierce,
-        lastDamage: room.game.lastDamage,
-        winnerId: room.game.winnerId,
-        log: room.game.log,
-        hp: room.game.hp,
-        maxHp: room.game.maxHp,
-        attackLevel: room.game.attackLevel,
-        defenseLevel: room.game.defenseLevel,
-        auroraUsesRemaining: room.game.auroraUsesRemaining,
-        selectedFourCount: room.game.selectedFourCount,
-        auroraAEffectCount: room.game.auroraAEffectCount,
-        roundAuroraUsed: room.game.roundAuroraUsed,
-        forceField: room.game.forceField,
-        effectEvents: room.game.effectEvents,
-        poison: room.game.poison,
-        resilience: room.game.resilience,
-        thorns: room.game.thorns,
-        power: room.game.power,
-        hackActive: room.game.hackActive,
-        danhengCounterReady: room.game.danhengCounterReady,
-        xilianCumulative: room.game.xilianCumulative,
+        attackValue:           room.game.attackValue,
+        defenseValue:          room.game.defenseValue,
+        attackPierce:          room.game.attackPierce,
+        lastDamage:            room.game.lastDamage,
+        winnerId:              room.game.winnerId,
+        log:                   room.game.log,
+        hp:                    room.game.hp,
+        maxHp:                 room.game.maxHp,
+        attackLevel:           room.game.attackLevel,
+        defenseLevel:          room.game.defenseLevel,
+        auroraUsesRemaining:   room.game.auroraUsesRemaining,
+        selectedFourCount:     room.game.selectedFourCount,
+        auroraAEffectCount:    room.game.auroraAEffectCount,
+        roundAuroraUsed:       room.game.roundAuroraUsed,
+        forceField:            room.game.forceField,
+        effectEvents:          room.game.effectEvents,
+        poison:                room.game.poison,
+        resilience:            room.game.resilience,
+        thorns:                room.game.thorns,
+        power:                 room.game.power,
+        hackActive:            room.game.hackActive,
+        danhengCounterReady:   room.game.danhengCounterReady,
+        xilianCumulative:      room.game.xilianCumulative,
         xilianAscensionActive: room.game.xilianAscensionActive,
-        yaoguangRerollsUsed: room.game.yaoguangRerollsUsed,
+        yaoguangRerollsUsed:   room.game.yaoguangRerollsUsed,
       }
     : null;
 
   return {
-    code: room.code,
-    status: room.status,
+    code:          room.code,
+    status:        room.status,
     waitingReason: room.waitingReason,
     players: room.players.map((p) => {
       const hideLoadout = room.status === 'lobby' && p.id !== viewerPlayerId;
       return {
-        id: p.id,
-        name: p.name,
-        characterId: hideLoadout ? null : p.characterId,
+        id:            p.id,
+        name:          p.name,
+        characterId:   hideLoadout ? null : p.characterId,
         characterName: hideLoadout
-          ? '鏈叕寮€'
+          ? '未公开'
           : (CharacterRegistry[p.characterId] && CharacterRegistry[p.characterId].name) || p.characterId,
-        auroraDiceId: hideLoadout ? null : p.auroraDiceId,
+        auroraDiceId:   hideLoadout ? null : p.auroraDiceId,
         auroraDiceName: hideLoadout
           ? null
           : (AuroraRegistry[p.auroraDiceId] && AuroraRegistry[p.auroraDiceId].name) || null,
@@ -104,14 +104,14 @@ function isAuroraEquipRequired(player) {
 }
 
 function readyToStart(room) {
-  if (room.players.length !== 2) return { ok: false, reason: '绛夊緟鍙︿竴浣嶇帺瀹跺姞鍏ャ€? };
+  if (room.players.length !== 2) return { ok: false, reason: '等待另一位玩家加入。' };
 
   for (const player of room.players) {
-    if (!player.characterId) return { ok: false, reason: `${player.name}灏氭湭閫夋嫨瑙掕壊銆俙 };
+    if (!player.characterId) return { ok: false, reason: `${player.name}尚未选择角色。` };
     const ch = CharacterRegistry[player.characterId];
-    if (!ch) return { ok: false, reason: `${player.name}瑙掕壊鏃犳晥銆俙 };
+    if (!ch) return { ok: false, reason: `${player.name}角色无效。` };
     if (!player.auroraDiceId) {
-      return { ok: false, reason: `${player.name}灏氭湭瑁呭鏇滃僵楠般€俙 };
+      return { ok: false, reason: `${player.name}尚未装备曜彩骰。` };
     }
   }
 
@@ -120,10 +120,10 @@ function readyToStart(room) {
 
 function createNewRoomPlayer(ws, name) {
   return {
-    id: ws.playerId,
+    id:           ws.playerId,
     ws,
     name,
-    characterId: 'xiadie',
+    characterId:  'xiadie',
     auroraDiceId: null,
   };
 }
@@ -149,4 +149,3 @@ module.exports = {
   createNewRoomPlayer,
   pushEffectEvent,
 };
-

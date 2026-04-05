@@ -1,9 +1,13 @@
-const CharacterHooks = require('./characterHooks');
-const AuroraHooks = require('./auroraHooks');
+const {
+  triggerCharacterHook,
+  triggerAuroraOnAttack,
+  triggerAuroraOnDefense,
+  canUseAurora: _canUseAurora,
+} = require('./registry');
 const { getPlayerById, pushEffectEvent } = require('./rooms');
 
 function canUseAurora(player, game, role) {
-  return AuroraHooks.canUse(player, game, role);
+  return _canUseAurora(player, game, role);
 }
 
 function triggerAuroraA(game, actorId) {
@@ -14,14 +18,14 @@ function applyAuroraAEffectOnAttack(room, game, attacker, selectedDice) {
   const auroraDie = selectedDice.find((d) => d.isAurora && d.hasA);
   if (!auroraDie) return;
   triggerAuroraA(game, attacker.id);
-  AuroraHooks.triggerAEffectOnAttack(game, attacker, auroraDie, room);
+  triggerAuroraOnAttack(game, attacker, auroraDie, room);
 }
 
 function applyAuroraAEffectOnDefense(room, game, defender, selectedDice) {
   const auroraDie = selectedDice.find((d) => d.isAurora && d.hasA);
   if (!auroraDie) return;
   triggerAuroraA(game, defender.id);
-  AuroraHooks.triggerAEffectOnDefense(game, defender, auroraDie, room);
+  triggerAuroraOnDefense(game, defender, auroraDie, room);
 }
 
 function applyAscension(room, game, player, selectedDice) {
@@ -38,7 +42,6 @@ function applyAscension(room, game, player, selectedDice) {
   for (const d of selectedDice) {
     if (d.value < minDie.value) minDie = d;
   }
-
   minDie.value = minDie.maxValue;
   minDie.label = minDie.hasA ? `${minDie.value}A` : `${minDie.value}`;
   game.log.push(`${player.name}触发【跃升】，将最小点骰子提升到最大值${minDie.maxValue}。`);
@@ -100,7 +103,7 @@ function checkGameOver(room, game) {
   if (game.hp[p1.id] <= 0 || game.hp[p2.id] <= 0) {
     room.status = 'ended';
     game.status = 'ended';
-    game.phase = 'ended';
+    game.phase  = 'ended';
     if (game.hp[p1.id] <= 0 && game.hp[p2.id] <= 0) {
       game.winnerId = game.attackerId;
       game.log.push('双方同时归零，判定当前攻击方获胜。');
@@ -117,11 +120,11 @@ function checkGameOver(room, game) {
 }
 
 function applyCharacterAttackSkill(room, game, attacker, selectedDice) {
-  CharacterHooks.trigger('onAttackConfirm', game, attacker, selectedDice, room);
+  triggerCharacterHook('onAttackConfirm', attacker, game, attacker, selectedDice, room);
 }
 
 function applyXiadieDefendPassives(room, game, defender, attacker, appliedHitValues) {
-  CharacterHooks.trigger('onDamageApplied', game, defender, attacker, appliedHitValues, room);
+  triggerCharacterHook('onDamageApplied', defender, game, defender, attacker, appliedHitValues, room);
 }
 
 function calcHits(game) {

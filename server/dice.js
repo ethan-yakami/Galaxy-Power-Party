@@ -1,5 +1,4 @@
-﻿const { AuroraRegistry } = require('./registry');
-
+﻿
 function newNormalDie(value, sides, slotId) {
   return {
     value,
@@ -24,6 +23,7 @@ function makeNormalDiceFromPool(diceSides) {
 }
 
 function rollAuroraFace(auroraId) {
+  const { AuroraRegistry } = require('./registry');
   const aurora = AuroraRegistry[auroraId];
   const face = aurora.faces[Math.floor(Math.random() * aurora.faces.length)];
   const maxValue = aurora.faces.reduce((acc, f) => (f.value > acc ? f.value : acc), 0);
@@ -171,4 +171,5 @@ module.exports = {
   areAllValuesSix,
   upgradeSide,
 };
+
 

@@ -188,7 +188,7 @@ h1 {
   background: rgba(8, 24, 76, 0.8);
   color: #d6e8ff;
   padding: 5px 11px;
-  font-size: 13px;
+  font-size: 16px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -399,7 +399,7 @@ button.danger {
 }
 
 .playerLoadout {
-  font-size: 13px;
+  font-size: 16px;
   color: var(--text-soft);
 }
 
@@ -437,14 +437,14 @@ button.danger {
 .selectionSummary p {
   margin: 0;
   color: #d4e6ff;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.4;
 }
 
 .confirmHint {
   margin: 0;
   color: #9fc5ff;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.4;
 }
 
@@ -887,7 +887,7 @@ button.danger {
 
 .auroraDesc p {
   margin: 0;
-  font-size: 13px;
+  font-size: 16px;
   color: #c5dcff;
   line-height: 1.45;
 }
@@ -933,14 +933,14 @@ button.danger {
   left: 0;
   right: auto;
   top: calc(100% + 4px);
-  min-width: 220px;
+  min-width: 250px;
   max-width: 340px;
   border: 1px solid rgba(133, 178, 255, 0.6);
   border-radius: 10px;
   padding: 8px 10px;
   background: rgba(7, 19, 65, 0.97);
   color: #cee3ff;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.4;
   z-index: 110;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -1104,7 +1104,7 @@ button.danger {
 }
 
 .docNote {
-  font-size: 13px;
+  font-size: 16px;
   color: #9fbfff;
 }
 

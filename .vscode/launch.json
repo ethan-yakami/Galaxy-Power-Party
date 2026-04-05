@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "attach",
+            "name": "连接到 Antigravity (9333)",
+            "port": 9333,
+            "webRoot": "${workspaceFolder}"
+        }
+    ]
+}

@@ -4,7 +4,7 @@ const http = require('http');
 const path = require('path');
 const WebSocket = require('ws');
 
-const { getCharacterSummary, getAuroraDiceSummary } = require('./server/characters');
+const { getCharacterSummary, getAuroraDiceSummary } = require('./server/registry');
 const { send } = require('./server/rooms');
 const createHandlers = require('./server/handlers');
 

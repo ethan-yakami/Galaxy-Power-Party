@@ -1,5 +1,5 @@
 const CharacterHooks = require('./characterHooks');
-const { CHARACTERS, AURORA_DICE } = require('./characters');
+const { CharacterRegistry, AuroraRegistry, triggerCharacterHook } = require('./registry');
 const {
   makeNormalDiceFromPool,
   rollAuroraFace,
@@ -65,8 +65,8 @@ function startGameIfReady(room) {
   const first = Math.random() < 0.5 ? p1 : p2;
   const second = first.id === p1.id ? p2 : p1;
 
-  const c1 = CHARACTERS[p1.characterId];
-  const c2 = CHARACTERS[p2.characterId];
+  const c1 = CharacterRegistry[p1.characterId];
+  const c2 = CharacterRegistry[p2.characterId];
 
   room.status = 'in_game';
   room.waitingReason = '';
@@ -288,7 +288,7 @@ function handleChooseCharacter(ws, msg) {
   if (room.status !== 'lobby') return send(ws, { type: 'error', message: '游戏已开始，不能更换角色。' });
 
   const characterId = msg.characterId;
-  if (!CHARACTERS[characterId]) return send(ws, { type: 'error', message: '无效角色。' });
+  if (!CharacterRegistry[characterId]) return send(ws, { type: 'error', message: '无效角色。' });
 
   const me = getPlayerById(room, ws.playerId);
   if (!me) return;
@@ -307,11 +307,11 @@ function handleChooseAurora(ws, msg) {
   const me = getPlayerById(room, ws.playerId);
   if (!me) return;
 
-  const ch = CHARACTERS[me.characterId];
+  const ch = CharacterRegistry[me.characterId];
   if (!ch) return;
 
   const auroraId = msg.auroraDiceId;
-  if (!AURORA_DICE[auroraId]) return send(ws, { type: 'error', message: '无效曜彩骰。' });
+  if (!AuroraRegistry[auroraId]) return send(ws, { type: 'error', message: '无效曜彩骰。' });
 
   me.auroraDiceId = auroraId;
   startGameIfReady(room);
@@ -401,7 +401,7 @@ function handleUseAurora(ws) {
   game.auroraUsesRemaining[me.id] -= 1;
   game.roundAuroraUsed[me.id] = true;
 
-  game.log.push(`${me.name}使用曜彩骰【${AURORA_DICE[me.auroraDiceId].name}】，投出 ${die.label}。`);
+  game.log.push(`${me.name}使用曜彩骰【${AuroraRegistry[me.auroraDiceId].name}】，投出 ${die.label}。`);
   broadcastRoom(room);
 }
 
@@ -432,7 +432,7 @@ function handleRerollAttack(ws, msg) {
   game.attackPreviewSelection = [];
   game.rerollsLeft -= 1;
 
-  CharacterHooks.trigger('onReroll', game, attacker);
+  triggerCharacterHook('onReroll', attacker, game, attacker);
 
   game.log.push(`${attacker.name}重投${indices.length}枚攻击骰，结果：${diceToText(game.attackDice)}（剩余重投${game.rerollsLeft}次）`);
   broadcastRoom(room);
@@ -471,7 +471,7 @@ function handleConfirmAttack(ws, msg) {
   game.attackPreviewSelection = indices.slice();
   game.attackValue = sumByIndices(game.attackDice, indices);
 
-  CharacterHooks.trigger('onMainAttackConfirm', game, attacker, selectedDice, room);
+  triggerCharacterHook('onMainAttackConfirm', attacker, game, attacker, selectedDice, room);
 
   if (checkGameOver(room, game)) {
     broadcastRoom(room);
@@ -495,7 +495,7 @@ function handleRollDefense(ws) {
 
   const defender = getPlayerById(room, game.defenderId);
 
-  CharacterHooks.trigger('onDefenseRoll', game, defender);
+  triggerCharacterHook('onDefenseRoll', defender, game, defender);
 
   game.defenseDice = makeNormalDiceFromPool(game.diceSidesByPlayer[defender.id]);
   sortDice(game.defenseDice);
@@ -529,7 +529,7 @@ function goNextRound(room, game, newAttacker, newDefender) {
   }
 
   for (const p of room.players) {
-    CharacterHooks.trigger('onRoundEnd', game, p);
+    triggerCharacterHook('onRoundEnd', p, game, p);
   }
 
   game.round += 1;
@@ -595,13 +595,13 @@ function handleConfirmDefense(ws, msg) {
 
   applyAscension(room, game, defender, selectedDice);
 
-  CharacterHooks.trigger('onDefenseConfirm', game, defender, selectedDice, room);
+  triggerCharacterHook('onDefenseConfirm', defender, game, defender, selectedDice, room);
 
   game.defenseSelection = indices;
   game.defensePreviewSelection = indices.slice();
   game.defenseValue = sumByIndices(game.defenseDice, indices);
 
-  CharacterHooks.trigger('onMainDefenseConfirm', game, defender, selectedDice, room);
+  triggerCharacterHook('onMainDefenseConfirm', defender, game, defender, selectedDice, room);
 
   applyAuroraAEffectOnDefense(room, game, defender, selectedDice);
   applyHackEffects(game, attacker, defender);
@@ -686,10 +686,10 @@ function handleConfirmDefense(ws, msg) {
   applyXiadieDefendPassives(room, game, defender, attacker, cappedHits);
 
   // Trigger attacker's post-damage hooks
-  CharacterHooks.trigger('onAttackAfterDamageResolved', game, attacker, totalDamage);
+  triggerCharacterHook('onAttackAfterDamageResolved', attacker, game, attacker, totalDamage);
 
   // Trigger defender's post-damage hooks
-  CharacterHooks.trigger('onAfterDamageResolved', game, defender, attacker, totalDamage);
+  triggerCharacterHook('onAfterDamageResolved', defender, game, defender, attacker, totalDamage);
 
   // Cactus counter resolution (Generic counter mechanics)
   if (game.counterActive[defender.id]) {
