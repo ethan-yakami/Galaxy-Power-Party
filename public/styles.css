@@ -1108,6 +1108,33 @@ button.danger {
   color: #9fbfff;
 }
 
+.customCharacterCard {
+  width: min(92vw, 680px);
+}
+
+.customCharacterForm {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.customCharacterForm label {
+  display: grid;
+  gap: 6px;
+}
+
+.customCharacterForm select,
+.customCharacterForm input {
+  width: 100%;
+  border: 1px solid rgba(146, 187, 255, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 16, 56, 0.9);
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 15px;
+  outline: none;
+}
+
 .fxLayer {
   position: fixed;
   inset: 0;

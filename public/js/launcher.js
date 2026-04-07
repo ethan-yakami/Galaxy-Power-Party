@@ -4,6 +4,7 @@
   const createBtn = document.getElementById('createBtn');
   const joinBtn = document.getElementById('joinBtn');
   const aiBtn = document.getElementById('aiBtn');
+  const workshopBtn = document.getElementById('workshopBtn');
   const messageEl = document.getElementById('launcherMessage');
 
   function setMessage(text, isError) {
@@ -39,6 +40,22 @@
     } catch {}
   }
 
+  function openWorkshopPage() {
+    const url = `${location.origin}/workshop.html`;
+    const win = window.open(url, '_blank', 'noopener');
+
+    if (!win) {
+      setMessage('浏览器拦截了新标签页，已在当前页跳转。');
+      location.href = url;
+      return;
+    }
+
+    setMessage('已打开角色工坊，可创建全局可选的自定义角色。');
+    try {
+      win.focus();
+    } catch {}
+  }
+
   if (createBtn) {
     createBtn.onclick = () => {
       openBattlePage('create', getPlayerName());
@@ -59,6 +76,12 @@
         return;
       }
       openBattlePage('join', getPlayerName(), code);
+    };
+  }
+
+  if (workshopBtn) {
+    workshopBtn.onclick = () => {
+      openWorkshopPage();
     };
   }
 })();

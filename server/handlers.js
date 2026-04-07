@@ -1,5 +1,4 @@
-const CharacterHooks = require('./characterHooks');
-const { CharacterRegistry, AuroraRegistry, triggerCharacterHook } = require('./registry');
+const { CharacterRegistry, AuroraRegistry, triggerCharacterHook, saveCustomVariant } = require('./registry');
 const {
   makeNormalDiceFromPool,
   rollAuroraFace,
@@ -43,6 +42,80 @@ const {
   reRandomizeAIPlayer,
   scheduleAIAction,
 } = require('./ai');
+
+const ALLOWED_VARIANT_OVERRIDE_KEYS = new Set([
+  'hp',
+  'diceSides',
+  'auroraUses',
+  'attackLevel',
+  'defenseLevel',
+  'maxAttackRerolls',
+]);
+
+function toInteger(value) {
+  if (typeof value === 'number' && Number.isInteger(value)) return value;
+  if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) return Number(value.trim());
+  return null;
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseOverrides(rawOverrides) {
+  if (!isPlainObject(rawOverrides)) {
+    return { ok: false, error: 'overrides 必须是对象。', overrides: null };
+  }
+
+  const overrides = {};
+  const keys = Object.keys(rawOverrides);
+  if (keys.length === 0) {
+    return { ok: false, error: '至少需要填写一个覆写字段。', overrides: null };
+  }
+
+  for (const key of keys) {
+    if (!ALLOWED_VARIANT_OVERRIDE_KEYS.has(key)) {
+      return { ok: false, error: `不允许覆写字段：${key}`, overrides: null };
+    }
+
+    if (key === 'diceSides') {
+      const sides = rawOverrides.diceSides;
+      if (!Array.isArray(sides) || sides.length === 0) {
+        return { ok: false, error: 'diceSides 必须是非空数组。', overrides: null };
+      }
+      const normalizedSides = [];
+      for (const side of sides) {
+        const parsed = toInteger(side);
+        if (!parsed || parsed < 2) {
+          return { ok: false, error: `diceSides 含有非法面值：${side}`, overrides: null };
+        }
+        normalizedSides.push(parsed);
+      }
+      overrides.diceSides = normalizedSides;
+      continue;
+    }
+
+    const parsed = toInteger(rawOverrides[key]);
+    if (parsed === null) {
+      return { ok: false, error: `${key} 必须是整数。`, overrides: null };
+    }
+
+    if (key === 'hp' || key === 'attackLevel' || key === 'defenseLevel') {
+      if (parsed <= 0) {
+        return { ok: false, error: `${key} 必须大于 0。`, overrides: null };
+      }
+      overrides[key] = parsed;
+      continue;
+    }
+
+    if (parsed < 0) {
+      return { ok: false, error: `${key} 不能小于 0。`, overrides: null };
+    }
+    overrides[key] = parsed;
+  }
+
+  return { ok: true, error: '', overrides };
+}
 
 module.exports = function createHandlers(rooms) {
 
@@ -318,6 +391,70 @@ function handleChooseAurora(ws, msg) {
   broadcastRoom(room);
 }
 
+function handleCreateCustomCharacter(ws, msg) {
+  const rawVariant = msg && msg.variant;
+  if (!isPlainObject(rawVariant)) {
+    send(ws, { type: 'error', message: '自定义角色参数无效。' });
+    return false;
+  }
+
+  const id = typeof rawVariant.id === 'string' ? rawVariant.id.trim() : '';
+  if (!id || !/^[a-z0-9_]{3,40}$/.test(id)) {
+    send(ws, { type: 'error', message: '角色 ID 必须是 3-40 位小写字母/数字/下划线。' });
+    return false;
+  }
+  if (CharacterRegistry[id]) {
+    send(ws, { type: 'error', message: `角色 ID 已存在：${id}` });
+    return false;
+  }
+
+  const baseCharacterId = typeof rawVariant.baseCharacterId === 'string'
+    ? rawVariant.baseCharacterId.trim()
+    : '';
+  if (!baseCharacterId || !CharacterRegistry[baseCharacterId]) {
+    send(ws, { type: 'error', message: `母角色不存在：${baseCharacterId || '(空)'}` });
+    return false;
+  }
+  if (CharacterRegistry[baseCharacterId].isCustomVariant) {
+    send(ws, { type: 'error', message: '母角色必须是原版角色，不能再以自定义变体为母本。' });
+    return false;
+  }
+
+  const overrideResult = parseOverrides(rawVariant.overrides);
+  if (!overrideResult.ok) {
+    send(ws, { type: 'error', message: overrideResult.error });
+    return false;
+  }
+
+  const name = typeof rawVariant.name === 'string' && rawVariant.name.trim()
+    ? rawVariant.name.trim().slice(0, 40)
+    : `${CharacterRegistry[baseCharacterId].name} 变体`;
+
+  const variantToSave = {
+    id,
+    baseCharacterId,
+    name,
+    overrides: overrideResult.overrides,
+    enabled: rawVariant.enabled !== false,
+  };
+
+  try {
+    saveCustomVariant(variantToSave);
+  } catch (err) {
+    console.error('[Error] saveCustomVariant:', err);
+    send(ws, { type: 'error', message: '保存自定义角色失败，请检查服务端日志。' });
+    return false;
+  }
+
+  send(ws, {
+    type: 'custom_character_created',
+    characterId: id,
+    baseCharacterId,
+    name,
+  });
+  return true;
+}
+
 function handleRollAttack(ws) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
@@ -331,7 +468,8 @@ function handleRollAttack(ws) {
 
   game.attackDice = makeNormalDiceFromPool(game.diceSidesByPlayer[attacker.id]);
   sortDice(game.attackDice);
-  game.rerollsLeft = attacker.characterId === 'yaoguang' ? 4 : 2;
+  const attackerCharacter = CharacterRegistry[attacker.characterId];
+  game.rerollsLeft = attackerCharacter ? attackerCharacter.maxAttackRerolls : 2;
   game.attackSelection = null;
   game.attackPreviewSelection = [];
   game.attackValue = null;
@@ -416,15 +554,21 @@ function handleRerollAttack(ws, msg) {
 
   const attacker = getPlayerById(room, game.attackerId);
   const indices = msg.indices;
+  const uniqueIndices = [];
+  const seen = new Set();
 
   if (!Array.isArray(indices)) return send(ws, { type: 'error', message: '重投参数无效。' });
   for (const idx of indices) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= game.attackDice.length) {
       return send(ws, { type: 'error', message: '重投索引无效。' });
     }
+    if (!seen.has(idx)) {
+      seen.add(idx);
+      uniqueIndices.push(idx);
+    }
   }
 
-  for (const idx of indices) {
+  for (const idx of uniqueIndices) {
     game.attackDice[idx] = rerollOneDie(game.attackDice[idx], attacker);
   }
 
@@ -434,7 +578,7 @@ function handleRerollAttack(ws, msg) {
 
   triggerCharacterHook('onReroll', attacker, game, attacker);
 
-  game.log.push(`${attacker.name}重投${indices.length}枚攻击骰，结果：${diceToText(game.attackDice)}（剩余重投${game.rerollsLeft}次）`);
+  game.log.push(`${attacker.name}重投${uniqueIndices.length}枚攻击骰，结果：${diceToText(game.attackDice)}（剩余重投${game.rerollsLeft}次）`);
   broadcastRoom(room);
 }
 
@@ -472,6 +616,7 @@ function handleConfirmAttack(ws, msg) {
   game.attackValue = sumByIndices(game.attackDice, indices);
 
   triggerCharacterHook('onMainAttackConfirm', attacker, game, attacker, selectedDice, room);
+  applyAuroraAEffectOnAttack(room, game, attacker, selectedDice);
 
   if (checkGameOver(room, game)) {
     broadcastRoom(room);
@@ -834,6 +979,7 @@ return {
   handleJoinRoom,
   handleChooseCharacter,
   handleChooseAurora,
+  handleCreateCustomCharacter,
   handleRollAttack,
   handleUseAurora,
   handleRerollAttack,

@@ -6,9 +6,13 @@ module.exports = {
   auroraUses:   2,
   attackLevel:  3,
   defenseLevel: 2,
+  maxAttackRerolls: 2,
   skillText:    '累计攻防值超过24后，攻击等级变为5，此后每回合获得跃升',
 
   hooks: {
+    shouldAscend(game, player) {
+      return !!game.xilianAscensionActive[player.id];
+    },
     onMainAttackConfirm(game, attacker) {
       game.xilianCumulative[attacker.id] += game.attackValue;
       if (!game.xilianAscensionActive[attacker.id] && game.xilianCumulative[attacker.id] > 24) {

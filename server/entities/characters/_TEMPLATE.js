@@ -42,6 +42,10 @@
  *   onRoundEnd(game, player)
  *     Called at end of round for EVERY player (attacker and defender).
  *
+ *   shouldAscend(game, player) -> boolean
+ *     Optional centralized ascension check hook.
+ *     Return true to enable applyAscension() for this selection.
+ *
  *   aiScoreAttackCombo(dice, indices, game, playerId) → number
  *     Return a numeric bonus score for this attack combination.
  *     Higher = AI prefers it. Typical range: 0–50.
@@ -62,6 +66,7 @@ module.exports = {
   hp:           30,
   diceSides:    [6, 6, 6, 4, 4],  // Array of die faces (length = dice pool size)
   auroraUses:   2,
+  maxAttackRerolls: 2, // Max rerolls available in attack phase
   attackLevel:  3,    // How many dice the attacker picks
   defenseLevel: 3,    // How many dice the defender picks
   skillText:    '技能描述文字（显示在大厅和游戏内）',

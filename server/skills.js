@@ -1,5 +1,6 @@
 const {
   triggerCharacterHook,
+  characterShouldAscend,
   triggerAuroraOnAttack,
   triggerAuroraOnDefense,
   canUseAurora: _canUseAurora,
@@ -29,13 +30,7 @@ function applyAuroraAEffectOnDefense(room, game, defender, selectedDice) {
 }
 
 function applyAscension(room, game, player, selectedDice) {
-  let shouldAscend = false;
-  if (player.characterId === 'daheita' && (game.auroraAEffectCount[player.id] || 0) >= 4) {
-    shouldAscend = true;
-  }
-  if (player.characterId === 'xilian' && game.xilianAscensionActive[player.id]) {
-    shouldAscend = true;
-  }
+  const shouldAscend = characterShouldAscend(player, game);
   if (!shouldAscend || !selectedDice.length) return;
 
   let minDie = selectedDice[0];

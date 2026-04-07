@@ -360,6 +360,22 @@
         setConnectionState('failed', '服务器返回错误。', msg.message || errorText);
         GPP.showErrorToast(msg.message || '发生错误');
         GPP.render();
+        return;
+      }
+
+      if (msg.type === 'custom_character_created') {
+        const createdName = msg.name || msg.characterId || '自定义角色';
+        const toast = `已创建角色：${createdName}`;
+        setMessage(toast);
+        return;
+      }
+
+      if (msg.type === 'characters_updated') {
+        state.characters = {};
+        (msg.characters || []).forEach((c) => {
+          state.characters[c.id] = c;
+        });
+        GPP.render();
       }
     };
   }
@@ -424,6 +440,10 @@
 
   if (dom.docBtn) {
     dom.docBtn.onclick = () => GPP.showDocModal();
+  }
+
+  if (dom.createVariantBtn) {
+    dom.createVariantBtn.onclick = () => GPP.showCustomCharacterModal();
   }
 
   if (dom.backToLauncherBtn) {

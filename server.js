@@ -55,6 +55,14 @@ let nextPlayerId = 1;
 
 const handlers = createHandlers(rooms);
 
+function broadcastCharacterCatalog() {
+  const payload = {
+    type: 'characters_updated',
+    characters: getCharacterSummary(),
+  };
+  wss.clients.forEach((client) => send(client, payload));
+}
+
 wss.on('connection', (ws) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
@@ -115,6 +123,17 @@ wss.on('connection', (ws) => {
           handlers.handleChooseAurora(ws, msg);
         } catch (err) {
           console.error('[Error] handleChooseAurora:', err);
+          send(ws, { type: 'error', message: '服务发生内部错误。' });
+        }
+        break;
+      case 'create_custom_character':
+        try {
+          const created = handlers.handleCreateCustomCharacter(ws, msg);
+          if (created) {
+            broadcastCharacterCatalog();
+          }
+        } catch (err) {
+          console.error('[Error] handleCreateCustomCharacter:', err);
           send(ws, { type: 'error', message: '服务发生内部错误。' });
         }
         break;
@@ -199,7 +218,7 @@ wss.on('connection', (ws) => {
         }
         break;
       default:
-        send(ws, { type: 'error', message: `未知消息类型: ${msg.type}` });
+        send(ws, { type: 'error', message: '未知消息类型。' });
     }
   });
 

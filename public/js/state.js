@@ -59,6 +59,7 @@ const dom = {
   lobbyControls: document.getElementById('lobbyControls'),
   selectionSummary: document.getElementById('selectionSummary'),
   confirmLoadoutBtn: document.getElementById('confirmLoadoutBtn'),
+  createVariantBtn: document.getElementById('createVariantBtn'),
   confirmHint: document.getElementById('confirmHint'),
   gameArea: document.getElementById('gameArea'),
   roundInfo: document.getElementById('roundInfo'),

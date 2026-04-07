@@ -9,6 +9,14 @@ function aiDelay() {
 function randomChoice(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
+
+function getAiCharacterPool() {
+  const baseOnly = Object.values(CharacterRegistry)
+    .filter((c) => !c.isCustomVariant)
+    .map((c) => c.id);
+  if (baseOnly.length > 0) return baseOnly;
+  return Object.keys(CharacterRegistry);
+}
 // Generate all combinations of k items from [0..n-1]
 function combinations(n, k) {
   const results = [];
@@ -34,8 +42,7 @@ function createAIPlayer(roomCode) {
     isAI: true,
     readyState: -1, // Not WebSocket.OPEN, so send() will skip
   };
-  const charIds = Object.keys(CharacterRegistry);
-  const charId = randomChoice(charIds);
+  const charId = randomChoice(getAiCharacterPool());
   
   const auroraIds = Object.keys(AuroraRegistry);
   const auroraId = randomChoice(auroraIds);
@@ -48,8 +55,7 @@ function createAIPlayer(roomCode) {
   };
 }
 function reRandomizeAIPlayer(player) {
-  const charIds = Object.keys(CharacterRegistry);
-  player.characterId = randomChoice(charIds);
+  player.characterId = randomChoice(getAiCharacterPool());
   
   player.auroraDiceId = randomChoice(Object.keys(AuroraRegistry));
 }

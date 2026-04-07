@@ -6,6 +6,7 @@ module.exports = {
   auroraUses:   2,
   attackLevel:  3,
   defenseLevel: 2,
+  maxAttackRerolls: 4,
   skillText:    '攻击4次重投；超过2次后每次重投+2层荆棘；攻击>=18移除荆棘+1曜彩次数',
 
   hooks: {

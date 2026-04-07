@@ -233,6 +233,255 @@
     overlay.classList.remove('hidden');
   }
 
+  function getBaseCharacterList() {
+    return Object.keys(state.characters)
+      .map((id) => state.characters[id])
+      .filter((c) => !c.isCustomVariant)
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-Hans-CN'));
+  }
+
+  function suggestVariantId(baseCharacterId) {
+    const prefix = `${baseCharacterId}_v`;
+    let maxN = 1;
+    Object.keys(state.characters).forEach((id) => {
+      if (!id.startsWith(prefix)) return;
+      const suffix = id.slice(prefix.length);
+      const n = Number(suffix);
+      if (Number.isInteger(n) && n >= maxN) {
+        maxN = n + 1;
+      }
+    });
+    return `${prefix}${maxN}`;
+  }
+
+  function parseDiceSidesInput(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return null;
+    const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return null;
+    const values = [];
+    for (const p of parts) {
+      if (!/^-?\d+$/.test(p)) return null;
+      const n = Number(p);
+      if (!Number.isInteger(n) || n < 2) return null;
+      values.push(n);
+    }
+    return values;
+  }
+
+  function getCustomCharacterOverlay() {
+    let overlay = document.getElementById('customCharacterOverlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'customCharacterOverlay';
+    overlay.className = 'docOverlay hidden';
+
+    const card = document.createElement('div');
+    card.className = 'docCard customCharacterCard';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'docCloseBtn';
+    closeBtn.type = 'button';
+    closeBtn.textContent = '关闭';
+    closeBtn.onclick = () => overlay.classList.add('hidden');
+
+    const title = document.createElement('h2');
+    title.textContent = '新建自定义角色';
+
+    const intro = document.createElement('p');
+    intro.className = 'docNote';
+    intro.textContent = '继承母角色机制，只调整数值面板（HP、骰子、攻防等级、曜彩次数、攻击重投上限）。';
+
+    const form = document.createElement('form');
+    form.id = 'customCharacterForm';
+    form.className = 'customCharacterForm';
+
+    form.innerHTML = [
+      '<label>母角色',
+      '  <select id="ccBaseCharacterId"></select>',
+      '</label>',
+      '<label>新角色 ID（小写字母/数字/下划线）',
+      '  <input id="ccVariantId" type="text" maxlength="40" placeholder="yaoguang_v2" />',
+      '</label>',
+      '<label>显示名称',
+      '  <input id="ccVariantName" type="text" maxlength="40" placeholder="曜光 v2" />',
+      '</label>',
+      '<label>HP',
+      '  <input id="ccHp" type="number" min="1" step="1" />',
+      '</label>',
+      '<label>普通骰面（逗号分隔）',
+      '  <input id="ccDiceSides" type="text" placeholder="8,8,6,6,4" />',
+      '</label>',
+      '<label>曜彩使用次数',
+      '  <input id="ccAuroraUses" type="number" min="0" step="1" />',
+      '</label>',
+      '<label>攻击等级',
+      '  <input id="ccAttackLevel" type="number" min="1" step="1" />',
+      '</label>',
+      '<label>防御等级',
+      '  <input id="ccDefenseLevel" type="number" min="1" step="1" />',
+      '</label>',
+      '<label>攻击阶段可重投次数',
+      '  <input id="ccMaxAttackRerolls" type="number" min="0" step="1" />',
+      '</label>',
+      '<div class="actions">',
+      '  <button id="ccSubmitBtn" class="primaryBtn" type="submit">保存自定义角色</button>',
+      '</div>',
+    ].join('');
+
+    card.appendChild(closeBtn);
+    card.appendChild(title);
+    card.appendChild(intro);
+    card.appendChild(form);
+    overlay.appendChild(card);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) overlay.classList.add('hidden');
+    };
+    document.body.appendChild(overlay);
+
+    const baseSelect = form.querySelector('#ccBaseCharacterId');
+    const idInput = form.querySelector('#ccVariantId');
+    const nameInput = form.querySelector('#ccVariantName');
+    const hpInput = form.querySelector('#ccHp');
+    const diceInput = form.querySelector('#ccDiceSides');
+    const auroraInput = form.querySelector('#ccAuroraUses');
+    const attackInput = form.querySelector('#ccAttackLevel');
+    const defenseInput = form.querySelector('#ccDefenseLevel');
+    const rerollInput = form.querySelector('#ccMaxAttackRerolls');
+
+    const fillByBase = () => {
+      const base = state.characters[baseSelect.value];
+      if (!base) return;
+      hpInput.value = String(base.hp);
+      diceInput.value = (base.diceSides || []).join(',');
+      auroraInput.value = String(base.auroraUses);
+      attackInput.value = String(base.attackLevel);
+      defenseInput.value = String(base.defenseLevel);
+      rerollInput.value = String(base.maxAttackRerolls === undefined ? 2 : base.maxAttackRerolls);
+
+      if (!idInput.value.trim()) {
+        idInput.value = suggestVariantId(base.id);
+      }
+      if (!nameInput.value.trim()) {
+        nameInput.value = `${base.name} 变体`;
+      }
+    };
+
+    baseSelect.onchange = () => {
+      idInput.value = '';
+      nameInput.value = '';
+      fillByBase();
+    };
+
+    form.onsubmit = (event) => {
+      event.preventDefault();
+
+      const base = state.characters[baseSelect.value];
+      if (!base) {
+        showErrorToast('母角色无效，请重新选择。');
+        return;
+      }
+
+      const variantId = String(idInput.value || '').trim();
+      if (!/^[a-z0-9_]{3,40}$/.test(variantId)) {
+        showErrorToast('角色 ID 需要 3-40 位小写字母/数字/下划线。');
+        return;
+      }
+
+      const hp = Number.parseInt(hpInput.value, 10);
+      const auroraUses = Number.parseInt(auroraInput.value, 10);
+      const attackLevel = Number.parseInt(attackInput.value, 10);
+      const defenseLevel = Number.parseInt(defenseInput.value, 10);
+      const maxAttackRerolls = Number.parseInt(rerollInput.value, 10);
+      const diceSides = parseDiceSidesInput(diceInput.value);
+
+      if (!Number.isInteger(hp) || hp <= 0) return showErrorToast('HP 必须是大于 0 的整数。');
+      if (!Number.isInteger(auroraUses) || auroraUses < 0) return showErrorToast('曜彩次数必须是非负整数。');
+      if (!Number.isInteger(attackLevel) || attackLevel <= 0) return showErrorToast('攻击等级必须是大于 0 的整数。');
+      if (!Number.isInteger(defenseLevel) || defenseLevel <= 0) return showErrorToast('防御等级必须是大于 0 的整数。');
+      if (!Number.isInteger(maxAttackRerolls) || maxAttackRerolls < 0) return showErrorToast('重投次数必须是非负整数。');
+      if (!diceSides) return showErrorToast('骰面格式无效，请使用类似 8,8,6,6,4 的写法。');
+
+      const overrides = {};
+      if (hp !== base.hp) overrides.hp = hp;
+      if ((base.diceSides || []).join(',') !== diceSides.join(',')) overrides.diceSides = diceSides;
+      if (auroraUses !== base.auroraUses) overrides.auroraUses = auroraUses;
+      if (attackLevel !== base.attackLevel) overrides.attackLevel = attackLevel;
+      if (defenseLevel !== base.defenseLevel) overrides.defenseLevel = defenseLevel;
+      if (maxAttackRerolls !== (base.maxAttackRerolls === undefined ? 2 : base.maxAttackRerolls)) {
+        overrides.maxAttackRerolls = maxAttackRerolls;
+      }
+
+      if (!Object.keys(overrides).length) {
+        showErrorToast('请至少修改一项数值后再保存。');
+        return;
+      }
+
+      send('create_custom_character', {
+        variant: {
+          id: variantId,
+          baseCharacterId: base.id,
+          name: String(nameInput.value || '').trim() || `${base.name} 变体`,
+          overrides,
+        },
+      });
+
+      overlay.classList.add('hidden');
+    };
+  }
+
+  function showCustomCharacterModal() {
+    const baseCharacters = getBaseCharacterList();
+    if (!baseCharacters.length) {
+      showErrorToast('角色数据尚未加载完成，请稍后重试。');
+      return;
+    }
+
+    const overlay = getCustomCharacterOverlay();
+    const form = document.getElementById('customCharacterForm');
+    if (!form) return;
+
+    const baseSelect = form.querySelector('#ccBaseCharacterId');
+    const idInput = form.querySelector('#ccVariantId');
+    const nameInput = form.querySelector('#ccVariantName');
+    const hpInput = form.querySelector('#ccHp');
+    const diceInput = form.querySelector('#ccDiceSides');
+    const auroraInput = form.querySelector('#ccAuroraUses');
+    const attackInput = form.querySelector('#ccAttackLevel');
+    const defenseInput = form.querySelector('#ccDefenseLevel');
+    const rerollInput = form.querySelector('#ccMaxAttackRerolls');
+
+    baseSelect.innerHTML = '';
+    baseCharacters.forEach((c) => {
+      const op = document.createElement('option');
+      op.value = c.id;
+      op.textContent = `${c.name} (${c.id})`;
+      baseSelect.appendChild(op);
+    });
+
+    const me = findPlayer(state.me);
+    const selectedId = state.ui.pendingCharacterId || (me && me.characterId) || baseCharacters[0].id;
+    const selectedCharacter = state.characters[selectedId];
+    const selectedBase = selectedCharacter && selectedCharacter.isCustomVariant
+      ? selectedCharacter.baseCharacterId
+      : selectedId;
+    const fallbackBase = baseCharacters[0].id;
+    baseSelect.value = baseCharacters.some((c) => c.id === selectedBase) ? selectedBase : fallbackBase;
+
+    const base = state.characters[baseSelect.value] || baseCharacters[0];
+    idInput.value = suggestVariantId(base.id);
+    nameInput.value = `${base.name} 变体`;
+    hpInput.value = String(base.hp);
+    diceInput.value = (base.diceSides || []).join(',');
+    auroraInput.value = String(base.auroraUses);
+    attackInput.value = String(base.attackLevel);
+    defenseInput.value = String(base.defenseLevel);
+    rerollInput.value = String(base.maxAttackRerolls === undefined ? 2 : base.maxAttackRerolls);
+
+    overlay.classList.remove('hidden');
+  }
+
   // --- Glossary tooltip system ---
 
   const GLOSSARY = {
@@ -308,6 +557,7 @@
     hideWinnerOverlay,
     showErrorToast,
     showDocModal,
+    showCustomCharacterModal,
     wrapGlossaryTerms,
     charTooltipHtml,
     auroraTooltipHtml,

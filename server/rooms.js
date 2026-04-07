@@ -100,7 +100,10 @@ function getPlayerById(room, playerId) {
 }
 
 function isAuroraEquipRequired(player) {
-  return true;
+  if (!player || !player.characterId) return true;
+  const ch = CharacterRegistry[player.characterId];
+  if (!ch) return true;
+  return ch.auroraUses > 0;
 }
 
 function readyToStart(room) {
@@ -110,7 +113,7 @@ function readyToStart(room) {
     if (!player.characterId) return { ok: false, reason: `${player.name}尚未选择角色。` };
     const ch = CharacterRegistry[player.characterId];
     if (!ch) return { ok: false, reason: `${player.name}角色无效。` };
-    if (!player.auroraDiceId) {
+    if (isAuroraEquipRequired(player) && !player.auroraDiceId) {
       return { ok: false, reason: `${player.name}尚未装备曜彩骰。` };
     }
   }
