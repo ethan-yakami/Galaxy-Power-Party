@@ -1,1 +1,4 @@
-Galaxy Power Party server running at http://localhost:3000
+Galaxy Power Party server running
+Bind: 0.0.0.0:3050
+Local: http://localhost:3050
+LAN: http://198.18.0.1:3050

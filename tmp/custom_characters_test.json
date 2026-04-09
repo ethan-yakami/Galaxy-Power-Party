@@ -1,0 +1,218 @@
+{
+  "variants": [
+    {
+      "id": "xiadie_test_238559",
+      "baseCharacterId": "xiadie",
+      "name": "Xiadie Test",
+      "overrides": {
+        "hp": 29,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "xiadie_test_277727",
+      "baseCharacterId": "xiadie",
+      "name": "Xiadie Test",
+      "overrides": {
+        "hp": 29,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "xiadie_test_036816",
+      "baseCharacterId": "xiadie",
+      "name": "Xiadie Test",
+      "overrides": {
+        "hp": 29,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_base_036824",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 28
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_dup_036826",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 29
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_reload_036830",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 31,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "xiadie_test_957443",
+      "baseCharacterId": "xiadie",
+      "name": "Xiadie Test",
+      "overrides": {
+        "hp": 29,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_base_957451",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 28
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_dup_957453",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 29
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_reload_957455",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 31,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "xiadie_test_124041",
+      "baseCharacterId": "xiadie",
+      "name": "Xiadie Test",
+      "overrides": {
+        "hp": 29,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_base_124047",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 28
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_dup_124049",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 29
+      },
+      "enabled": true
+    },
+    {
+      "id": "custom_reload_124050",
+      "baseCharacterId": "xiadie",
+      "name": "遐蝶 变体",
+      "overrides": {
+        "hp": 31,
+        "attackLevel": 4,
+        "defenseLevel": 3,
+        "auroraUses": 2,
+        "maxAttackRerolls": 2,
+        "diceSides": [
+          8,
+          8,
+          6,
+          6,
+          4
+        ]
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -333,6 +333,16 @@
         return;
       }
 
+      if (msg.type === 'weather_changed') {
+        const weatherPayload = msg.weather || null;
+        const display = GPP.getWeatherDisplay({
+          round: Number.isInteger(msg.round) ? msg.round : (state.room && state.room.game ? state.room.game.round : 1),
+          weather: weatherPayload,
+        });
+        GPP.showWeatherBroadcast(display);
+        return;
+      }
+
       if (msg.type === 'left_room') {
         state.pendingAction = null;
         state.room = null;
@@ -444,6 +454,10 @@
 
   if (dom.createVariantBtn) {
     dom.createVariantBtn.onclick = () => GPP.showCustomCharacterModal();
+  }
+
+  if (dom.weatherGuideBtn) {
+    dom.weatherGuideBtn.onclick = () => GPP.showGuideModal('weather');
   }
 
   if (dom.backToLauncherBtn) {

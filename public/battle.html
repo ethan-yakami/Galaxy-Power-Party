@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>银河战力党 · 战斗页</title>
-    <link rel="stylesheet" href="styles.css?v=20260403" />
+    <link rel="stylesheet" href="styles.css?v=20260408d" />
   </head>
   <body>
     <div class="bgLayer" aria-hidden="true">
@@ -63,12 +63,14 @@
           <aside class="panel roomSide">
             <h3>房间成员</h3>
             <ul id="playersList" class="playersList"></ul>
+            <section id="weatherStatusCard" class="weatherStatusCard hidden" aria-live="polite"></section>
 
             <div id="lobbyControls" class="lobbyStage">
               <div id="selectionSummary" class="selectionSummary"></div>
               <div class="actions">
                 <button id="confirmLoadoutBtn" class="primaryBtn" type="button">确认当前选择</button>
                 <button id="createVariantBtn" class="secondaryBtn" type="button">新建自定义角色</button>
+                <button id="weatherGuideBtn" class="secondaryBtn" type="button">天气与机制</button>
               </div>
               <p id="confirmHint" class="confirmHint"></p>
               <p id="lobbyHint" class="lobbyHint">等待双方完成配置...</p>
@@ -92,6 +94,7 @@
             <div class="panel battleTop">
               <p id="roundInfo" class="roundInfo"></p>
               <p id="turnInfo" class="turnInfo"></p>
+              <div id="weatherBanner" class="weatherBanner hidden" aria-live="polite"></div>
             </div>
 
             <div class="battleMain">
@@ -115,11 +118,11 @@
       </section>
     </main>
 
-    <script src="js/state.js?v=20260403"></script>
-    <script src="js/ui.js?v=20260403"></script>
-    <script src="js/effects.js?v=20260403"></script>
-    <script src="js/dice-ui.js?v=20260403"></script>
-    <script src="js/render.js?v=20260403"></script>
-    <script src="js/connection.js?v=20260403"></script>
+    <script src="js/state.js?v=20260408d"></script>
+    <script src="js/ui.js?v=20260408d"></script>
+    <script src="js/effects.js?v=20260408d"></script>
+    <script src="js/dice-ui.js?v=20260408d"></script>
+    <script src="js/render.js?v=20260408d"></script>
+    <script src="js/connection.js?v=20260408d"></script>
   </body>
 </html>

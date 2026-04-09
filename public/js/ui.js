@@ -233,6 +233,536 @@
     overlay.classList.remove('hidden');
   }
 
+  const WEATHER_STAGE_ORDER = [2, 4, 6, 8];
+  const WEATHER_TYPE_CLASS = {
+    '坚守': 'guard',
+    '助力': 'assist',
+    '进攻': 'offense',
+    '逆转': 'reverse',
+  };
+  const weatherGuideData = {
+    introRules: [
+      '第1回合无天气。',
+      '在回合2/4/6/8开始前切换天气。',
+      '每个阶段会从对应候选池随机生效1个天气。',
+      '本面板用于规则介绍，是否已上线以当前对局引擎为准。',
+    ],
+    stages: {
+      2: [
+        {
+          name: '霜',
+          type: '坚守',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '攻击方本次选骰包含相同点数。',
+          effect: '下回合其防御等级 +1（阶段性临时修正）。',
+        },
+        {
+          name: '青蛙雨',
+          type: '助力',
+          timing: '掷骰阶段',
+          condition: '任一方掷骰结果出现最小值。',
+          effect: '双方所有骰子都不会出现最小值。',
+        },
+        {
+          name: '细雪',
+          type: '坚守',
+          timing: '回合开始（onRoundStart）',
+          condition: '攻击方上一攻击回合未进行重投。',
+          effect: '获得3层仅下回合可用的韧性。',
+        },
+        {
+          name: '鱼雨',
+          type: '助力',
+          timing: '攻击确认/防守确认',
+          condition: '任一方完成攻击或防守选骰确认。',
+          effect: '双方当前回合额外获得1次重投机会。',
+        },
+        {
+          name: '幻日',
+          type: '进攻',
+          timing: '重投动作触发',
+          condition: '当前天气为幻日且执行重投。',
+          effect: '额外提供2次重投机会；每次重投都会施加2层荆棘。',
+        },
+        {
+          name: '飓风',
+          type: '进攻',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '任一方完成攻击选骰确认。',
+          effect: '该次攻击获得1次连击。',
+        },
+        {
+          name: '雨夹雪',
+          type: '助力',
+          timing: '回合开始（onRoundStart）',
+          condition: '生命值不为满的玩家。',
+          effect: '获得反击准备，并使防御等级 +2（阶段性临时修正）。',
+        },
+        {
+          name: '日食',
+          type: '进攻',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '本次选中的骰子包含不同点数。',
+          effect: '攻击值 +4。',
+        },
+        {
+          name: '雷雨',
+          type: '助力',
+          timing: '攻击确认/防守确认',
+          condition: '攻击确认时作用攻方，防守确认时作用守方。',
+          effect: '攻击方攻击值 +4，防守方防御值 +4。',
+        },
+      ],
+      4: [
+        {
+          name: '暴雪',
+          type: '坚守',
+          timing: '防守确认后（onDefenseSelect）',
+          condition: '防御方本次防御值 < 8。',
+          effect: '防御方本回合获得力场。',
+        },
+        {
+          name: '烈日',
+          type: '进攻',
+          timing: '伤害结算后（onAfterDamageResolved）',
+          condition: '本次造成了有效伤害。',
+          effect: '触发虹吸：回复 floor(伤害*0.5) 的生命值，不超过最大生命值。',
+        },
+        {
+          name: '酸雨',
+          type: '助力',
+          timing: '回合开始（onRoundStart）',
+          condition: '场上生命值更多的一方（平血不触发）。',
+          effect: '附加1层中毒。',
+        },
+        {
+          name: '高温',
+          type: '进攻',
+          timing: '回合开始（onRoundStart）',
+          condition: '场上生命值更少的一方。',
+          effect: '获得2层力量，持续到本次天气结束。',
+        },
+        {
+          name: '暴雨',
+          type: '逆转',
+          timing: '阶段切入（onStageEnter）',
+          condition: '进入回合4阶段时。',
+          effect: '双方攻击等级 +1，防御等级 +1（阶段性临时修正）。',
+        },
+        {
+          name: '中雪',
+          type: '坚守',
+          timing: '攻击确认/防守确认',
+          condition: '本次选骰包含3个相同点数。',
+          effect: '治愈10点生命值（不超过最大生命值）。',
+        },
+        {
+          name: '大雪',
+          type: '坚守',
+          timing: '攻击确认/防守确认',
+          condition: '本次选骰中包含7。',
+          effect: '攻击值/防御值 +4。',
+        },
+        {
+          name: '沙尘',
+          type: '进攻',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '攻击方本次选骰点数全为奇数。',
+          effect: '攻击方获得3层力量。',
+        },
+      ],
+      6: [
+        {
+          name: '云海',
+          type: '助力',
+          timing: '阶段切入（onStageEnter）',
+          condition: '切入本天气时。',
+          effect: '双方获得1次曜彩骰使用次数。',
+        },
+        {
+          name: '彩虹',
+          type: '进攻',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '攻击值 <= 10。',
+          effect: '本次攻击获得洞穿。',
+        },
+        {
+          name: '干旱',
+          type: '进攻',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '根据对方当前防御等级计算。',
+          effect: '每一级防御等级为攻击方附加3点攻击值。',
+        },
+        {
+          name: '日月同辉',
+          type: '逆转',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '攻击方当前生命值 <= 3。',
+          effect: '攻击值翻倍。',
+        },
+        {
+          name: '云隙光',
+          type: '进攻',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '生命值更少的玩家执行攻击（同血不触发）。',
+          effect: '该次攻击获得连击。',
+        },
+        {
+          name: '时空暴',
+          type: '逆转',
+          timing: '伤害结算后（onAfterDamageResolved）',
+          condition: '攻击方本次选骰点数全为6。',
+          effect: '本次结算后双方生命值互换。',
+        },
+        {
+          name: '晴天雨',
+          type: '进攻',
+          timing: '掷骰阶段',
+          condition: '防守方掷骰时。',
+          effect: '防守方骰子无法掷出最大值。',
+        },
+      ],
+      8: [
+        {
+          name: '晴',
+          type: '进攻',
+          timing: '阶段切入（onStageEnter）',
+          condition: '切入本天气时。',
+          effect: '双方获得5层力量，持续到本次天气结束。',
+        },
+        {
+          name: '晴雷',
+          type: '逆转',
+          timing: '攻击确认后（onAttackSelect）',
+          condition: '攻击方完成攻击选骰确认。',
+          effect: '直接造成3点瞬伤。',
+        },
+        {
+          name: '毒雾',
+          type: '逆转',
+          timing: '阶段切入（onStageEnter）',
+          condition: '切入本天气时。',
+          effect: '双方附加2层中毒。',
+        },
+      ],
+    },
+  };
+
+  const mechanicGuideSeed = [
+    { term: '中毒', timing: '回合结算后 / 回合推进' },
+    { term: '荆棘', timing: '伤害结算前' },
+    { term: '力量', timing: '攻击值计算阶段' },
+    { term: '韧性', timing: '防守值计算阶段' },
+    { term: '反击', timing: '防守值 > 攻击值时' },
+    { term: '反击准备', timing: '获得状态后的下一次防守' },
+    { term: '洞穿', timing: '攻击伤害结算阶段' },
+    { term: '力场', timing: '受击结算阶段（非洞穿伤害）' },
+    { term: '连击', timing: '本次攻击结算后追加一段攻击' },
+    { term: '瞬伤', timing: '技能或天气即时触发' },
+    { term: '命定', timing: '攻击/防守选骰确认时' },
+    { term: '超载', timing: '攻击确认与防守确认阶段' },
+    { term: '不屈', timing: '受到致命伤害时（本回合）' },
+    { term: '背水', timing: '主动发动时立即生效' },
+    {
+      term: '虹吸',
+      timing: '伤害结算后（onAfterDamageResolved）',
+      description: '造成伤害后，回复伤害值的50%（向下取整），且不会超过最大生命值。',
+    },
+  ];
+
+  const WEATHER_SHORT_EFFECT_MAP = {
+    frost: '若攻击选骰含同点数，下回合防御等级+1。',
+    frog_rain: '所有骰子不会掷出最小值。',
+    light_snow: '攻击回合未重投时，下回合获得3层临时韧性。',
+    fish_rain: '攻防确认时双方各额外获得1次重投机会。',
+    illusion_sun: '额外+2次重投，但每次重投附加2层荆棘。',
+    gale: '攻击确认时获得1次连击。',
+    sleet: '非满血玩家回合开始时获得反击且防御等级+2。',
+    eclipse: '攻击选骰含不同点数时，攻击值+4。',
+    thunder_rain: '攻击方攻击值+4，防守方防御值+4。',
+    blizzard: '防守值<8时，本回合获得力场。',
+    scorching_sun: '造成伤害后，回复伤害值50%（向下取整）。',
+    acid_rain: '每回合对当前生命更高方附加1层中毒。',
+    high_temp: '每回合生命更低方获得2层力量（阶段内有效）。',
+    heavy_rain: '阶段开始双方攻击等级+1、防御等级+1。',
+    mid_snow: '攻防选骰含3同点时，回复10点生命。',
+    big_snow: '攻防选骰含7时，攻击值/防御值+4。',
+    sandstorm: '攻击选骰全奇数时，获得3层力量。',
+    cloud_sea: '阶段切换时双方各获得1次曜彩骰次数。',
+    rainbow: '攻击值<=10时，本次攻击获得洞穿。',
+    drought: '按对方防御等级每级附加3点攻击值。',
+    sun_moon: '攻击方生命值<=3时，攻击值翻倍。',
+    sunbeam: '生命更低方攻击时获得连击。',
+    spacetime_storm: '攻击选骰全6时，伤害后双方生命互换。',
+    sunny_rain: '防守方骰子无法掷出最大值。',
+    clear: '阶段切换时双方获得5层力量。',
+    clear_thunder: '攻击确认时直接造成3点瞬伤。',
+    toxic_fog: '阶段切换时双方附加2层中毒。',
+  };
+
+  let weatherBroadcastTimer = null;
+  let weatherBroadcastHideTimer = null;
+
+  function normalizeGuideTab(tab) {
+    return tab === 'mechanic' || tab === 'mechanics' ? 'mechanic' : 'weather';
+  }
+
+  function normalizeGuideStage(value) {
+    const n = Number.parseInt(value, 10);
+    return WEATHER_STAGE_ORDER.includes(n) ? n : WEATHER_STAGE_ORDER[0];
+  }
+
+  function getWeatherStageRoundByRound(round) {
+    if (round >= 8) return 8;
+    if (round >= 6) return 6;
+    if (round >= 4) return 4;
+    if (round >= 2) return 2;
+    return 0;
+  }
+
+  function getWeatherDisplay(game) {
+    const round = game && Number.isInteger(game.round) ? game.round : 1;
+    const weather = game && game.weather ? game.weather : null;
+    const stageRound = weather && Number.isInteger(weather.stageRound) && weather.stageRound > 0
+      ? weather.stageRound
+      : getWeatherStageRoundByRound(round);
+    const weatherId = weather && typeof weather.weatherId === 'string' ? weather.weatherId : null;
+
+    if (!weatherId) {
+      return {
+        id: null,
+        name: '无天气',
+        type: '-',
+        typeClass: 'assist',
+        stageRound,
+        effect: round <= 1 ? '第1回合天气不生效。' : '本阶段天气缺失，按无天气处理。',
+        isNone: true,
+      };
+    }
+
+    const type = weather.weatherType || '助力';
+    return {
+      id: weatherId,
+      name: weather.weatherName || weatherId,
+      type,
+      typeClass: WEATHER_TYPE_CLASS[type] || 'assist',
+      stageRound,
+      effect: WEATHER_SHORT_EFFECT_MAP[weatherId] || '效果待同步，请查看天气与机制。',
+      isNone: false,
+    };
+  }
+
+  function getWeatherBroadcastNode() {
+    let node = document.getElementById('weatherBroadcast');
+    if (node) return node;
+
+    node = document.createElement('div');
+    node.id = 'weatherBroadcast';
+    node.className = 'weatherBroadcast hidden';
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function hideWeatherBroadcast(node) {
+    if (!node) return;
+    node.classList.remove('show');
+    if (weatherBroadcastHideTimer) clearTimeout(weatherBroadcastHideTimer);
+    weatherBroadcastHideTimer = setTimeout(() => {
+      node.classList.add('hidden');
+      weatherBroadcastHideTimer = null;
+    }, 180);
+  }
+
+  function showWeatherBroadcast(display) {
+    if (!display) return;
+    const node = getWeatherBroadcastNode();
+    const text = display.isNone
+      ? '天气切换：无天气｜第1回合天气不生效。'
+      : `天气切换：${display.name}｜${display.effect}`;
+
+    if (weatherBroadcastTimer) clearTimeout(weatherBroadcastTimer);
+    if (weatherBroadcastHideTimer) {
+      clearTimeout(weatherBroadcastHideTimer);
+      weatherBroadcastHideTimer = null;
+    }
+
+    node.textContent = text;
+    node.classList.remove('hidden');
+    requestAnimationFrame(() => node.classList.add('show'));
+
+    weatherBroadcastTimer = setTimeout(() => {
+      hideWeatherBroadcast(node);
+      weatherBroadcastTimer = null;
+    }, 2000);
+  }
+
+  function getMechanicGuideData() {
+    return mechanicGuideSeed.map((entry) => ({
+      term: entry.term,
+      timing: entry.timing,
+      description: entry.description || GLOSSARY[entry.term] || '待补充定义。',
+    }));
+  }
+
+  function buildWeatherGuideSection(activeStage) {
+    const stage = normalizeGuideStage(activeStage);
+    const cards = weatherGuideData.stages[stage] || [];
+    const stageTabsHtml = WEATHER_STAGE_ORDER.map((round) => {
+      const count = (weatherGuideData.stages[round] || []).length;
+      const activeClass = round === stage ? ' active' : '';
+      return `<button type="button" class="guideStageTab${activeClass}" data-guide-stage="${round}">回合${round}（${count}）</button>`;
+    }).join('');
+
+    const cardsHtml = cards.map((card) => {
+      const typeClass = WEATHER_TYPE_CLASS[card.type] || 'assist';
+      return [
+        '<article class="weatherGuideCard">',
+        `  <header class="weatherGuideCardHead"><h4>${escapeHtml(card.name)}</h4><span class="weatherTypeTag weatherType-${typeClass}">${escapeHtml(card.type)}</span></header>`,
+        '  <dl class="weatherGuideMeta">',
+        `    <div><dt>触发时机</dt><dd>${wrapGlossaryTerms(card.timing)}</dd></div>`,
+        `    <div><dt>条件</dt><dd>${wrapGlossaryTerms(card.condition)}</dd></div>`,
+        `    <div><dt>效果</dt><dd>${wrapGlossaryTerms(card.effect)}</dd></div>`,
+        '  </dl>',
+        '</article>',
+      ].join('');
+    }).join('');
+
+    return [
+      '<section class="guideSection">',
+      '  <div class="guideRuleBox">',
+      '    <h3>天气规则总览</h3>',
+      `    <ul>${weatherGuideData.introRules.map((rule) => `<li>${escapeHtml(rule)}</li>`).join('')}</ul>`,
+      '  </div>',
+      `  <div class="guideStageTabs">${stageTabsHtml}</div>`,
+      `  <p class="guideStageHint">当前展示：回合${stage}天气候选池，共${cards.length}张。</p>`,
+      `  <div class="weatherGuideGrid">${cardsHtml}</div>`,
+      '</section>',
+    ].join('');
+  }
+
+  function buildMechanicGuideSection() {
+    const items = getMechanicGuideData();
+    const rows = items.map((entry) => [
+      '<article class="mechanicGuideCard">',
+      `  <h4>${escapeHtml(entry.term)}</h4>`,
+      `  <p class="mechanicGuideTiming"><b>触发时机：</b>${escapeHtml(entry.timing)}</p>`,
+      `  <p>${wrapGlossaryTerms(entry.description)}</p>`,
+      '</article>',
+    ].join('')).join('');
+
+    return [
+      '<section class="guideSection">',
+      '  <div class="guideRuleBox">',
+      '    <h3>机制词典</h3>',
+      '    <p>以下术语与战斗页 tooltip 保持同源定义，用于快速理解状态、结算和触发时机。</p>',
+      '  </div>',
+      `  <div class="mechanicGuideGrid">${rows}</div>`,
+      '</section>',
+    ].join('');
+  }
+
+  function buildGuideModalContent(activeTab, activeStage) {
+    const tab = normalizeGuideTab(activeTab);
+    const topTabsHtml = [
+      `<button type="button" class="guideTopTab${tab === 'weather' ? ' active' : ''}" data-guide-tab="weather">天气介绍</button>`,
+      `<button type="button" class="guideTopTab${tab === 'mechanic' ? ' active' : ''}" data-guide-tab="mechanic">机制介绍</button>`,
+    ].join('');
+
+    return [
+      `<div class="guideTopTabs">${topTabsHtml}</div>`,
+      tab === 'weather' ? buildWeatherGuideSection(activeStage) : buildMechanicGuideSection(),
+    ].join('');
+  }
+
+  function closeGuideModal() {
+    const overlay = document.getElementById('guideOverlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+
+  function renderGuideModal(overlay) {
+    if (!overlay) return;
+    const activeTab = normalizeGuideTab(overlay.dataset.activeTab);
+    const activeStage = normalizeGuideStage(overlay.dataset.activeStage);
+
+    overlay.dataset.activeTab = activeTab;
+    overlay.dataset.activeStage = String(activeStage);
+
+    const content = overlay.querySelector('#guideContent');
+    if (content) {
+      content.innerHTML = buildGuideModalContent(activeTab, activeStage);
+    }
+  }
+
+  function getGuideOverlay() {
+    let overlay = document.getElementById('guideOverlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'guideOverlay';
+    overlay.className = 'docOverlay hidden';
+    overlay.dataset.activeTab = 'weather';
+    overlay.dataset.activeStage = String(WEATHER_STAGE_ORDER[0]);
+
+    const card = document.createElement('div');
+    card.className = 'docCard guideCard';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'docCloseBtn';
+    closeBtn.type = 'button';
+    closeBtn.textContent = '关闭';
+    closeBtn.onclick = closeGuideModal;
+
+    const title = document.createElement('h2');
+    title.className = 'guideTitle';
+    title.textContent = '天气与机制';
+
+    const content = document.createElement('div');
+    content.id = 'guideContent';
+    content.className = 'guideContent';
+
+    card.appendChild(closeBtn);
+    card.appendChild(title);
+    card.appendChild(content);
+    overlay.appendChild(card);
+
+    overlay.onclick = (event) => {
+      if (event.target === overlay) closeGuideModal();
+    };
+
+    card.onclick = (event) => {
+      const tabBtn = event.target.closest('[data-guide-tab]');
+      if (tabBtn) {
+        overlay.dataset.activeTab = tabBtn.getAttribute('data-guide-tab') || 'weather';
+        renderGuideModal(overlay);
+        return;
+      }
+
+      const stageBtn = event.target.closest('[data-guide-stage]');
+      if (stageBtn) {
+        overlay.dataset.activeStage = stageBtn.getAttribute('data-guide-stage') || String(WEATHER_STAGE_ORDER[0]);
+        renderGuideModal(overlay);
+      }
+    };
+
+    const onEsc = (event) => {
+      if (event.key === 'Escape' && !overlay.classList.contains('hidden')) {
+        closeGuideModal();
+      }
+    };
+    document.addEventListener('keydown', onEsc);
+
+    document.body.appendChild(overlay);
+    return overlay;
+  }
+
+  function showGuideModal(defaultTab) {
+    const overlay = getGuideOverlay();
+    overlay.dataset.activeTab = normalizeGuideTab(defaultTab || overlay.dataset.activeTab);
+    overlay.dataset.activeStage = String(normalizeGuideStage(overlay.dataset.activeStage));
+    renderGuideModal(overlay);
+    overlay.classList.remove('hidden');
+  }
+
   function getBaseCharacterList() {
     return Object.keys(state.characters)
       .map((id) => state.characters[id])
@@ -557,6 +1087,9 @@
     hideWinnerOverlay,
     showErrorToast,
     showDocModal,
+    showGuideModal,
+    getWeatherDisplay,
+    showWeatherBroadcast,
     showCustomCharacterModal,
     wrapGlossaryTerms,
     charTooltipHtml,

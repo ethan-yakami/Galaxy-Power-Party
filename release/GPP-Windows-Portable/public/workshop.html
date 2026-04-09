@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>银河战力党 · 角色工坊</title>
+    <link rel="stylesheet" href="workshop.css?v=20260406" />
+  </head>
+  <body>
+    <div class="workshopBg" aria-hidden="true">
+      <div class="workshopGlow workshopGlowA"></div>
+      <div class="workshopGlow workshopGlowB"></div>
+    </div>
+
+    <main class="workshopShell">
+      <section class="workshopCard">
+        <div class="workshopHead">
+          <div>
+            <p class="workshopSub">GALAXY POWER PARTY</p>
+            <h1>角色工坊</h1>
+            <p class="workshopDesc">创建“机制不变、仅改数值”的自定义角色。创建成功后联机房间会实时刷新角色列表。</p>
+          </div>
+          <div class="workshopHeadActions">
+            <button id="backBtn" type="button">返回启动台</button>
+            <button id="reconnectBtn" type="button">重连工坊</button>
+          </div>
+        </div>
+
+        <div class="statusBar">
+          <span id="connBadge" class="badge">连接中</span>
+          <span id="playerIdBadge" class="badge muted">玩家ID：-</span>
+        </div>
+
+        <form id="workshopForm" class="workshopForm">
+          <label>
+            母角色（原版）
+            <select id="baseCharacterId"></select>
+          </label>
+
+          <label>
+            新角色 ID（3-40位：小写字母/数字/下划线）
+            <input id="variantId" maxlength="40" placeholder="yaoguang_v3" />
+          </label>
+
+          <label>
+            显示名称
+            <input id="variantName" maxlength="40" placeholder="曜光 v3" />
+          </label>
+
+          <label>
+            HP
+            <input id="hp" type="number" min="1" step="1" />
+          </label>
+
+          <label>
+            普通骰面（逗号分隔）
+            <input id="diceSides" placeholder="8,8,6,6,4" />
+          </label>
+
+          <label>
+            曜彩使用次数
+            <input id="auroraUses" type="number" min="0" step="1" />
+          </label>
+
+          <label>
+            攻击等级
+            <input id="attackLevel" type="number" min="1" step="1" />
+          </label>
+
+          <label>
+            防御等级
+            <input id="defenseLevel" type="number" min="1" step="1" />
+          </label>
+
+          <label>
+            攻击阶段重投上限
+            <input id="maxAttackRerolls" type="number" min="0" step="1" />
+          </label>
+
+          <div class="actions">
+            <button id="submitBtn" class="primaryBtn" type="submit">保存自定义角色</button>
+          </div>
+        </form>
+
+        <p id="workshopMessage" class="workshopMessage">等待连接服务端...</p>
+        <pre id="basePreview" class="previewBox"></pre>
+      </section>
+    </main>
+
+    <script src="js/workshop.js?v=20260406"></script>
+  </body>
+</html>

@@ -2,6 +2,7 @@ const express = require('express');
 const compression = require('compression');
 const http = require('http');
 const path = require('path');
+const os = require('os');
 const WebSocket = require('ws');
 
 const { getCharacterSummary, getAuroraDiceSummary } = require('./server/registry');
@@ -16,7 +17,8 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('[Global Error] Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 const app = express();
 app.use(compression());
@@ -227,7 +229,41 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => {
+function getLanIPv4() {
+  const interfaces = os.networkInterfaces();
+  for (const values of Object.values(interfaces)) {
+    if (!Array.isArray(values)) continue;
+    for (const item of values) {
+      if (!item || item.internal) continue;
+      if (item.family === 'IPv4') return item.address;
+    }
+  }
+  return null;
+}
+
+function getLocalOpenHost(host) {
+  if (host === '0.0.0.0' || host === '::' || host === '::0') return 'localhost';
+  if (host === '::1') return 'localhost';
+  return host;
+}
+
+server.listen(PORT, HOST, () => {
+  const localUrl = `http://${getLocalOpenHost(HOST)}:${PORT}`;
+  const lanIp = getLanIPv4();
+
   // eslint-disable-next-line no-console
-  console.log(`Galaxy Power Party server running at http://localhost:${PORT}`);
+  console.log(`Galaxy Power Party server running`);
+  // eslint-disable-next-line no-console
+  console.log(`Bind: ${HOST}:${PORT}`);
+  // eslint-disable-next-line no-console
+  console.log(`Local: ${localUrl}`);
+  if (HOST === '0.0.0.0' || HOST === '::' || HOST === '::0') {
+    if (lanIp) {
+      // eslint-disable-next-line no-console
+      console.log(`LAN: http://${lanIp}:${PORT}`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log('LAN: IPv4 address not detected');
+    }
+  }
 });

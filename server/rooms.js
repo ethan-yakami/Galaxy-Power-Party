@@ -38,6 +38,7 @@ function sanitizeRoom(room, viewerPlayerId) {
         roundAuroraUsed:       room.game.roundAuroraUsed,
         forceField:            room.game.forceField,
         effectEvents:          room.game.effectEvents,
+        weather:               room.game.weather,
         poison:                room.game.poison,
         resilience:            room.game.resilience,
         thorns:                room.game.thorns,

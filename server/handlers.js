@@ -38,6 +38,18 @@ const {
   calcHits,
 } = require('./skills');
 const {
+  ensureWeatherState,
+  updateWeatherForNewRound,
+  onEndCurrentRound,
+  getAttackRerollBonus,
+  applySingleDieConstraints,
+  applyDiceConstraints,
+  onAttackReroll,
+  onAttackSelect,
+  onDefenseSelect,
+  onAfterDamageResolved,
+} = require('./weather');
+const {
   createAIPlayer,
   reRandomizeAIPlayer,
   scheduleAIAction,
@@ -121,8 +133,30 @@ module.exports = function createHandlers(rooms) {
 
 let _handlerRefs = null;
 
+function buildWeatherChangedPayload(game) {
+  if (!game || !game.weather || !game.weather.weatherId) return null;
+  if (game.weather.enteredAtRound !== game.round) return null;
+  return {
+    type: 'weather_changed',
+    weather: {
+      weatherId: game.weather.weatherId,
+      weatherName: game.weather.weatherName || game.weather.weatherId,
+      weatherType: game.weather.weatherType || '',
+      stageRound: game.weather.stageRound || 0,
+      enteredAtRound: game.weather.enteredAtRound || 0,
+    },
+    round: game.round,
+  };
+}
+
 function broadcastRoom(room) {
   _broadcastRoom(room);
+  if (room.game && room.game.pendingWeatherChanged) {
+    for (const p of room.players) {
+      send(p.ws, room.game.pendingWeatherChanged);
+    }
+    room.game.pendingWeatherChanged = null;
+  }
   if (_handlerRefs) scheduleAIAction(room, rooms, _handlerRefs);
 }
 
@@ -272,8 +306,11 @@ function startGameIfReady(room) {
     extraAttackQueued: false,
     effectEventSeq: 0,
     effectEvents: [],
+    pendingWeatherChanged: null,
     log: [`游戏开始。先手攻击方：${first.name}。`],
   };
+
+  ensureWeatherState(room, room.game);
 }
 
 function leaveRoom(ws) {
@@ -467,9 +504,15 @@ function handleRollAttack(ws) {
   const defender = getPlayerById(room, game.defenderId);
 
   game.attackDice = makeNormalDiceFromPool(game.diceSidesByPlayer[attacker.id]);
+  applyDiceConstraints(room, game, game.attackDice, 'attack');
   sortDice(game.attackDice);
   const attackerCharacter = CharacterRegistry[attacker.characterId];
   game.rerollsLeft = attackerCharacter ? attackerCharacter.maxAttackRerolls : 2;
+  const weatherRerollBonus = getAttackRerollBonus(game);
+  if (weatherRerollBonus > 0) {
+    game.rerollsLeft += weatherRerollBonus;
+    game.log.push(`【天气】${game.weather.weatherName}生效：本回合额外重投+${weatherRerollBonus}。`);
+  }
   game.attackSelection = null;
   game.attackPreviewSelection = [];
   game.attackValue = null;
@@ -493,8 +536,6 @@ function handleRollAttack(ws) {
   game.unyielding[defender.id] = false;
   game.desperateBonus[attacker.id] = 0;
   game.desperateBonus[defender.id] = 0;
-  game.counterActive[attacker.id] = false;
-  game.counterActive[defender.id] = false;
   game.yaoguangRerollsUsed[attacker.id] = 0;
 
   game.phase = 'attack_reroll_or_select';
@@ -526,12 +567,13 @@ function handleUseAurora(ws) {
   if (!verdict.ok) return send(ws, { type: 'error', message: verdict.reason });
 
   const die = rollAuroraFace(me.auroraDiceId);
+  const constrainedDie = applySingleDieConstraints(room, game, die, role);
   if (role === 'attack') {
-    game.attackDice.push(die);
+    game.attackDice.push(constrainedDie);
     sortDice(game.attackDice);
     game.attackPreviewSelection = [];
   } else {
-    game.defenseDice.push(die);
+    game.defenseDice.push(constrainedDie);
     sortDice(game.defenseDice);
     game.defensePreviewSelection = [];
   }
@@ -539,7 +581,7 @@ function handleUseAurora(ws) {
   game.auroraUsesRemaining[me.id] -= 1;
   game.roundAuroraUsed[me.id] = true;
 
-  game.log.push(`${me.name}使用曜彩骰【${AuroraRegistry[me.auroraDiceId].name}】，投出 ${die.label}。`);
+  game.log.push(`${me.name}使用曜彩骰【${AuroraRegistry[me.auroraDiceId].name}】，投出 ${constrainedDie.label}。`);
   broadcastRoom(room);
 }
 
@@ -570,12 +612,14 @@ function handleRerollAttack(ws, msg) {
 
   for (const idx of uniqueIndices) {
     game.attackDice[idx] = rerollOneDie(game.attackDice[idx], attacker);
+    game.attackDice[idx] = applySingleDieConstraints(room, game, game.attackDice[idx], 'attack');
   }
 
   sortDice(game.attackDice);
   game.attackPreviewSelection = [];
   game.rerollsLeft -= 1;
 
+  onAttackReroll(room, game, attacker);
   triggerCharacterHook('onReroll', attacker, game, attacker);
 
   game.log.push(`${attacker.name}重投${uniqueIndices.length}枚攻击骰，结果：${diceToText(game.attackDice)}（剩余重投${game.rerollsLeft}次）`);
@@ -591,6 +635,7 @@ function handleConfirmAttack(ws, msg) {
   if (game.attackerId !== ws.playerId) return;
 
   const attacker = getPlayerById(room, game.attackerId);
+  const defender = getPlayerById(room, game.defenderId);
   const needCount = game.attackLevel[attacker.id];
   const indices = msg.indices;
 
@@ -617,6 +662,7 @@ function handleConfirmAttack(ws, msg) {
 
   triggerCharacterHook('onMainAttackConfirm', attacker, game, attacker, selectedDice, room);
   applyAuroraAEffectOnAttack(room, game, attacker, selectedDice);
+  onAttackSelect(room, game, attacker, defender, selectedDice);
 
   if (checkGameOver(room, game)) {
     broadcastRoom(room);
@@ -643,6 +689,7 @@ function handleRollDefense(ws) {
   triggerCharacterHook('onDefenseRoll', defender, game, defender);
 
   game.defenseDice = makeNormalDiceFromPool(game.diceSidesByPlayer[defender.id]);
+  applyDiceConstraints(room, game, game.defenseDice, 'defense');
   sortDice(game.defenseDice);
 
   game.defenseSelection = null;
@@ -655,6 +702,10 @@ function handleRollDefense(ws) {
 }
 
 function goNextRound(room, game, newAttacker, newDefender) {
+  game.pendingWeatherChanged = null;
+  const endingAttackerId = game.attackerId;
+  onEndCurrentRound(room, game, endingAttackerId);
+
   for (const p of room.players) {
     if (game.poison[p.id] > 0) {
       const opponent = room.players.find((q) => q.id !== p.id);
@@ -708,6 +759,9 @@ function goNextRound(room, game, newAttacker, newDefender) {
   game.counterActive[newDefender.id] = false;
   game.yaoguangRerollsUsed[newAttacker.id] = 0;
   game.yaoguangRerollsUsed[newDefender.id] = 0;
+
+  updateWeatherForNewRound(room, game);
+  game.pendingWeatherChanged = buildWeatherChangedPayload(game);
   game.log.push(`第${game.round}回合开始，攻击方：${newAttacker.name}`);
 }
 
@@ -750,6 +804,7 @@ function handleConfirmDefense(ws, msg) {
 
   applyAuroraAEffectOnDefense(room, game, defender, selectedDice);
   applyHackEffects(game, attacker, defender);
+  onDefenseSelect(room, game, defender, selectedDice);
 
   // Overload (超载) defense self-damage
   if (game.overload[defender.id] > 0) {
@@ -835,6 +890,8 @@ function handleConfirmDefense(ws, msg) {
 
   // Trigger defender's post-damage hooks
   triggerCharacterHook('onAfterDamageResolved', defender, game, defender, attacker, totalDamage);
+
+  onAfterDamageResolved(room, game, attacker, defender, totalDamage);
 
   // Cactus counter resolution (Generic counter mechanics)
   if (game.counterActive[defender.id]) {
@@ -922,7 +979,8 @@ function handlePlayAgain(ws) {
     }
   }
 
-  startGameIfReady(room);
+  // Keep players in lobby after "play again"; do not auto-start.
+  // New match should only start after players re-confirm configuration.
   broadcastRoom(room);
 }
 

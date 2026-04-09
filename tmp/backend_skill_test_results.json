@@ -1,0 +1,688 @@
+{
+  "total": 107,
+  "pass": 107,
+  "fail": 0,
+  "byGroup": {
+    "FLOW-SRV": {
+      "total": 12,
+      "pass": 12,
+      "fail": 0
+    },
+    "CHAR": {
+      "total": 14,
+      "pass": 14,
+      "fail": 0
+    },
+    "AURORA": {
+      "total": 19,
+      "pass": 19,
+      "fail": 0
+    },
+    "WEATHER": {
+      "total": 36,
+      "pass": 36,
+      "fail": 0
+    },
+    "CROSS": {
+      "total": 8,
+      "pass": 8,
+      "fail": 0
+    },
+    "TXT-MIS": {
+      "total": 8,
+      "pass": 8,
+      "fail": 0
+    },
+    "CUSTOM": {
+      "total": 10,
+      "pass": 10,
+      "fail": 0
+    }
+  },
+  "failed": [],
+  "results": [
+    {
+      "testId": "FLOW-SRV-001",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-002",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-003",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-004",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-005",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-006",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-007",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-008",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-009",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-010",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-011",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "FLOW-SRV-012",
+      "group": "FLOW-SRV",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-BAIE",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-DAHEITA",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-DANHENG",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-FENGJIN",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-HUANGQUAN",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-HUOHUA",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-KAFUKA",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-LIUYING",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-SANYUEQI",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-SHAJIN",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-XIADIE",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-XILIAN",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-YAOGUANG",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CHAR-ZHIGENGNIAO",
+      "group": "CHAR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-BERSERKER",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-BIGREDBUTTON",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-CACTUS",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-DESTINY",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-EVOLUTION",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-GAMBLER",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-HEARTBEAT",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-LEGACY",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-LOAN",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-MAGICBULLET",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-MEDIC",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-MIRACLE",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-OATH",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-PRIME",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-REPEATER",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-REVENGE",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-SIXSIX",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-STARSHIELD",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "AURORA-TRICKSTER",
+      "group": "AURORA",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-001",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-002",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-THUNDER-RAIN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-ILLUSION-SUN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CLEAR-THUNDER",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-SCORCHING-SUN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-SUNNY-RAIN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-TOXIC-FOG",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-SPACETIME",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-ORDER-001",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-PIERCE-FORCEFIELD",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-001-DESPERATE",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-002-POWER",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-003-OVERLOAD",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-004-WEATHER-DOC-STATE",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-001-INVALID-ID",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-002-INVALID-OVERRIDE",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-003-VALID-CREATE",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-003",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-004",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-005",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-006",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-007",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-008",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-FLOW-009",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-FROST",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-FROG_RAIN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-LIGHT_SNOW",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-FISH_RAIN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-GALE",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-SLEET",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-ECLIPSE",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-BLIZZARD",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-ACID_RAIN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-HIGH_TEMP",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-HEAVY_RAIN",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-MID_SNOW",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-BIG_SNOW",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-SANDSTORM",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-CLOUD_SEA",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-RAINBOW",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-DROUGHT",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-SUN_MOON",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-SUNBEAM",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "WEATHER-CARD-CLEAR",
+      "group": "WEATHER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-HACK-APPLY",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-UNYIELDING-CAP",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-COUNTER-RESOLVE",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-SPACETIME-GAMEOVER-ORDER",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-POISON-ROUNDEND",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CROSS-STACKING-BOOL",
+      "group": "CROSS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-005-REPEATER-DEFENSE-PATH",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-006-STARSHIELD-ATTACK-PATH",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-007-XILIAN-LOG-TEXT",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "TXT-MIS-008-WEATHER-SPEC-STATE",
+      "group": "TXT-MIS",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-004-INVALID-BASE",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-005-BASE-IS-CUSTOM",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-006-OVERRIDES-NONOBJ",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-007-DICESIDES-INVALID",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-008-POSITIVE-REQUIRED",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-009-DUPLICATE-ID",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "testId": "CUSTOM-010-PERSIST-RELOAD",
+      "group": "CUSTOM",
+      "status": "PASS",
+      "detail": ""
+    }
+  ],
+  "generatedAt": "2026-04-09T11:28:44.053Z"
+}

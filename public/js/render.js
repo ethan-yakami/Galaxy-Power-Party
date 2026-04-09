@@ -93,6 +93,38 @@
     }
   }
 
+  function ensureWeatherAnchors() {
+    if (!dom.weatherStatusCard) {
+      const roomSide = document.querySelector('.roomSide');
+      if (roomSide) {
+        const card = document.createElement('section');
+        card.id = 'weatherStatusCard';
+        card.className = 'weatherStatusCard hidden';
+        card.setAttribute('aria-live', 'polite');
+
+        if (dom.lobbyControls && dom.lobbyControls.parentNode === roomSide) {
+          roomSide.insertBefore(card, dom.lobbyControls);
+        } else {
+          roomSide.appendChild(card);
+        }
+
+        dom.weatherStatusCard = card;
+      }
+    }
+
+    if (!dom.weatherBanner) {
+      const battleTop = document.querySelector('#gameArea .battleTop');
+      if (battleTop) {
+        const banner = document.createElement('div');
+        banner.id = 'weatherBanner';
+        banner.className = 'weatherBanner hidden';
+        banner.setAttribute('aria-live', 'polite');
+        battleTop.appendChild(banner);
+        dom.weatherBanner = banner;
+      }
+    }
+  }
+
   function renderPlayersList(room) {
     dom.playersList.innerHTML = '';
     if (!room || !room.players) return;
@@ -537,6 +569,33 @@
     dom.actionRail.appendChild(actions);
   }
 
+  function renderWeatherPanels(game) {
+    const weatherDisplay = GPP.getWeatherDisplay(game);
+    const typeText = weatherDisplay.type === '-' ? '未生效' : weatherDisplay.type;
+    const typeClass = weatherDisplay.typeClass || 'assist';
+    const stageText = weatherDisplay.stageRound ? `回合${weatherDisplay.stageRound}阶段` : '开局阶段';
+
+    if (dom.weatherStatusCard) {
+      dom.weatherStatusCard.innerHTML = [
+        '<p class="weatherStatusLabel">当前天气</p>',
+        `<div class="weatherStatusHead"><h4>${escapeHtml(weatherDisplay.name)}</h4><span class="weatherTypeTag weatherType-${typeClass}">${escapeHtml(typeText)}</span></div>`,
+        `<p class="weatherStatusMeta">阶段：${escapeHtml(stageText)}</p>`,
+        `<p class="weatherStatusDesc">${escapeHtml(weatherDisplay.effect)}</p>`,
+      ].join('');
+      dom.weatherStatusCard.classList.remove('hidden');
+    }
+
+    if (dom.weatherBanner) {
+      dom.weatherBanner.innerHTML = [
+        '<span class="weatherBannerPrefix">天气</span>',
+        `<span class="weatherBannerName">${escapeHtml(weatherDisplay.name)}</span>`,
+        `<span class="weatherTypeTag weatherType-${typeClass}">${escapeHtml(typeText)}</span>`,
+        `<span class="weatherBannerEffect">${escapeHtml(weatherDisplay.effect)}</span>`,
+      ].join('');
+      dom.weatherBanner.classList.remove('hidden');
+    }
+  }
+
   function renderPlayerZone(game, player, zoneEl, isSelf) {
     zoneEl.innerHTML = '';
     zoneEl.classList.remove('activeTurnZone');
@@ -701,6 +760,8 @@
     dom.connectionPanel.classList.remove('hidden');
     dom.roomPanel.classList.add('hidden');
     dom.msgPanel.classList.remove('hidden');
+    if (dom.weatherStatusCard) dom.weatherStatusCard.classList.add('hidden');
+    if (dom.weatherBanner) dom.weatherBanner.classList.add('hidden');
 
     syncLogDrawer();
   }
@@ -719,6 +780,8 @@
       dom.gameArea.classList.add('hidden');
       dom.lobbyArea.classList.remove('hidden');
       if (dom.lobbyControls) dom.lobbyControls.classList.remove('hidden');
+      if (dom.weatherStatusCard) dom.weatherStatusCard.classList.add('hidden');
+      if (dom.weatherBanner) dom.weatherBanner.classList.add('hidden');
 
       const me = GPP.findPlayer(state.me);
       ensurePendingLoadout(me);
@@ -743,6 +806,7 @@
 
     dom.roundInfo.textContent = `第 ${game.round} 回合 · ${getPhaseLabel(game.phase)}`;
     dom.turnInfo.textContent = `攻击方：${attacker ? attacker.name : '-'} ｜ 防守方：${defender ? defender.name : '-'}`;
+    renderWeatherPanels(game);
 
     renderPlayerZone(game, enemy, dom.enemyZone, false);
     renderPlayerZone(game, me, dom.selfZone, true);
@@ -756,6 +820,7 @@
 
   function render() {
     ensureStaticBindings();
+    ensureWeatherAnchors();
     GPP.hideWinnerOverlay();
 
     if (!state.room) {
