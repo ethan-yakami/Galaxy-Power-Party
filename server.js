@@ -1,8 +1,9 @@
-const express = require('express');
+﻿const express = require('express');
 const compression = require('compression');
 const http = require('http');
 const path = require('path');
 const os = require('os');
+const { randomBytes } = require('crypto');
 const WebSocket = require('ws');
 
 const { getCharacterSummary, getAuroraDiceSummary } = require('./server/registry');
@@ -41,13 +42,30 @@ const wss = new WebSocket.Server({
   },
 });
 
-// WebSocket heartbeat to keep connections alive on Render
+// WebSocket heartbeat with tolerant miss threshold for weak networks
 const HEARTBEAT_INTERVAL = 30000;
+const HEARTBEAT_MAX_MISSES = 3;
 const heartbeatTimer = setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (ws.isAlive === false) return ws.terminate();
-    ws.isAlive = false;
-    ws.ping();
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    if (ws.awaitingPong) {
+      ws.heartbeatMisses = (ws.heartbeatMisses || 0) + 1;
+    } else {
+      ws.heartbeatMisses = 0;
+    }
+
+    if ((ws.heartbeatMisses || 0) >= HEARTBEAT_MAX_MISSES) {
+      ws.terminate();
+      return;
+    }
+
+    ws.awaitingPong = true;
+    try {
+      ws.ping();
+    } catch {
+      ws.terminate();
+    }
   });
 }, HEARTBEAT_INTERVAL);
 wss.on('close', () => clearInterval(heartbeatTimer));
@@ -66,15 +84,21 @@ function broadcastCharacterCatalog() {
 }
 
 wss.on('connection', (ws) => {
-  ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
+  ws.awaitingPong = false;
+  ws.heartbeatMisses = 0;
+  ws.on('pong', () => {
+    ws.awaitingPong = false;
+    ws.heartbeatMisses = 0;
+  });
 
   ws.playerId = `P${nextPlayerId++}`;
   ws.playerRoomCode = null;
+  ws.reconnectToken = randomBytes(24).toString('hex');
 
   send(ws, {
     type: 'welcome',
     playerId: ws.playerId,
+    reconnectToken: ws.reconnectToken,
     characters: getCharacterSummary(),
     auroraDice: getAuroraDiceSummary(),
   });
@@ -84,7 +108,7 @@ wss.on('connection', (ws) => {
     try {
       msg = JSON.parse(raw.toString());
     } catch {
-      return send(ws, { type: 'error', message: '消息格式错误。' });
+      return send(ws, { type: 'error', message: '娑堟伅鏍煎紡閿欒。' });
     }
 
     switch (msg.type) {
@@ -93,7 +117,7 @@ wss.on('connection', (ws) => {
           handlers.handleCreateRoom(ws, msg);
         } catch (err) {
           console.error('[Error] handleCreateRoom:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'create_ai_room':
@@ -101,7 +125,7 @@ wss.on('connection', (ws) => {
           handlers.handleCreateAIRoom(ws, msg);
         } catch (err) {
           console.error('[Error] handleCreateAIRoom:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'join_room':
@@ -109,7 +133,7 @@ wss.on('connection', (ws) => {
           handlers.handleJoinRoom(ws, msg);
         } catch (err) {
           console.error('[Error] handleJoinRoom:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'choose_character':
@@ -117,7 +141,7 @@ wss.on('connection', (ws) => {
           handlers.handleChooseCharacter(ws, msg);
         } catch (err) {
           console.error('[Error] handleChooseCharacter:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'choose_aurora_die':
@@ -125,7 +149,7 @@ wss.on('connection', (ws) => {
           handlers.handleChooseAurora(ws, msg);
         } catch (err) {
           console.error('[Error] handleChooseAurora:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'create_custom_character':
@@ -136,16 +160,24 @@ wss.on('connection', (ws) => {
           }
         } catch (err) {
           console.error('[Error] handleCreateCustomCharacter:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'leave_room':
         try {
-          handlers.leaveRoom(ws);
+          handlers.leaveRoom(ws, { reason: 'leave_room' });
           send(ws, { type: 'left_room' });
         } catch (err) {
           console.error('[Error] leaveRoom:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+        }
+        break;
+      case 'resume_session':
+        try {
+          handlers.handleResumeSession(ws, msg);
+        } catch (err) {
+          console.error('[Error] handleResumeSession:', err);
+          send(ws, { type: 'session_resume_failed', reason: 'server_error' });
         }
         break;
       case 'play_again':
@@ -153,7 +185,7 @@ wss.on('connection', (ws) => {
           handlers.handlePlayAgain(ws);
         } catch (err) {
           console.error('[Error] handlePlayAgain:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'disband_room':
@@ -161,7 +193,7 @@ wss.on('connection', (ws) => {
           handlers.handleDisbandRoom(ws);
         } catch (err) {
           console.error('[Error] handleDisbandRoom:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'roll_attack':
@@ -169,7 +201,7 @@ wss.on('connection', (ws) => {
           handlers.handleRollAttack(ws);
         } catch (err) {
           console.error('[Error] handleRollAttack:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'use_aurora_die':
@@ -177,7 +209,7 @@ wss.on('connection', (ws) => {
           handlers.handleUseAurora(ws);
         } catch (err) {
           console.error('[Error] handleUseAurora:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'reroll_attack':
@@ -185,7 +217,7 @@ wss.on('connection', (ws) => {
           handlers.handleRerollAttack(ws, msg);
         } catch (err) {
           console.error('[Error] handleRerollAttack:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'update_live_selection':
@@ -200,7 +232,7 @@ wss.on('connection', (ws) => {
           handlers.handleConfirmAttack(ws, msg);
         } catch (err) {
           console.error('[Error] handleConfirmAttack:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'roll_defense':
@@ -208,7 +240,7 @@ wss.on('connection', (ws) => {
           handlers.handleRollDefense(ws);
         } catch (err) {
           console.error('[Error] handleRollDefense:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       case 'confirm_defense_selection':
@@ -216,16 +248,16 @@ wss.on('connection', (ws) => {
           handlers.handleConfirmDefense(ws, msg);
         } catch (err) {
           console.error('[Error] handleConfirmDefense:', err);
-          send(ws, { type: 'error', message: '服务发生内部错误。' });
+          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
         }
         break;
       default:
-        send(ws, { type: 'error', message: '未知消息类型。' });
+        send(ws, { type: 'error', message: '鏈煡娑堟伅绫诲瀷。' });
     }
   });
 
   ws.on('close', () => {
-    handlers.leaveRoom(ws);
+    handlers.handleSocketClosed(ws);
   });
 });
 
@@ -267,3 +299,6 @@ server.listen(PORT, HOST, () => {
     }
   }
 });
+
+
+

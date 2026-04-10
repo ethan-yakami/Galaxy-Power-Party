@@ -1,4 +1,4 @@
-const { CharacterRegistry, AuroraRegistry, triggerCharacterHook, saveCustomVariant } = require('./registry');
+﻿const { CharacterRegistry, AuroraRegistry, triggerCharacterHook, saveCustomVariant } = require('./registry');
 const {
   makeNormalDiceFromPool,
   rollAuroraFace,
@@ -6,6 +6,7 @@ const {
   sortDice,
   diceToText,
   sumByIndices,
+  getEffectiveSelectionCount,
   isValidDistinctIndices,
   isValidDistinctIndicesAnyCount,
   countSelectedValue,
@@ -133,6 +134,130 @@ module.exports = function createHandlers(rooms) {
 
 let _handlerRefs = null;
 
+const SESSION_GRACE_MS = 90 * 1000;
+const OFFLINE_AUTO_DELAY_MS = 900;
+
+function clearPlayerTimers(player) {
+  if (!player) return;
+  if (player.graceTimer) {
+    clearTimeout(player.graceTimer);
+    player.graceTimer = null;
+  }
+  if (player.autoActionTimer) {
+    clearTimeout(player.autoActionTimer);
+    player.autoActionTimer = null;
+  }
+}
+
+function setPlayerOnline(player, isOnline) {
+  if (!player) return;
+  player.isOnline = !!isOnline;
+  if (isOnline) {
+    player.disconnectedAt = null;
+    player.graceDeadline = null;
+    if (player.graceTimer) {
+      clearTimeout(player.graceTimer);
+      player.graceTimer = null;
+    }
+  } else {
+    player.disconnectedAt = Date.now();
+    player.graceDeadline = player.disconnectedAt + SESSION_GRACE_MS;
+  }
+}
+
+function getActiveActorId(game) {
+  if (!game) return null;
+  if (game.phase === 'attack_roll' || game.phase === 'attack_reroll_or_select') return game.attackerId;
+  if (game.phase === 'defense_roll' || game.phase === 'defense_select') return game.defenderId;
+  return null;
+}
+
+function pickHighestIndices(dice, needCount, requiredIdx) {
+  if (!Array.isArray(dice) || !Number.isInteger(needCount) || needCount <= 0) return [];
+  if (needCount >= dice.length) return dice.map((_, i) => i);
+
+  const pairs = dice.map((die, idx) => ({
+    idx,
+    value: die && Number.isFinite(die.value) ? die.value : 0,
+  }));
+  pairs.sort((a, b) => b.value - a.value);
+
+  const picked = [];
+  if (Number.isInteger(requiredIdx) && requiredIdx >= 0 && requiredIdx < dice.length) {
+    picked.push(requiredIdx);
+  }
+  for (const item of pairs) {
+    if (picked.length >= needCount) break;
+    if (picked.includes(item.idx)) continue;
+    picked.push(item.idx);
+  }
+
+  if (picked.length > needCount) picked.length = needCount;
+  return picked;
+}
+
+function pickRerollIndicesForOfflineAttack(game) {
+  const dice = game && game.attackDice ? game.attackDice : [];
+  const pairs = [];
+  for (let i = 0; i < dice.length; i += 1) {
+    const die = dice[i];
+    if (!die) continue;
+    if (die.isAurora) continue;
+    const max = Number.isFinite(die.maxValue) ? die.maxValue : 6;
+    const expected = (max + 1) / 2;
+    const deficit = expected - die.value;
+    if (deficit > 0) {
+      pairs.push({ idx: i, deficit });
+    }
+  }
+  pairs.sort((a, b) => b.deficit - a.deficit);
+  const chosen = pairs.slice(0, 2).map((x) => x.idx);
+
+  const destinyIdx = dice.findIndex((d) => d && d.isAurora && d.auroraId === 'destiny');
+  if (destinyIdx !== -1 && !chosen.includes(destinyIdx)) {
+    if (chosen.length >= 2) chosen[chosen.length - 1] = destinyIdx;
+    else chosen.push(destinyIdx);
+  }
+
+  return chosen.filter((v, i, arr) => arr.indexOf(v) === i);
+}
+
+function notifyPresenceChanged(room, player, reason) {
+  if (!room || !player) return;
+  const payload = {
+    type: 'player_presence_changed',
+    roomCode: room.code,
+    playerId: player.id,
+    isOnline: player.isOnline !== false,
+    disconnectedAt: player.disconnectedAt || null,
+    graceDeadline: player.graceDeadline || null,
+    reason: reason || '',
+  };
+  for (const p of room.players) {
+    send(p.ws, payload);
+  }
+}
+
+function forfeitByDisconnect(room, loser, reasonText) {
+  if (!room || !room.game || room.status !== 'in_game') return;
+  const game = room.game;
+  if (game.status === 'ended') return;
+
+  const winner = room.players.find((p) => p.id !== loser.id) || null;
+  room.status = 'ended';
+  game.status = 'ended';
+  game.phase = 'ended';
+  game.winnerId = winner ? winner.id : null;
+  if (loser && game.hp && loser.id in game.hp) {
+    game.hp[loser.id] = 0;
+  }
+  if (winner) {
+    game.log.push(reasonText || `${loser.name} 断线超时，${winner.name} 获胜。`);
+  } else {
+    game.log.push(reasonText || '对局结束。');
+  }
+}
+
 function buildWeatherChangedPayload(game) {
   if (!game || !game.weather || !game.weather.weatherId) return null;
   if (game.weather.enteredAtRound !== game.round) return null;
@@ -157,7 +282,103 @@ function broadcastRoom(room) {
     }
     room.game.pendingWeatherChanged = null;
   }
-  if (_handlerRefs) scheduleAIAction(room, rooms, _handlerRefs);
+  if (_handlerRefs) {
+    scheduleAIAction(room, rooms, _handlerRefs);
+    scheduleOfflineAutoAction(room);
+  }
+}
+
+function performOfflineAction(room, actor, phaseAtSchedule) {
+  if (!room || !room.game || room.status !== 'in_game') return;
+  if (!_handlerRefs || !actor) return;
+
+  const game = room.game;
+  if (game.status === 'ended') return;
+  if (game.phase !== phaseAtSchedule) return;
+  if (actor.isOnline !== false) return;
+  if (actor.ws && actor.ws.isAI) return;
+
+  const wsLike = actor.ws;
+  if (!wsLike) return;
+
+  if (game.phase === 'attack_roll' && game.attackerId === actor.id) {
+    _handlerRefs.handleRollAttack(wsLike);
+    return;
+  }
+
+  if (game.phase === 'attack_reroll_or_select' && game.attackerId === actor.id) {
+    if (!game.roundAuroraUsed[actor.id]) {
+      const verdict = canUseAurora(actor, game, 'attack');
+      if (verdict.ok) {
+        _handlerRefs.handleUseAurora(wsLike);
+        return;
+      }
+    }
+
+    if (game.rerollsLeft > 0) {
+      const rerollIndices = pickRerollIndicesForOfflineAttack(game);
+      if (rerollIndices.length > 0) {
+        _handlerRefs.handleRerollAttack(wsLike, { indices: rerollIndices });
+        return;
+      }
+    }
+
+    const need = getEffectiveSelectionCount(game.attackLevel[actor.id], game.attackDice.length);
+    const destinyIdx = game.attackDice.findIndex((d) => d && d.isAurora && d.auroraId === 'destiny');
+    const indices = pickHighestIndices(game.attackDice, need, destinyIdx);
+    _handlerRefs.handleConfirmAttack(wsLike, { indices });
+    return;
+  }
+
+  if (game.phase === 'defense_roll' && game.defenderId === actor.id) {
+    _handlerRefs.handleRollDefense(wsLike);
+    return;
+  }
+
+  if (game.phase === 'defense_select' && game.defenderId === actor.id) {
+    if (!game.roundAuroraUsed[actor.id]) {
+      const verdict = canUseAurora(actor, game, 'defense');
+      if (verdict.ok) {
+        _handlerRefs.handleUseAurora(wsLike);
+        return;
+      }
+    }
+
+    const need = getEffectiveSelectionCount(game.defenseLevel[actor.id], game.defenseDice.length);
+    const destinyIdx = game.defenseDice.findIndex((d) => d && d.isAurora && d.auroraId === 'destiny');
+    const indices = pickHighestIndices(game.defenseDice, need, destinyIdx);
+    _handlerRefs.handleConfirmDefense(wsLike, { indices });
+  }
+}
+
+function scheduleOfflineAutoAction(room) {
+  if (!room || !room.game || room.status !== 'in_game') return;
+  const game = room.game;
+  if (game.status === 'ended') return;
+
+  const actorId = getActiveActorId(game);
+  if (!actorId) return;
+
+  for (const p of room.players) {
+    if (p.id !== actorId && p.autoActionTimer) {
+      clearTimeout(p.autoActionTimer);
+      p.autoActionTimer = null;
+    }
+  }
+
+  const actor = room.players.find((p) => p.id === actorId);
+  if (!actor || actor.isOnline !== false || (actor.ws && actor.ws.isAI)) return;
+
+  if (actor.autoActionTimer) {
+    clearTimeout(actor.autoActionTimer);
+    actor.autoActionTimer = null;
+  }
+
+  const phaseSnapshot = game.phase;
+  actor.autoActionTimer = setTimeout(() => {
+    actor.autoActionTimer = null;
+    performOfflineAction(room, actor, phaseSnapshot);
+  }, OFFLINE_AUTO_DELAY_MS);
 }
 
 function startGameIfReady(room) {
@@ -313,23 +534,16 @@ function startGameIfReady(room) {
   ensureWeatherState(room, room.game);
 }
 
-function leaveRoom(ws) {
+function leaveRoom(ws, options = {}) {
   const room = getPlayerRoom(ws, rooms);
   if (!room) return;
 
   const idx = room.players.findIndex((p) => p.id === ws.playerId);
-  if (idx !== -1) {
-    room.players.splice(idx, 1);
-    if (room.game && room.status === 'in_game' && room.players.length === 1) {
-      const remaining = room.players[0];
-      remaining.ws.playerRoomCode = null;
-      send(remaining.ws, { type: 'left_room', reason: '对手已离开房间，房间已关闭。' });
-      rooms.delete(room.code);
-      ws.playerRoomCode = null;
-      return;
-    }
-  }
+  if (idx === -1) return;
 
+  const leaving = room.players[idx];
+  clearPlayerTimers(leaving);
+  room.players.splice(idx, 1);
   ws.playerRoomCode = null;
 
   if (room.players.length === 0) {
@@ -337,22 +551,68 @@ function leaveRoom(ws) {
     return;
   }
 
-  // Clean up rooms with only AI players remaining
   if (room.players.every((p) => p.ws && p.ws.isAI)) {
     rooms.delete(room.code);
     return;
   }
 
-  if (room.status === 'lobby') {
-    startGameIfReady(room);
+  if (room.status === 'in_game' && room.game && room.game.status !== 'ended' && room.players.length === 1) {
+    forfeitByDisconnect(room, leaving, `${leaving.name} 主动退出，${room.players[0].name} 获胜。`);
   }
 
+  if (room.status === 'lobby') {
+    room.waitingReason = '等待另一位玩家加入。';
+  }
+
+  if (!options.silentPresence) {
+    notifyPresenceChanged(room, leaving, options.reason || 'left_room');
+  }
   broadcastRoom(room);
 }
 
+function handleSocketClosed(ws) {
+  const room = getPlayerRoom(ws, rooms);
+  if (!room) return;
+
+  const player = getPlayerById(room, ws.playerId);
+  if (!player) return;
+  if (player.ws !== ws) return;
+
+  setPlayerOnline(player, false);
+  notifyPresenceChanged(room, player, 'socket_closed');
+  broadcastRoom(room);
+
+  player.graceTimer = setTimeout(() => {
+    const currentRoom = rooms.get(room.code);
+    if (!currentRoom) return;
+    const currentPlayer = currentRoom.players.find((p) => p.id === player.id);
+    if (!currentPlayer || currentPlayer.isOnline !== false) return;
+
+    if (currentRoom.status === 'in_game' && currentRoom.game && currentRoom.game.status !== 'ended') {
+      forfeitByDisconnect(currentRoom, currentPlayer, `${currentPlayer.name} 断线超时，判负。`);
+      notifyPresenceChanged(currentRoom, currentPlayer, 'disconnect_timeout');
+      broadcastRoom(currentRoom);
+      return;
+    }
+
+    const removeIdx = currentRoom.players.findIndex((p) => p.id === currentPlayer.id);
+    if (removeIdx !== -1) {
+      currentRoom.players.splice(removeIdx, 1);
+    }
+    if (currentRoom.players.length === 0) {
+      rooms.delete(currentRoom.code);
+      return;
+    }
+    if (currentRoom.status === 'lobby') {
+      currentRoom.waitingReason = '等待另一位玩家加入。';
+    }
+    notifyPresenceChanged(currentRoom, currentPlayer, 'disconnect_removed');
+    broadcastRoom(currentRoom);
+  }, SESSION_GRACE_MS);
+}
 function handleCreateRoom(ws, msg) {
   if (!msg.name || typeof msg.name !== 'string') return send(ws, { type: 'error', message: '请输入玩家名称。' });
-  if (getPlayerRoom(ws, rooms)) leaveRoom(ws);
+  if (getPlayerRoom(ws, rooms)) leaveRoom(ws, { reason: 'switch_room' });
 
   const code = newRoomCode(rooms);
   const room = {
@@ -365,7 +625,7 @@ function handleCreateRoom(ws, msg) {
 
   rooms.set(code, room);
 
-  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `玩家${ws.playerId}`));
+  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `鐜╁${ws.playerId}`));
   ws.playerRoomCode = code;
 
   startGameIfReady(room);
@@ -381,9 +641,9 @@ function handleJoinRoom(ws, msg) {
 
   const room = rooms.get(code);
   if (!room) return send(ws, { type: 'error', message: '房间不存在。' });
-  if (room.players.length >= 2) return send(ws, { type: 'error', message: '房间已满。' });
+  if (room.players.length >= 2) return send(ws, { type: 'error', message: '鎴块棿宸叉弧。' });
 
-  if (getPlayerRoom(ws, rooms)) leaveRoom(ws);
+  if (getPlayerRoom(ws, rooms)) leaveRoom(ws, { reason: 'switch_room' });
 
   room.players.push(createNewRoomPlayer(ws, name.slice(0, 20)));
   ws.playerRoomCode = code;
@@ -392,13 +652,62 @@ function handleJoinRoom(ws, msg) {
   broadcastRoom(room);
 }
 
+function handleResumeSession(ws, msg) {
+  const roomCode = String((msg && msg.roomCode) || '').trim();
+  const reconnectToken = String((msg && msg.reconnectToken) || '').trim();
+  if (!roomCode || !reconnectToken) {
+    send(ws, { type: 'session_resume_failed', reason: 'missing_params' });
+    return;
+  }
+
+  const room = rooms.get(roomCode);
+  if (!room) {
+    send(ws, { type: 'session_resume_failed', reason: 'room_not_found' });
+    return;
+  }
+
+  const player = room.players.find((p) => p.reconnectToken === reconnectToken);
+  if (!player) {
+    send(ws, { type: 'session_resume_failed', reason: 'token_mismatch' });
+    return;
+  }
+
+  if (player.graceDeadline && Date.now() > player.graceDeadline && player.isOnline === false) {
+    send(ws, { type: 'session_resume_failed', reason: 'grace_expired' });
+    return;
+  }
+
+  if (getPlayerRoom(ws, rooms)) {
+    leaveRoom(ws, { reason: 'switch_room', silentPresence: true });
+  }
+
+  const oldWs = player.ws;
+  if (oldWs && oldWs !== ws) {
+    oldWs.playerRoomCode = null;
+  }
+
+  player.ws = ws;
+  ws.playerId = player.id;
+  ws.playerRoomCode = room.code;
+  ws.reconnectToken = player.reconnectToken;
+  setPlayerOnline(player, true);
+
+  send(ws, {
+    type: 'session_resumed',
+    playerId: player.id,
+    roomCode: room.code,
+  });
+  notifyPresenceChanged(room, player, 'session_resumed');
+  broadcastRoom(room);
+}
+
 function handleChooseCharacter(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
-  if (!room) return send(ws, { type: 'error', message: '你不在房间内。' });
-  if (room.status !== 'lobby') return send(ws, { type: 'error', message: '游戏已开始，不能更换角色。' });
+  if (!room) return send(ws, { type: 'error', message: '浣犱笉鍦ㄦ埧闂村唴。' });
+  if (room.status !== 'lobby') return send(ws, { type: 'error', message: '娓告垙宸插紑濮嬶紝涓嶈兘鏇存崲瑙掕壊。' });
 
   const characterId = msg.characterId;
-  if (!CharacterRegistry[characterId]) return send(ws, { type: 'error', message: '无效角色。' });
+  if (!CharacterRegistry[characterId]) return send(ws, { type: 'error', message: '鏃犳晥瑙掕壊。' });
 
   const me = getPlayerById(room, ws.playerId);
   if (!me) return;
@@ -411,7 +720,7 @@ function handleChooseCharacter(ws, msg) {
 
 function handleChooseAurora(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
-  if (!room) return send(ws, { type: 'error', message: '你不在房间内。' });
+  if (!room) return send(ws, { type: 'error', message: '浣犱笉鍦ㄦ埧闂村唴。' });
   if (room.status !== 'lobby') return send(ws, { type: 'error', message: '游戏已开始，不能更换曜彩骰。' });
 
   const me = getPlayerById(room, ws.playerId);
@@ -441,7 +750,7 @@ function handleCreateCustomCharacter(ws, msg) {
     return false;
   }
   if (CharacterRegistry[id]) {
-    send(ws, { type: 'error', message: `角色 ID 已存在：${id}` });
+    send(ws, { type: 'error', message: `瑙掕壊 ID 宸插瓨鍦細${id}` });
     return false;
   }
 
@@ -465,7 +774,7 @@ function handleCreateCustomCharacter(ws, msg) {
 
   const name = typeof rawVariant.name === 'string' && rawVariant.name.trim()
     ? rawVariant.name.trim().slice(0, 40)
-    : `${CharacterRegistry[baseCharacterId].name} 变体`;
+    : `${CharacterRegistry[baseCharacterId].name} 鍙樹綋`;
 
   const variantToSave = {
     id,
@@ -479,7 +788,7 @@ function handleCreateCustomCharacter(ws, msg) {
     saveCustomVariant(variantToSave);
   } catch (err) {
     console.error('[Error] saveCustomVariant:', err);
-    send(ws, { type: 'error', message: '保存自定义角色失败，请检查服务端日志。' });
+    send(ws, { type: 'error', message: '淇濆瓨鑷畾涔夎鑹插け璐ワ紝璇锋鏌ユ湇鍔＄鏃ュ織。' });
     return false;
   }
 
@@ -539,7 +848,7 @@ function handleRollAttack(ws) {
   game.yaoguangRerollsUsed[attacker.id] = 0;
 
   game.phase = 'attack_reroll_or_select';
-  game.log.push(`${attacker.name}投掷攻击骰：${diceToText(game.attackDice)}`);
+  game.log.push(`${attacker.name}鎶曟幏鏀诲嚮楠帮細${diceToText(game.attackDice)}`);
 
   broadcastRoom(room);
 }
@@ -592,22 +901,27 @@ function handleRerollAttack(ws, msg) {
 
   if (room.status !== 'in_game' || game.phase !== 'attack_reroll_or_select') return;
   if (game.attackerId !== ws.playerId) return;
-  if (game.rerollsLeft <= 0) return send(ws, { type: 'error', message: '没有剩余重投次数。' });
+  if (game.rerollsLeft <= 0) return send(ws, { type: 'error', message: '娌℃湁鍓╀綑閲嶆姇娆℃暟。' });
 
   const attacker = getPlayerById(room, game.attackerId);
   const indices = msg.indices;
   const uniqueIndices = [];
   const seen = new Set();
 
-  if (!Array.isArray(indices)) return send(ws, { type: 'error', message: '重投参数无效。' });
+  if (!Array.isArray(indices)) return send(ws, { type: 'error', message: '閲嶆姇鍙傛暟鏃犳晥。' });
   for (const idx of indices) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= game.attackDice.length) {
-      return send(ws, { type: 'error', message: '重投索引无效。' });
+      return send(ws, { type: 'error', message: '閲嶆姇绱㈠紩鏃犳晥。' });
     }
     if (!seen.has(idx)) {
       seen.add(idx);
       uniqueIndices.push(idx);
     }
+  }
+
+  const destinyIdx = game.attackDice.findIndex((d) => d.isAurora && d.auroraId === 'destiny');
+  if (destinyIdx !== -1 && !uniqueIndices.includes(destinyIdx)) {
+    return send(ws, { type: 'error', message: '命定：重投时必须包含命定曜彩骰。' });
   }
 
   for (const idx of uniqueIndices) {
@@ -636,7 +950,7 @@ function handleConfirmAttack(ws, msg) {
 
   const attacker = getPlayerById(room, game.attackerId);
   const defender = getPlayerById(room, game.defenderId);
-  const needCount = game.attackLevel[attacker.id];
+  const needCount = getEffectiveSelectionCount(game.attackLevel[attacker.id], game.attackDice.length);
   const indices = msg.indices;
 
   if (!isValidDistinctIndices(indices, needCount, game.attackDice.length)) {
@@ -696,7 +1010,7 @@ function handleRollDefense(ws) {
   game.defensePreviewSelection = [];
   game.defenseValue = null;
   game.phase = 'defense_select';
-  game.log.push(`${defender.name}投掷防守骰：${diceToText(game.defenseDice)}`);
+  game.log.push(`${defender.name}投掷防御骰：${diceToText(game.defenseDice)}`);
 
   broadcastRoom(room);
 }
@@ -775,7 +1089,7 @@ function handleConfirmDefense(ws, msg) {
 
   const defender = getPlayerById(room, game.defenderId);
   const attacker = getPlayerById(room, game.attackerId);
-  const needCount = game.defenseLevel[defender.id];
+  const needCount = getEffectiveSelectionCount(game.defenseLevel[defender.id], game.defenseDice.length);
   const indices = msg.indices;
 
   if (!isValidDistinctIndices(indices, needCount, game.defenseDice.length)) {
@@ -846,7 +1160,7 @@ function handleConfirmDefense(ws, msg) {
         return part;
       });
       if (game.unyielding[defender.id]) {
-        game.log.push(`${defender.name}的【不屈】生效，生命值保留至1。`);
+        game.log.push(`${defender.name}的不屈生效，生命值保留至1。`);
       }
     }
   }
@@ -872,9 +1186,9 @@ function handleConfirmDefense(ws, msg) {
   });
 
   if (game.extraAttackQueued) {
-    game.log.push(`${attacker.name}发动复读追加攻击，总伤害${totalDamage}。`);
+    game.log.push(`${attacker.name}发动连击追加攻击，总伤害${totalDamage}。`);
   } else {
-    game.log.push(`${attacker.name}攻击${defender.name}，攻击值${game.attackValue}，防守值${game.defenseValue}，造成${totalDamage}点伤害。`);
+    game.log.push(`${attacker.name}攻击${defender.name}，攻击值${game.attackValue}，防御值${game.defenseValue}，造成${totalDamage}点伤害。`);
   }
 
   // Track cumulative damage taken
@@ -946,7 +1260,7 @@ function handleUpdateLiveSelection(ws, msg) {
 
   if (game.phase === 'defense_select' && game.defenderId === ws.playerId && game.defenseDice) {
     if (!isValidDistinctIndicesAnyCount(indices, game.defenseDice.length)) return;
-    const need = game.defenseLevel[game.defenderId];
+    const need = getEffectiveSelectionCount(game.defenseLevel[game.defenderId], game.defenseDice.length);
     if (indices.length > need) return;
     game.defensePreviewSelection = indices.slice();
     broadcastRoom(room);
@@ -956,31 +1270,22 @@ function handleUpdateLiveSelection(ws, msg) {
 function handlePlayAgain(ws) {
   const room = getPlayerRoom(ws, rooms);
   if (!room) return;
-  if (room.status !== 'ended') return send(ws, { type: 'error', message: '当前不在结算阶段。' });
+  if (room.status !== 'ended') return send(ws, { type: 'error', message: '褰撳墠涓嶅湪缁撶畻闃舵。' });
 
   room.status = 'lobby';
   room.game = null;
-  room.waitingReason = '等待双方确认开局配置。';
+  room.waitingReason = '绛夊緟鍙屾柟纭寮€灞€閰嶇疆。';
 
-  // Re-randomize AI player loadout for variety
-  const hasAI = room.players.some((p) => p.ws && p.ws.isAI);
   for (const p of room.players) {
+    clearPlayerTimers(p);
+    p.characterId = null;
+    p.auroraDiceId = null;
     if (p.ws && p.ws.isAI) {
+      // AI keeps auto-loadout capability while humans must re-select.
       reRandomizeAIPlayer(p);
     }
   }
 
-  // For AI rooms, reset human's aurora so they re-select in lobby
-  if (hasAI) {
-    for (const p of room.players) {
-      if (!(p.ws && p.ws.isAI)) {
-        p.auroraDiceId = null;
-      }
-    }
-  }
-
-  // Keep players in lobby after "play again"; do not auto-start.
-  // New match should only start after players re-confirm configuration.
   broadcastRoom(room);
 }
 
@@ -999,7 +1304,7 @@ function handleDisbandRoom(ws) {
 
 function handleCreateAIRoom(ws, msg) {
   if (!msg.name || typeof msg.name !== 'string') return send(ws, { type: 'error', message: '请输入玩家名称。' });
-  if (getPlayerRoom(ws, rooms)) leaveRoom(ws);
+  if (getPlayerRoom(ws, rooms)) leaveRoom(ws, { reason: 'switch_room' });
 
   const code = newRoomCode(rooms);
   const room = {
@@ -1012,7 +1317,7 @@ function handleCreateAIRoom(ws, msg) {
 
   rooms.set(code, room);
 
-  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `玩家${ws.playerId}`));
+  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `鐜╁${ws.playerId}`));
   ws.playerRoomCode = code;
 
   const aiPlayer = createAIPlayer(code);
@@ -1033,8 +1338,10 @@ _handlerRefs = {
 
 return {
   leaveRoom,
+  handleSocketClosed,
   handleCreateRoom,
   handleJoinRoom,
+  handleResumeSession,
   handleChooseCharacter,
   handleChooseAurora,
   handleCreateCustomCharacter,
@@ -1051,3 +1358,6 @@ return {
 };
 
 }; // end createHandlers
+
+
+

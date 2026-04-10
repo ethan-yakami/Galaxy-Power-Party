@@ -22,6 +22,24 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(111, 181, 255, 0.95) rgba(8, 17, 57, 0.72);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: rgba(8, 17, 57, 0.72);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid rgba(8, 17, 57, 0.72);
+  background: linear-gradient(180deg, rgba(133, 212, 255, 0.95), rgba(58, 110, 255, 0.92));
 }
 
 html,
@@ -276,6 +294,7 @@ button {
   background: linear-gradient(140deg, rgba(26, 61, 179, 0.92), rgba(16, 42, 130, 0.95));
   cursor: pointer;
   transition: transform 0.12s ease, filter 0.12s ease, border-color 0.15s ease;
+  min-height: 44px;
 }
 
 button:hover:not(:disabled) {
@@ -355,9 +374,10 @@ button.danger {
 }
 
 .weatherStatusCard {
-  border: 1px solid rgba(139, 188, 255, 0.48);
+  border: 2px solid rgba(255, 215, 120, 0.9);
   border-radius: 12px;
   background: linear-gradient(160deg, rgba(11, 26, 84, 0.88), rgba(12, 38, 102, 0.72));
+  box-shadow: inset 0 0 22px rgba(255, 214, 106, 0.2), 0 10px 20px rgba(0, 0, 0, 0.24);
   padding: 10px;
   display: grid;
   gap: 7px;
@@ -394,6 +414,66 @@ button.danger {
   font-size: 14px;
   line-height: 1.45;
   color: #deebff;
+}
+
+.weatherTypeCard-guard {
+  background: linear-gradient(160deg, rgba(14, 72, 128, 0.93), rgba(16, 54, 113, 0.86));
+}
+
+.weatherTypeCard-assist {
+  background: linear-gradient(160deg, rgba(20, 93, 87, 0.92), rgba(22, 63, 100, 0.86));
+}
+
+.weatherTypeCard-offense {
+  background: linear-gradient(160deg, rgba(108, 68, 12, 0.94), rgba(77, 48, 10, 0.88));
+}
+
+.weatherTypeCard-reverse {
+  background: linear-gradient(160deg, rgba(76, 44, 136, 0.94), rgba(45, 29, 98, 0.88));
+}
+
+.turnOwnershipCard {
+  border: 2px solid rgba(146, 199, 255, 0.9);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+}
+
+.turnOwnershipLabel {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(230, 244, 255, 0.9);
+}
+
+.turnOwnershipText {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.turnOwner-self {
+  border-color: rgba(120, 205, 255, 0.96);
+  background: linear-gradient(145deg, rgba(16, 65, 147, 0.92), rgba(16, 40, 122, 0.9));
+}
+
+.turnOwner-self .turnOwnershipText {
+  color: #a5edff;
+}
+
+.turnOwner-enemy {
+  border-color: rgba(255, 162, 176, 0.96);
+  background: linear-gradient(145deg, rgba(130, 39, 74, 0.93), rgba(88, 22, 54, 0.9));
+}
+
+.turnOwner-enemy .turnOwnershipText {
+  color: #ffd0dc;
+}
+
+.turnOwner-neutral {
+  background: linear-gradient(145deg, rgba(26, 45, 108, 0.88), rgba(18, 31, 92, 0.82));
 }
 
 .playersList {
@@ -443,6 +523,19 @@ button.danger {
 .playerLoadout {
   font-size: 16px;
   color: var(--text-soft);
+}
+
+.playerPresence {
+  font-size: 14px;
+  letter-spacing: 0.03em;
+}
+
+.playerPresence.online {
+  color: #8fffd2;
+}
+
+.playerPresence.offline {
+  color: #ffc4d8;
 }
 
 .lobbyStage {
@@ -571,10 +664,10 @@ button.danger {
 
 .weatherBanner {
   margin-top: 6px;
-  border: 1px solid rgba(159, 224, 255, 0.7);
+  border: 2px solid rgba(255, 214, 110, 0.92);
   border-radius: 12px;
   background: linear-gradient(145deg, rgba(11, 56, 147, 0.9), rgba(22, 87, 186, 0.88));
-  box-shadow: inset 0 0 22px rgba(119, 235, 255, 0.22), 0 8px 18px rgba(0, 0, 0, 0.26);
+  box-shadow: inset 0 0 24px rgba(255, 220, 128, 0.22), 0 8px 18px rgba(0, 0, 0, 0.26);
   padding: 10px 12px;
   display: flex;
   flex-wrap: wrap;
@@ -883,6 +976,7 @@ button.danger {
   background: linear-gradient(145deg, rgba(28, 67, 166, 0.86), rgba(17, 45, 126, 0.9));
   filter: drop-shadow(0px 0px 2px rgba(160, 210, 255, 0.9)) drop-shadow(0px 0px 6px rgba(45, 110, 255, 0.6));
   transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.1s ease;
+  touch-action: none;
 }
 
 .die:hover {
@@ -890,9 +984,24 @@ button.danger {
 }
 
 .die.selected {
-  filter: drop-shadow(0px 0px 2px #fffb00) drop-shadow(0px 0px 2px #fffb00) drop-shadow(0px 0px 6px #ffea00) drop-shadow(0px 0px 24px rgba(255, 225, 0, 0.9));
-  transform: scale(1.18) translateY(-6px);
+  filter: drop-shadow(0px 0px 3px #ffe76e) drop-shadow(0px 0px 10px #ffdd5e) drop-shadow(0px 0px 24px rgba(255, 214, 82, 0.96));
+  transform: scale(1.12) translateY(-4px);
   z-index: 10;
+}
+
+.die::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.die.selected::after {
+  border-color: #ffd84a;
+  box-shadow: 0 0 0 2px rgba(255, 233, 142, 0.5);
 }
 
 .dieLabel {
@@ -904,8 +1013,8 @@ button.danger {
 
 .shape-d4 {
   background: linear-gradient(145deg, rgba(113, 51, 255, 0.95), rgba(74, 34, 182, 0.94));
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,15 85,76 15,76' fill='black' stroke='black' stroke-width='10' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,15 85,76 15,76' fill='black' stroke='black' stroke-width='10' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  clip-path: polygon(50% 8%, 92% 88%, 8% 88%);
+  border-radius: 0;
 }
 
 .shape-d4 .dieLabel {
@@ -919,20 +1028,27 @@ button.danger {
 
 .shape-d8 {
   background: linear-gradient(145deg, rgba(255, 152, 50, 0.95), rgba(223, 90, 14, 0.94));
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,12 88,50 50,88 12,50' fill='black' stroke='black' stroke-width='10' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,12 88,50 50,88 12,50' fill='black' stroke='black' stroke-width='10' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  clip-path: polygon(50% 6%, 94% 50%, 50% 94%, 6% 50%);
+  border-radius: 0;
 }
 
 .shape-d12 {
   background: linear-gradient(145deg, rgba(255, 204, 71, 0.95), rgba(212, 128, 9, 0.96));
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,12 88,39 73,86 27,86 12,39' fill='black' stroke='black' stroke-width='10' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpolygon points='50,12 88,39 73,86 27,86 12,39' fill='black' stroke='black' stroke-width='10' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  clip-path: polygon(50% 6%, 90% 32%, 76% 90%, 24% 90%, 10% 32%);
+  border-radius: 0;
 }
 
 .shape-aurora {
   border-radius: 50%;
   border-color: rgba(131, 237, 255, 0.95);
   background: radial-gradient(circle at 30% 30%, rgba(154, 236, 255, 0.96), rgba(54, 82, 254, 0.9));
+}
+
+.shape-d4::after,
+.shape-d8::after,
+.shape-d12::after {
+  clip-path: inherit;
+  border-radius: 0;
 }
 
 .sumBadge {
@@ -987,7 +1103,7 @@ button.danger {
   border-radius: 8px;
   background: rgba(6, 17, 57, 0.96);
   color: #d0e4ff;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
   padding: 8px 10px;
   z-index: 120;
@@ -1010,8 +1126,8 @@ button.danger {
   left: 0;
   right: auto;
   top: calc(100% + 4px);
-  min-width: 250px;
-  max-width: 340px;
+  min-width: 220px;
+  max-width: min(82vw, 360px);
   border: 1px solid rgba(133, 178, 255, 0.6);
   border-radius: 10px;
   padding: 8px 10px;
@@ -1019,7 +1135,7 @@ button.danger {
   color: #cee3ff;
   font-size: 16px;
   line-height: 1.4;
-  z-index: 110;
+  z-index: 600;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
@@ -1078,7 +1194,7 @@ button.danger {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-width: min(92vw, 480px);
+  max-width: min(96vw, 680px);
 }
 
 .errorToast {
@@ -1088,12 +1204,17 @@ button.danger {
   border: 1px solid rgba(255, 170, 196, 0.68);
   background: rgba(117, 28, 61, 0.96);
   color: #ffe2ec;
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 14px 16px;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
   opacity: 0;
   transform: translateY(-8px);
   transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.errorToast.important {
+  border-color: rgba(255, 217, 134, 0.92);
+  background: linear-gradient(145deg, rgba(134, 68, 13, 0.96), rgba(122, 45, 28, 0.94));
 }
 
 .errorToast.show {
@@ -1108,13 +1229,13 @@ button.danger {
 
 .errorToastMsg {
   flex: 1;
-  font-size: 14px;
-  line-height: 1.35;
+  font-size: 17px;
+  line-height: 1.45;
 }
 
 .errorToastClose {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border: 1px solid rgba(255, 195, 215, 0.72);
   border-radius: 6px;
   background: rgba(140, 40, 75, 0.96);
@@ -1130,12 +1251,12 @@ button.danger {
   transform: translate(-50%, -10px);
   z-index: 12500;
   max-width: min(92vw, 720px);
-  border: 1px solid rgba(181, 243, 255, 0.78);
+  border: 2px solid rgba(255, 214, 100, 0.96);
   border-radius: 12px;
-  background: linear-gradient(145deg, rgba(13, 61, 152, 0.95), rgba(14, 98, 205, 0.92));
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35), inset 0 0 26px rgba(108, 236, 255, 0.22);
+  background: linear-gradient(145deg, rgba(21, 83, 183, 0.96), rgba(18, 64, 152, 0.95));
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35), inset 0 0 26px rgba(255, 219, 126, 0.3);
   color: #eff8ff;
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   line-height: 1.35;
   padding: 12px 14px;
@@ -1672,6 +1793,49 @@ button.danger {
 
   .weatherBannerEffect {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .appShell {
+    padding: 8px 8px 14px;
+    gap: 10px;
+  }
+
+  .panel {
+    padding: 10px;
+  }
+
+  .actions {
+    gap: 6px;
+  }
+
+  button {
+    width: 100%;
+    font-size: 16px;
+    padding: 12px 14px;
+  }
+
+  .railActions {
+    gap: 10px;
+  }
+
+  .railActions button {
+    font-size: 17px;
+    padding: 12px;
+  }
+
+  .die {
+    width: 52px;
+    height: 52px;
+  }
+
+  .dieLabel {
+    font-size: 18px;
+  }
+
+  .turnOwnershipText {
+    font-size: 16px;
   }
 }
 

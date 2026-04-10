@@ -102,10 +102,13 @@
     const container = getErrorToastContainer();
     const toast = document.createElement('div');
     toast.className = 'errorToast';
+    const content = text || '发生错误';
+    const isImportant = /命定|重投|必须|网络|断线|恢复/.test(content);
+    if (isImportant) toast.classList.add('important');
 
     const msg = document.createElement('div');
     msg.className = 'errorToastMsg';
-    msg.textContent = text || '发生错误';
+    msg.textContent = content;
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'errorToastClose';
@@ -128,7 +131,7 @@
     container.appendChild(toast);
 
     requestAnimationFrame(() => toast.classList.add('show'));
-    setTimeout(removeToast, 2600);
+    setTimeout(removeToast, isImportant ? 4600 : 3200);
   }
 
   function buildDocContent() {

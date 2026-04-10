@@ -1,11 +1,11 @@
-(function() {
+﻿(function() {
   const { state, dom, send, sendWithFeedback } = GPP;
 
   const PHASE_LABELS = {
     attack_roll: '攻击投掷',
     attack_reroll_or_select: '攻击调整',
-    defense_roll: '防守投掷',
-    defense_select: '防守选择',
+    defense_roll: '防御投掷',
+    defense_select: '防御选择',
     ended: '结算',
   };
 
@@ -29,11 +29,11 @@
     }
 
     if (game.phase === 'defense_roll') {
-      return game.defenderId === me ? '轮到你投掷防守骰' : '等待对手投掷防守骰';
+      return game.defenderId === me ? '轮到你投掷防御骰' : '等待对手投掷防御骰';
     }
 
     if (game.phase === 'defense_select') {
-      return game.defenderId === me ? '选择防守组合并确认' : '对手正在确认防守组合';
+      return game.defenderId === me ? '选择防御组合并确认' : '对手正在确认防御组合';
     }
 
     return '等待下一步操作';
@@ -76,6 +76,12 @@
     return btn;
   }
 
+  function formatGraceCountdown(deadline) {
+    if (!deadline) return '';
+    const remain = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    return `${remain}s`;
+  }
+
   function syncLogDrawer() {
     if (!dom.logDrawer || !dom.logToggleBtn) return;
 
@@ -109,6 +115,24 @@
         }
 
         dom.weatherStatusCard = card;
+      }
+    }
+
+    if (!dom.turnOwnershipCard) {
+      const roomSide = document.querySelector('.roomSide');
+      if (roomSide) {
+        const card = document.createElement('section');
+        card.id = 'turnOwnershipCard';
+        card.className = 'turnOwnershipCard hidden';
+        card.setAttribute('aria-live', 'polite');
+
+        if (dom.lobbyControls && dom.lobbyControls.parentNode === roomSide) {
+          roomSide.insertBefore(card, dom.lobbyControls);
+        } else {
+          roomSide.appendChild(card);
+        }
+
+        dom.turnOwnershipCard = card;
       }
     }
 
@@ -148,14 +172,25 @@
       name.className = 'playerName';
       name.textContent = `${p.name}${GPP.isMe(p.id) ? '（你）' : ''}`;
 
-      const loadout = document.createElement('p');
+            const loadout = document.createElement('p');
       loadout.className = 'playerLoadout';
       const charText = p.characterName || '未公开';
       const auraText = p.auroraDiceName || (GPP.isMe(p.id) ? '未装备' : '未公开');
       loadout.textContent = `角色：${charText}｜曜彩：${auraText}`;
 
+      const presence = document.createElement('p');
+      const online = p.isOnline !== false;
+      presence.className = `playerPresence ${online ? 'online' : 'offline'}`;
+      if (online) {
+        presence.textContent = '在线';
+      } else {
+        const grace = formatGraceCountdown(p.graceDeadline);
+        presence.textContent = grace ? `离线保留中（${grace}）` : '离线';
+      }
+
       labels.appendChild(name);
       labels.appendChild(loadout);
+      labels.appendChild(presence);
       left.appendChild(labels);
       top.appendChild(left);
 
@@ -195,12 +230,12 @@
 
   function getCharacterNameById(characterId) {
     const c = state.characters[characterId];
-    return c ? c.name : '未选择';
+    return c ? c.name : '鏈€夋嫨';
   }
 
   function getAuroraNameById(auroraId) {
     const a = state.auroraDice.find((d) => d.id === auroraId);
-    return a ? a.name : '未选择';
+    return a ? a.name : '鏈€夋嫨';
   }
 
   function doesCharacterNeedAurora(characterId) {
@@ -269,13 +304,13 @@
       : '无需曜彩';
 
     dom.selectionSummary.innerHTML = [
-      `<p><b>待确认</b>：角色 ${escapeHtml(pendingCharacterName)} ｜ 曜彩 ${escapeHtml(pendingAuroraName)}</p>`,
-      `<p><b>已确认</b>：角色 ${escapeHtml(confirmedCharacterName)} ｜ 曜彩 ${escapeHtml(confirmedAuroraName)}</p>`,
+      `<p><b>待确认</b>：角色 ${escapeHtml(pendingCharacterName)} ｜曜彩 ${escapeHtml(pendingAuroraName)}</p>`,
+      `<p><b>已确认</b>：角色 ${escapeHtml(confirmedCharacterName)} ｜曜彩 ${escapeHtml(confirmedAuroraName)}</p>`,
     ].join('');
 
     const verdict = getLoadoutConfirmState(me);
     dom.confirmLoadoutBtn.disabled = !verdict.canConfirm;
-    dom.confirmLoadoutBtn.textContent = verdict.canConfirm ? '确认当前选择' : '确认当前选择';
+    dom.confirmLoadoutBtn.textContent = '确认当前选择';
 
     if (verdict.canConfirm) {
       dom.confirmHint.textContent = state.ui.confirmHint || '点击确认后才会提交到房间。';
@@ -302,8 +337,8 @@
 
       state.ui.pendingDirty = false;
       state.ui.confirmHint = pickedCharacter && pickedCharacter.auroraUses > 0 && pickedAuroraId
-        ? `已提交选择：${pickedCharacter.name} + ${getAuroraNameById(pickedAuroraId)}`
-        : `已提交选择：${pickedCharacter ? pickedCharacter.name : '角色'}`;
+        ? `宸叉彁浜ら€夋嫨）'{pickedCharacter.name} + ${getAuroraNameById(pickedAuroraId)}`
+        : `宸叉彁浜ら€夋嫨）'{pickedCharacter ? pickedCharacter.name : '瑙掕壊'}`;
 
       GPP.render();
     };
@@ -322,7 +357,7 @@
       const btn = document.createElement('button');
       btn.className = 'selectionBtn';
       btn.type = 'button';
-      btn.innerHTML = `${escapeHtml(c.name)} · ${formatShortSpecHtml(c.shortSpec)}`;
+      btn.innerHTML = `${escapeHtml(c.name)} 路 ${formatShortSpecHtml(c.shortSpec)}`;
       if (me.characterId === c.id) btn.classList.add('confirmedSelection');
       if (state.ui.pendingCharacterId === c.id) btn.classList.add('pendingSelection');
       btn.onclick = () => {
@@ -368,7 +403,7 @@
       const btn = document.createElement('button');
       btn.className = 'selectionBtn';
       btn.type = 'button';
-      btn.textContent = `${a.name} · ${a.facesText}`;
+      btn.textContent = `${a.name} 路 ${a.facesText}`;
       if (me.auroraDiceId === a.id) btn.classList.add('confirmedSelection');
       if (state.ui.pendingAuroraDiceId === a.id) btn.classList.add('pendingSelection');
       btn.onclick = () => {
@@ -380,7 +415,7 @@
 
       const tip = document.createElement('div');
       tip.className = 'tooltip';
-      tip.innerHTML = `<b>${a.name}</b><br>骰面：${a.facesText}<br>${a.effectText}<br>条件：${a.conditionText}`;
+      tip.innerHTML = `<b>${escapeHtml(a.name)}</b><br>骰面：${escapeHtml(a.facesText)}<br>${escapeHtml(a.effectText)}<br>条件：${escapeHtml(a.conditionText)}`;
 
       wrap.appendChild(btn);
       wrap.appendChild(tip);
@@ -397,7 +432,7 @@
     if (game.attackValue !== null && game.attackValue !== undefined && game.defenseValue !== null && game.defenseValue !== undefined) {
       const diff = game.attackPierce ? game.attackValue : Math.max(0, game.attackValue - game.defenseValue);
       const tag = game.attackPierce ? '洞穿' : '差值';
-      dom.battleCenterScore.textContent = `${game.attackValue} : ${game.defenseValue} · ${tag} ${diff}`;
+      dom.battleCenterScore.textContent = `${game.attackValue} : ${game.defenseValue} 路 ${tag} ${diff}`;
       return;
     }
 
@@ -415,7 +450,7 @@
     }
 
     if (game.phase === 'defense_roll' && game.defenderId === state.me) {
-      dom.battleCenterScore.textContent = '点击投掷防守骰';
+      dom.battleCenterScore.textContent = '点击投掷防御骰';
       dom.battleCenterScore.classList.add('clickableCenter');
       dom.battleCenterScore.onclick = () => {
         if (state.pendingAction) return;
@@ -482,7 +517,7 @@
 
         const hint = document.createElement('p');
         hint.className = 'railHint';
-        hint.textContent = `已选 ${state.selectedDice.size}/${needCount} · 剩余重投 ${game.rerollsLeft}`;
+        hint.textContent = `已选 ${state.selectedDice.size}/${needCount} ｜ 剩余重投 ${game.rerollsLeft}`;
         actions.appendChild(hint);
 
         if (!meChar || meChar.auroraUses > 0) {
@@ -515,7 +550,7 @@
 
     if (game.phase === 'defense_roll') {
       if (game.defenderId === state.me) {
-        actions.appendChild(createActionButton('投掷防守骰', '投掷中...', 'roll_defense', false, () => {
+        actions.appendChild(createActionButton('投掷防御骰', '投掷中...', 'roll_defense', false, () => {
           GPP.clearSelection();
           sendWithFeedback('roll_defense', 'roll_defense');
         }, 'primaryBtn'));
@@ -551,7 +586,7 @@
           ));
         }
 
-        actions.appendChild(createActionButton(`确认防守（选${needCount}）`, '确认中...', 'confirm_defense', state.selectedDice.size !== needCount, () => {
+        actions.appendChild(createActionButton(`确认防御（选${needCount}）`, '确认中...', 'confirm_defense', state.selectedDice.size !== needCount, () => {
           const indices = [...state.selectedDice];
           GPP.clearSelection();
           sendWithFeedback('confirm_defense_selection', 'confirm_defense', { indices });
@@ -569,6 +604,40 @@
     dom.actionRail.appendChild(actions);
   }
 
+  function getTurnOwnership(game) {
+    if (!game) return { ownerId: null, ownerType: 'neutral', label: '等待开局' };
+    if (game.phase === 'attack_roll' || game.phase === 'attack_reroll_or_select') {
+      const mine = game.attackerId === state.me;
+      return {
+        ownerId: game.attackerId,
+        ownerType: mine ? 'self' : 'enemy',
+        label: mine ? '当前是你的攻击回合' : '当前是对方攻击回合',
+      };
+    }
+    if (game.phase === 'defense_roll' || game.phase === 'defense_select') {
+      const mine = game.defenderId === state.me;
+      return {
+        ownerId: game.defenderId,
+        ownerType: mine ? 'self' : 'enemy',
+        label: mine ? '当前是你的防守回合' : '当前是对方防守回合',
+      };
+    }
+    if (game.phase === 'ended' || game.status === 'ended') {
+      return { ownerId: null, ownerType: 'neutral', label: '本局已结束' };
+    }
+    return { ownerId: null, ownerType: 'neutral', label: '等待回合推进' };
+  }
+
+  function renderTurnOwnershipCard(game) {
+    if (!dom.turnOwnershipCard) return;
+    const info = getTurnOwnership(game);
+    dom.turnOwnershipCard.className = `turnOwnershipCard turnOwner-${info.ownerType}`;
+    dom.turnOwnershipCard.innerHTML = [
+      '<p class="turnOwnershipLabel">回合归属</p>',
+      `<p class="turnOwnershipText">${escapeHtml(info.label)}</p>`,
+    ].join('');
+  }
+
   function renderWeatherPanels(game) {
     const weatherDisplay = GPP.getWeatherDisplay(game);
     const typeText = weatherDisplay.type === '-' ? '未生效' : weatherDisplay.type;
@@ -576,23 +645,23 @@
     const stageText = weatherDisplay.stageRound ? `回合${weatherDisplay.stageRound}阶段` : '开局阶段';
 
     if (dom.weatherStatusCard) {
+      dom.weatherStatusCard.className = `weatherStatusCard weatherTypeCard-${typeClass}`;
       dom.weatherStatusCard.innerHTML = [
         '<p class="weatherStatusLabel">当前天气</p>',
         `<div class="weatherStatusHead"><h4>${escapeHtml(weatherDisplay.name)}</h4><span class="weatherTypeTag weatherType-${typeClass}">${escapeHtml(typeText)}</span></div>`,
         `<p class="weatherStatusMeta">阶段：${escapeHtml(stageText)}</p>`,
         `<p class="weatherStatusDesc">${escapeHtml(weatherDisplay.effect)}</p>`,
       ].join('');
-      dom.weatherStatusCard.classList.remove('hidden');
     }
 
     if (dom.weatherBanner) {
+      dom.weatherBanner.className = `weatherBanner weatherTypeCard-${typeClass}`;
       dom.weatherBanner.innerHTML = [
         '<span class="weatherBannerPrefix">天气</span>',
         `<span class="weatherBannerName">${escapeHtml(weatherDisplay.name)}</span>`,
         `<span class="weatherTypeTag weatherType-${typeClass}">${escapeHtml(typeText)}</span>`,
         `<span class="weatherBannerEffect">${escapeHtml(weatherDisplay.effect)}</span>`,
       ].join('');
-      dom.weatherBanner.classList.remove('hidden');
     }
   }
 
@@ -646,7 +715,7 @@
     stats.className = 'atkDefBox';
     const atkLevel = game.attackLevel && game.attackLevel[player.id] !== undefined ? game.attackLevel[player.id] : '-';
     const defLevel = game.defenseLevel && game.defenseLevel[player.id] !== undefined ? game.defenseLevel[player.id] : '-';
-    stats.textContent = `攻击等级 ${atkLevel} · 防守等级 ${defLevel}`;
+    stats.textContent = `攻击等级 ${atkLevel} ｜ 防御等级 ${defLevel}`;
     zoneEl.appendChild(stats);
 
     const meta = document.createElement('p');
@@ -697,7 +766,7 @@
       ? '攻击骰'
       : displayed.lane === 'attack_selected'
         ? '已确认攻击骰'
-        : '防守骰';
+        : '防御骰';
 
     const diceTitle = document.createElement('p');
     diceTitle.className = 'metaLine diceTitle';
@@ -761,6 +830,7 @@
     dom.roomPanel.classList.add('hidden');
     dom.msgPanel.classList.remove('hidden');
     if (dom.weatherStatusCard) dom.weatherStatusCard.classList.add('hidden');
+    if (dom.turnOwnershipCard) dom.turnOwnershipCard.classList.add('hidden');
     if (dom.weatherBanner) dom.weatherBanner.classList.add('hidden');
 
     syncLogDrawer();
@@ -781,6 +851,7 @@
       dom.lobbyArea.classList.remove('hidden');
       if (dom.lobbyControls) dom.lobbyControls.classList.remove('hidden');
       if (dom.weatherStatusCard) dom.weatherStatusCard.classList.add('hidden');
+      if (dom.turnOwnershipCard) dom.turnOwnershipCard.classList.add('hidden');
       if (dom.weatherBanner) dom.weatherBanner.classList.add('hidden');
 
       const me = GPP.findPlayer(state.me);
@@ -804,9 +875,10 @@
     const me = GPP.findPlayer(state.me);
     const enemy = room.players.find((p) => p.id !== state.me) || null;
 
-    dom.roundInfo.textContent = `第 ${game.round} 回合 · ${getPhaseLabel(game.phase)}`;
+    dom.roundInfo.textContent = `第${game.round}回合 ｜ ${getPhaseLabel(game.phase)}`;
     dom.turnInfo.textContent = `攻击方：${attacker ? attacker.name : '-'} ｜ 防守方：${defender ? defender.name : '-'}`;
     renderWeatherPanels(game);
+    renderTurnOwnershipCard(game);
 
     renderPlayerZone(game, enemy, dom.enemyZone, false);
     renderPlayerZone(game, me, dom.selfZone, true);
@@ -838,3 +910,5 @@
 
   GPP.render = render;
 })();
+
+

@@ -66,6 +66,14 @@ function sumByIndices(dice, indices) {
   return indices.reduce((acc, idx) => acc + dice[idx].value, 0);
 }
 
+function getEffectiveSelectionCount(requestedCount, diceCount) {
+  const requested = Number.isInteger(requestedCount) ? requestedCount : 1;
+  const maxCount = Number.isInteger(diceCount) && diceCount > 0 ? diceCount : 1;
+  if (requested < 1) return 1;
+  if (requested > maxCount) return maxCount;
+  return requested;
+}
+
 function isValidDistinctIndices(indices, needCount, diceCount) {
   if (!Array.isArray(indices)) return false;
   if (indices.length !== needCount) return false;
@@ -157,6 +165,7 @@ module.exports = {
   sortDice,
   diceToText,
   sumByIndices,
+  getEffectiveSelectionCount,
   isValidDistinctIndices,
   isValidDistinctIndicesAnyCount,
   countSelectedValue,

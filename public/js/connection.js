@@ -4,6 +4,8 @@
 
   const CONNECT_WELCOME_TIMEOUT_MS = 6000;
   const ROOM_ACK_TIMEOUT_MS = 8000;
+  const RECONNECT_TOKEN_KEY = 'gpp_reconnect_token';
+  const LAST_ROOM_CODE_KEY = 'gpp_last_room_code';
 
   let connectWatchdogTimer = null;
   let roomAckTimer = null;
@@ -22,6 +24,24 @@
     if (handle) {
       clearTimeout(handle);
     }
+  }
+
+  function storageGet(key) {
+    try {
+      return localStorage.getItem(key) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function storageSet(key, value) {
+    try {
+      if (value === null || value === undefined || value === '') {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, String(value));
+      }
+    } catch {}
   }
 
   function setLaunchHint(text) {
@@ -196,6 +216,21 @@
     }
   }
 
+  function tryResumeSession() {
+    const roomCode = storageGet(LAST_ROOM_CODE_KEY);
+    const storedToken = storageGet(RECONNECT_TOKEN_KEY);
+    const reconnectToken = (roomCode && storedToken)
+      ? storedToken
+      : (state.ui.reconnectToken || storedToken);
+    if (!roomCode || !reconnectToken) return false;
+
+    state.ui.resumePending = true;
+    setLaunchHint(`检测到历史房间 ${roomCode}，正在尝试恢复会话...`);
+    setConnectionState('welcome_received', '检测到断线会话，正在自动恢复。');
+    send('resume_session', { roomCode, reconnectToken });
+    return true;
+  }
+
   function openSocket(url) {
     try {
       return new WebSocket(url);
@@ -263,6 +298,8 @@
 
       if (msg.type === 'welcome') {
         state.me = msg.playerId;
+        const freshReconnectToken = typeof msg.reconnectToken === 'string' ? msg.reconnectToken : '';
+        state.ui.reconnectToken = freshReconnectToken || state.ui.reconnectToken || '';
         (msg.characters || []).forEach((c) => {
           state.characters[c.id] = c;
         });
@@ -274,6 +311,14 @@
 
         state.ui.welcomeReceived = true;
         stopConnectWatchdog();
+
+        if (tryResumeSession()) {
+          return;
+        }
+
+        if (freshReconnectToken) {
+          storageSet(RECONNECT_TOKEN_KEY, freshReconnectToken);
+        }
 
         if (state.ui.launchIntent) {
           setConnectionState('welcome_received', '连接成功，正在自动进入房间。');
@@ -290,11 +335,16 @@
 
       if (msg.type === 'room_state') {
         state.pendingAction = null;
+        state.ui.resumePending = false;
         const prevRoomCode = state.room && state.room.code;
         const prevHadGame = !!(state.room && state.room.game);
         const nextRoomCode = msg.room && msg.room.code;
 
         state.room = msg.room;
+        if (state.room && state.room.code) {
+          storageSet(LAST_ROOM_CODE_KEY, state.room.code);
+          state.ui.launchIntentConsumed = true;
+        }
         if (prevRoomCode !== nextRoomCode) {
           state.ui.pendingCharacterId = null;
           state.ui.pendingAuroraDiceId = null;
@@ -333,6 +383,56 @@
         return;
       }
 
+      if (msg.type === 'session_resumed') {
+        if (msg.playerId) {
+          state.me = msg.playerId;
+          if (dom.myIdEl) {
+            dom.myIdEl.textContent = `玩家ID：${msg.playerId}`;
+          }
+        }
+        state.ui.resumePending = false;
+        state.ui.launchIntentConsumed = true;
+        stopRoomAckWatchdog();
+        setConnectionState('welcome_received', '会话恢复成功。');
+        setMessage('已恢复到断线前房间。');
+        if (msg.roomCode) {
+          storageSet(LAST_ROOM_CODE_KEY, msg.roomCode);
+        }
+        const savedToken = storageGet(RECONNECT_TOKEN_KEY);
+        if (savedToken) {
+          state.ui.reconnectToken = savedToken;
+        }
+        return;
+      }
+
+      if (msg.type === 'session_resume_failed') {
+        state.ui.resumePending = false;
+        storageSet(LAST_ROOM_CODE_KEY, '');
+        if (state.ui.reconnectToken) {
+          storageSet(RECONNECT_TOKEN_KEY, state.ui.reconnectToken);
+        }
+        const reason = msg.reason || 'unknown';
+        setMessage(`会话恢复失败：${reason}`);
+        setConnectionState('welcome_received', '历史会话恢复失败，将尝试常规入房。');
+        if (state.ui.launchIntent) {
+          triggerLaunchIntent(false);
+        }
+        return;
+      }
+
+      if (msg.type === 'player_presence_changed') {
+        if (state.room && state.room.code === msg.roomCode && Array.isArray(state.room.players)) {
+          const target = state.room.players.find((p) => p.id === msg.playerId);
+          if (target) {
+            target.isOnline = msg.isOnline !== false;
+            target.disconnectedAt = msg.disconnectedAt || null;
+            target.graceDeadline = msg.graceDeadline || null;
+            GPP.render();
+          }
+        }
+        return;
+      }
+
       if (msg.type === 'weather_changed') {
         const weatherPayload = msg.weather || null;
         const display = GPP.getWeatherDisplay({
@@ -346,6 +446,7 @@
       if (msg.type === 'left_room') {
         state.pendingAction = null;
         state.room = null;
+        state.ui.resumePending = false;
         GPP.clearSelection();
         state.lastProcessedEffectId = 0;
         state.ui.pendingCharacterId = null;
@@ -353,6 +454,7 @@
         state.ui.pendingDirty = false;
         state.ui.confirmHint = '';
         state.ui.launchIntentConsumed = false;
+        storageSet(LAST_ROOM_CODE_KEY, '');
         stopRoomAckWatchdog();
         GPP.render();
 
@@ -367,7 +469,11 @@
         state.pendingAction = null;
         const errorText = `错误：${msg.message}`;
         setMessage(errorText);
-        setConnectionState('failed', '服务器返回错误。', msg.message || errorText);
+        if (state.ui.welcomeReceived && GPP.ws && GPP.ws.readyState === WebSocket.OPEN) {
+          setConnectionState('welcome_received', '连接稳定。', '');
+        } else {
+          setConnectionState('failed', '服务器返回错误。', msg.message || errorText);
+        }
         GPP.showErrorToast(msg.message || '发生错误');
         GPP.render();
         return;
@@ -394,6 +500,7 @@
     clearTimer(reconnectTimer);
 
     stopConnectWatchdog();
+    state.ui.resumePending = false;
 
     let wsUrl;
     try {

@@ -29,6 +29,8 @@ const state = {
     socketToken: 0,
     welcomeReceived: false,
     roomAckPending: false,
+    resumePending: false,
+    reconnectToken: '',
   },
 };
 
@@ -56,6 +58,7 @@ const dom = {
   roomCodeEl: document.getElementById('roomCode'),
   playersList: document.getElementById('playersList'),
   weatherStatusCard: document.getElementById('weatherStatusCard'),
+  turnOwnershipCard: document.getElementById('turnOwnershipCard'),
   lobbyArea: document.getElementById('lobbyArea'),
   lobbyControls: document.getElementById('lobbyControls'),
   selectionSummary: document.getElementById('selectionSummary'),

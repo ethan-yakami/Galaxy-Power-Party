@@ -2,6 +2,7 @@
   const { state, send } = GPP;
 
   let liveSelectionTimeout = null;
+  let dragSelection = null;
 
   function sumSelectedIndices(dice, indices) {
     let sum = 0;
@@ -11,11 +12,26 @@
     return sum;
   }
 
-  function getNeedCountForPhase(game, phase) {
+  function getRawNeedCountForPhase(game, phase) {
     if (phase === 'attack') {
       return game.attackLevel && game.attackLevel[game.attackerId] !== undefined ? game.attackLevel[game.attackerId] : 3;
     }
     return game.defenseLevel && game.defenseLevel[game.defenderId] !== undefined ? game.defenseLevel[game.defenderId] : 3;
+  }
+
+  function getEffectiveSelectionCount(requestedCount, diceCount) {
+    const requested = Number.isInteger(requestedCount) ? requestedCount : 1;
+    const maxCount = Number.isInteger(diceCount) && diceCount > 0 ? diceCount : 1;
+    if (requested < 1) return 1;
+    if (requested > maxCount) return maxCount;
+    return requested;
+  }
+
+  function getNeedCountForPhase(game, phase) {
+    const rawNeed = getRawNeedCountForPhase(game, phase);
+    const dice = phase === 'attack' ? game.attackDice : game.defenseDice;
+    const diceCount = Array.isArray(dice) ? dice.length : 0;
+    return getEffectiveSelectionCount(rawNeed, diceCount);
   }
 
   function toggleDie(index, maxSelectable) {
@@ -29,6 +45,49 @@
       send('update_live_selection', { indices: [...state.selectedDice] });
     }, 80);
     GPP.render();
+  }
+
+  function applySelectionMode(index, maxSelectable, mode) {
+    if (mode === 'remove') {
+      state.selectedDice.delete(index);
+      return;
+    }
+    if (state.selectedDice.has(index)) return;
+    if (maxSelectable !== null && maxSelectable !== undefined && state.selectedDice.size >= maxSelectable) return;
+    state.selectedDice.add(index);
+  }
+
+  function syncLiveSelection() {
+    clearTimeout(liveSelectionTimeout);
+    liveSelectionTimeout = setTimeout(() => {
+      send('update_live_selection', { indices: [...state.selectedDice] });
+    }, 80);
+  }
+
+  function beginDragSelection(index, maxSelectable) {
+    const mode = state.selectedDice.has(index) ? 'remove' : 'add';
+    dragSelection = {
+      mode,
+      maxSelectable,
+      visited: new Set(),
+    };
+    dragSelection.visited.add(index);
+    applySelectionMode(index, maxSelectable, mode);
+    syncLiveSelection();
+    GPP.render();
+  }
+
+  function moveDragSelection(index) {
+    if (!dragSelection) return;
+    if (dragSelection.visited.has(index)) return;
+    dragSelection.visited.add(index);
+    applySelectionMode(index, dragSelection.maxSelectable, dragSelection.mode);
+    syncLiveSelection();
+    GPP.render();
+  }
+
+  function endDragSelection() {
+    dragSelection = null;
   }
 
   function getDieShapeClass(die) {
@@ -55,7 +114,25 @@
       node.appendChild(label);
 
       if (clickable) {
-        node.onclick = () => toggleDie(index, maxSelectable);
+        node.onpointerdown = (event) => {
+          event.preventDefault();
+          beginDragSelection(index, maxSelectable);
+        };
+        node.onpointerenter = () => {
+          moveDragSelection(index);
+        };
+        node.onpointerup = () => {
+          endDragSelection();
+        };
+        node.onpointercancel = () => {
+          endDragSelection();
+        };
+        node.onmouseleave = () => {
+          if (!dragSelection) return;
+        };
+      } else {
+        node.onpointerdown = null;
+        node.onpointerenter = null;
       }
       row.appendChild(node);
     });
@@ -140,6 +217,8 @@
 
   Object.assign(GPP, {
     sumSelectedIndices,
+    getRawNeedCountForPhase,
+    getEffectiveSelectionCount,
     getNeedCountForPhase,
     toggleDie,
     renderDice,
@@ -148,4 +227,7 @@
     getCommittedSumForPlayer,
     getPreviewSelectionForPlayer,
   });
+
+  window.addEventListener('pointerup', endDragSelection);
+  window.addEventListener('pointercancel', endDragSelection);
 })();

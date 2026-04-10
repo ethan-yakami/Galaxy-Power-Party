@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const SkillRegistry = require('./skillRegistry');
 
 const CHAR_DIR = path.join(__dirname, 'entities', 'characters');
 const AURORA_DIR = path.join(__dirname, 'entities', 'auroras');
@@ -28,6 +29,52 @@ function isNonNegativeInt(value) {
   return Number.isInteger(value) && value >= 0;
 }
 
+function normalizeSkillRefs(raw) {
+  if (!Array.isArray(raw)) return [];
+  const refs = [];
+  for (const item of raw) {
+    if (typeof item === 'string' && item.trim()) {
+      refs.push({ skillId: item.trim(), params: {} });
+      continue;
+    }
+    if (!isPlainObject(item)) continue;
+    const skillId = typeof item.skillId === 'string' ? item.skillId.trim() : '';
+    if (!skillId) continue;
+    refs.push({
+      skillId,
+      params: isPlainObject(item.params) ? item.params : {},
+    });
+  }
+  return refs;
+}
+
+function buildLegacyCharacterSkill(id, hooks) {
+  const skillId = `character:${id}:legacy`;
+  const handlers = {};
+  for (const [hookName, fn] of Object.entries(hooks || {})) {
+    if (typeof fn !== 'function') continue;
+    handlers[hookName] = ({ args = [] }) => fn(...args);
+  }
+  SkillRegistry.register(skillId, handlers, { kind: 'character', ownerId: id, legacy: true });
+  return { skillId, params: {} };
+}
+
+function buildLegacyAuroraSkill(id, hooks) {
+  const skillId = `aurora:${id}:legacy`;
+  const handlers = {};
+  if (typeof hooks.canUse === 'function') {
+    handlers.canUse = ({ player, game, role }) => hooks.canUse(player, game, role);
+  }
+  if (typeof hooks.onAttack === 'function') {
+    handlers.onAttack = ({ game, player, auroraDie, room }) => hooks.onAttack(game, player, auroraDie, room);
+  }
+  if (typeof hooks.onDefense === 'function') {
+    handlers.onDefense = ({ game, player, auroraDie, room }) => hooks.onDefense(game, player, auroraDie, room);
+  }
+  SkillRegistry.register(skillId, handlers, { kind: 'aurora', ownerId: id, legacy: true });
+  return { skillId, params: {} };
+}
+
 function loadDir(dir) {
   const registry = {};
   if (!fs.existsSync(dir)) return registry;
@@ -42,9 +89,6 @@ function loadDir(dir) {
       if (!entity || !entity.id) {
         console.warn(`[Registry] Skipping ${file}: missing "id" field.`);
         continue;
-      }
-      if (registry[entity.id]) {
-        console.warn(`[Registry] Duplicate id "${entity.id}" in ${file}; overriding previous.`);
       }
       registry[entity.id] = entity;
     } catch (err) {
@@ -82,7 +126,6 @@ function normalizeCharacterEntity(entity, sourceTag, options = {}) {
     console.warn(`[Registry] Skipping ${sourceTag}: invalid "diceSides".`);
     return null;
   }
-
   for (const side of entity.diceSides) {
     if (!isPositiveInt(side) || side < 2) {
       console.warn(`[Registry] Skipping ${sourceTag}: invalid die side "${side}".`);
@@ -115,6 +158,10 @@ function normalizeCharacterEntity(entity, sourceTag, options = {}) {
     return null;
   }
 
+  const explicitSkillRefs = normalizeSkillRefs(entity.skills);
+  const legacyRef = buildLegacyCharacterSkill(id, hooks);
+  const skills = explicitSkillRefs.length ? explicitSkillRefs : [legacyRef];
+
   const baseCharacterId = options.baseCharacterId || id;
   const isCustomVariant = !!options.isCustomVariant;
 
@@ -128,15 +175,26 @@ function normalizeCharacterEntity(entity, sourceTag, options = {}) {
     defenseLevel: entity.defenseLevel,
     skillText,
     hooks,
+    skills,
     maxAttackRerolls,
     baseCharacterId,
     isCustomVariant,
   });
 }
 
+function normalizeAuroraEntity(entity, sourceTag) {
+  if (!isPlainObject(entity)) return null;
+  const id = typeof entity.id === 'string' ? entity.id.trim() : '';
+  if (!id) return null;
+  const hooks = isPlainObject(entity.hooks) ? entity.hooks : {};
+  const explicitSkillRefs = normalizeSkillRefs(entity.skills);
+  const legacyRef = buildLegacyAuroraSkill(id, hooks);
+  const skills = explicitSkillRefs.length ? explicitSkillRefs : [legacyRef];
+  return Object.assign({}, entity, { id, hooks, skills });
+}
+
 function loadCustomCharacterVariants() {
   if (!fs.existsSync(CUSTOM_CHAR_PATH)) return [];
-
   try {
     const raw = fs.readFileSync(CUSTOM_CHAR_PATH, 'utf8');
     const parsed = JSON.parse(raw);
@@ -161,15 +219,13 @@ function buildVariantCharacter(variant, characterRegistry) {
     return null;
   }
 
-  const enabled = variant.enabled !== false;
-  if (!enabled) return null;
+  if (variant.enabled === false) return null;
 
   const id = typeof variant.id === 'string' ? variant.id.trim() : '';
   if (!id) {
     console.warn('[Registry] Skipping custom variant: missing/invalid "id".');
     return null;
   }
-
   if (characterRegistry[id]) {
     console.warn(`[Registry] Skipping custom variant "${id}": id already exists.`);
     return null;
@@ -192,7 +248,6 @@ function buildVariantCharacter(variant, characterRegistry) {
     console.warn(`[Registry] Skipping custom variant "${id}": missing/invalid "overrides".`);
     return null;
   }
-
   for (const key of Object.keys(overrides)) {
     if (!ALLOWED_VARIANT_OVERRIDE_KEYS.has(key)) {
       console.warn(`[Registry] Skipping custom variant "${id}": override key "${key}" is not allowed.`);
@@ -205,6 +260,7 @@ function buildVariantCharacter(variant, characterRegistry) {
     id,
     name,
     hooks: base.hooks,
+    skills: base.skills,
     skillText: base.skillText,
   });
 
@@ -220,8 +276,7 @@ function buildCharacterRegistry() {
   const baseIds = Object.keys(baseCharacters).sort();
 
   for (const id of baseIds) {
-    const raw = baseCharacters[id];
-    const normalized = normalizeCharacterEntity(raw, `character "${id}"`, {
+    const normalized = normalizeCharacterEntity(baseCharacters[id], `character "${id}"`, {
       baseCharacterId: id,
       isCustomVariant: false,
     });
@@ -239,12 +294,40 @@ function buildCharacterRegistry() {
   return registry;
 }
 
+function buildAuroraRegistry() {
+  const registry = {};
+  const raw = loadDir(AURORA_DIR);
+  for (const id of Object.keys(raw)) {
+    const normalized = normalizeAuroraEntity(raw[id], `aurora "${id}"`);
+    if (!normalized) continue;
+    registry[normalized.id] = normalized;
+  }
+  return registry;
+}
+
 function countSides(sides) {
   const map = {};
   for (const s of sides) map[s] = (map[s] || 0) + 1;
   const keys = Object.keys(map).map(Number).sort((a, b) => b - a);
   return keys.map((k) => `${map[k]}x${k}`).join(' ');
 }
+
+const CharacterRegistry = {};
+const AuroraRegistry = {};
+
+function reloadRegistry() {
+  SkillRegistry.clear();
+  const nextCharacters = buildCharacterRegistry();
+  const nextAuroras = buildAuroraRegistry();
+
+  for (const id of Object.keys(CharacterRegistry)) delete CharacterRegistry[id];
+  for (const id of Object.keys(AuroraRegistry)) delete AuroraRegistry[id];
+
+  Object.assign(CharacterRegistry, nextCharacters);
+  Object.assign(AuroraRegistry, nextAuroras);
+}
+
+reloadRegistry();
 
 function getCharacterSummary() {
   return Object.values(CharacterRegistry).map((c) => ({
@@ -276,56 +359,58 @@ function getAuroraDiceSummary() {
 function triggerCharacterHook(hookName, player, ...args) {
   if (!player || !player.characterId) return null;
   const entity = CharacterRegistry[player.characterId];
-  if (!entity) return null;
-  const hooks = entity.hooks;
-  if (hooks && typeof hooks[hookName] === 'function') {
-    return hooks[hookName](...args);
-  }
-  return null;
+  if (!entity || !Array.isArray(entity.skills)) return null;
+  return SkillRegistry.runMany(entity.skills, hookName, {
+    kind: 'character',
+    ownerId: entity.id,
+    player,
+    args,
+    game: args[0] || null,
+  });
 }
 
 function characterShouldAscend(player, game) {
-  if (!player || !player.characterId) return false;
-  const entity = CharacterRegistry[player.characterId];
-  if (!entity || !entity.hooks) return false;
-  if (typeof entity.hooks.shouldAscend !== 'function') return false;
-
-  try {
-    return !!entity.hooks.shouldAscend(game, player);
-  } catch (err) {
-    console.error(`[Registry] character shouldAscend hook failed for "${player.characterId}":`, err);
-    return false;
-  }
+  const result = triggerCharacterHook('shouldAscend', player, game, player);
+  return !!result;
 }
 
 function characterAiScoreAttack(characterId, dice, indices, game, playerId) {
   const entity = CharacterRegistry[characterId];
-  if (!entity) return 0;
-  const hooks = entity.hooks;
-  if (hooks && typeof hooks.aiScoreAttackCombo === 'function') {
-    return hooks.aiScoreAttackCombo(dice, indices, game, playerId);
-  }
-  return 0;
+  if (!entity || !Array.isArray(entity.skills)) return 0;
+  const result = SkillRegistry.runMany(entity.skills, 'aiScoreAttackCombo', {
+    kind: 'character',
+    ownerId: entity.id,
+    args: [dice, indices, game, playerId],
+    game,
+    playerId,
+  });
+  return typeof result === 'number' ? result : 0;
 }
 
 function characterAiScoreDefense(characterId, dice, indices, game, playerId) {
   const entity = CharacterRegistry[characterId];
-  if (!entity) return 0;
-  const hooks = entity.hooks;
-  if (hooks && typeof hooks.aiScoreDefenseCombo === 'function') {
-    return hooks.aiScoreDefenseCombo(dice, indices, game, playerId);
-  }
-  return 0;
+  if (!entity || !Array.isArray(entity.skills)) return 0;
+  const result = SkillRegistry.runMany(entity.skills, 'aiScoreDefenseCombo', {
+    kind: 'character',
+    ownerId: entity.id,
+    args: [dice, indices, game, playerId],
+    game,
+    playerId,
+  });
+  return typeof result === 'number' ? result : 0;
 }
 
 function characterAiFilterReroll(characterId, dice, game, playerId) {
   const entity = CharacterRegistry[characterId];
-  if (!entity) return null;
-  const hooks = entity.hooks;
-  if (hooks && typeof hooks.aiFilterReroll === 'function') {
-    return hooks.aiFilterReroll(dice, game, playerId);
-  }
-  return null;
+  if (!entity || !Array.isArray(entity.skills)) return null;
+  const result = SkillRegistry.runMany(entity.skills, 'aiFilterReroll', {
+    kind: 'character',
+    ownerId: entity.id,
+    args: [dice, game, playerId],
+    game,
+    playerId,
+  });
+  return Array.isArray(result) ? result : null;
 }
 
 function canUseAurora(player, game, role) {
@@ -337,38 +422,48 @@ function canUseAurora(player, game, role) {
   if (game.roundAuroraUsed[player.id]) return { ok: false, reason: '本轮你已使用过曜彩骰。' };
 
   const entity = AuroraRegistry[auroraId];
-  if (entity && entity.hooks && typeof entity.hooks.canUse === 'function') {
-    const check = entity.hooks.canUse(player, game, role);
-    if (check && !check.ok) return check;
-  }
+  if (!entity || !Array.isArray(entity.skills)) return { ok: true, reason: '' };
+
+  const check = SkillRegistry.runMany(entity.skills, 'canUse', {
+    kind: 'aurora',
+    ownerId: entity.id,
+    player,
+    game,
+    role,
+    args: [player, game, role],
+  });
+  if (check && check.ok === false) return check;
   return { ok: true, reason: '' };
 }
 
 function triggerAuroraOnAttack(game, attacker, auroraDie, room) {
   if (!auroraDie || !auroraDie.hasA) return;
   const entity = AuroraRegistry[auroraDie.auroraId];
-  if (entity && entity.hooks && typeof entity.hooks.onAttack === 'function') {
-    entity.hooks.onAttack(game, attacker, auroraDie, room);
-  }
+  if (!entity || !Array.isArray(entity.skills)) return;
+  SkillRegistry.runMany(entity.skills, 'onAttack', {
+    kind: 'aurora',
+    ownerId: entity.id,
+    game,
+    player: attacker,
+    auroraDie,
+    room,
+    args: [game, attacker, auroraDie, room],
+  });
 }
 
 function triggerAuroraOnDefense(game, defender, auroraDie, room) {
   if (!auroraDie || !auroraDie.hasA) return;
   const entity = AuroraRegistry[auroraDie.auroraId];
-  if (entity && entity.hooks && typeof entity.hooks.onDefense === 'function') {
-    entity.hooks.onDefense(game, defender, auroraDie, room);
-  }
-}
-
-let CharacterRegistry = buildCharacterRegistry();
-const AuroraRegistry = loadDir(AURORA_DIR);
-
-function reloadRegistry() {
-  const nextRegistry = buildCharacterRegistry();
-  for (const id of Object.keys(CharacterRegistry)) {
-    delete CharacterRegistry[id];
-  }
-  Object.assign(CharacterRegistry, nextRegistry);
+  if (!entity || !Array.isArray(entity.skills)) return;
+  SkillRegistry.runMany(entity.skills, 'onDefense', {
+    kind: 'aurora',
+    ownerId: entity.id,
+    game,
+    player: defender,
+    auroraDie,
+    room,
+    args: [game, defender, auroraDie, room],
+  });
 }
 
 function saveCustomVariant(variant) {
@@ -408,4 +503,5 @@ module.exports = {
   canUseAurora,
   triggerAuroraOnAttack,
   triggerAuroraOnDefense,
+  SkillRegistry,
 };
