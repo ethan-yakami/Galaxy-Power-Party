@@ -1,4 +1,4 @@
-﻿(function() {
+(function() {
   const { state, dom, send, sendWithFeedback } = GPP;
 
   const PHASE_LABELS = {
@@ -230,12 +230,12 @@
 
   function getCharacterNameById(characterId) {
     const c = state.characters[characterId];
-    return c ? c.name : '鏈€夋嫨';
+    return c ? c.name : '未选择';
   }
 
   function getAuroraNameById(auroraId) {
     const a = state.auroraDice.find((d) => d.id === auroraId);
-    return a ? a.name : '鏈€夋嫨';
+    return a ? a.name : '未选择';
   }
 
   function doesCharacterNeedAurora(characterId) {
@@ -337,8 +337,8 @@
 
       state.ui.pendingDirty = false;
       state.ui.confirmHint = pickedCharacter && pickedCharacter.auroraUses > 0 && pickedAuroraId
-        ? `宸叉彁浜ら€夋嫨）'{pickedCharacter.name} + ${getAuroraNameById(pickedAuroraId)}`
-        : `宸叉彁浜ら€夋嫨）'{pickedCharacter ? pickedCharacter.name : '瑙掕壊'}`;
+        ? `已提交选择）'{pickedCharacter.name} + ${getAuroraNameById(pickedAuroraId)}`
+        : `已提交选择）'{pickedCharacter ? pickedCharacter.name : '角色'}`;
 
       GPP.render();
     };
@@ -357,7 +357,7 @@
       const btn = document.createElement('button');
       btn.className = 'selectionBtn';
       btn.type = 'button';
-      btn.innerHTML = `${escapeHtml(c.name)} 路 ${formatShortSpecHtml(c.shortSpec)}`;
+      btn.innerHTML = `${escapeHtml(c.name)} &nbsp; ${formatShortSpecHtml(c.shortSpec)}`;
       if (me.characterId === c.id) btn.classList.add('confirmedSelection');
       if (state.ui.pendingCharacterId === c.id) btn.classList.add('pendingSelection');
       btn.onclick = () => {
@@ -403,7 +403,7 @@
       const btn = document.createElement('button');
       btn.className = 'selectionBtn';
       btn.type = 'button';
-      btn.textContent = `${a.name} 路 ${a.facesText}`;
+      btn.textContent = `${a.name}  ${a.facesText}`;
       if (me.auroraDiceId === a.id) btn.classList.add('confirmedSelection');
       if (state.ui.pendingAuroraDiceId === a.id) btn.classList.add('pendingSelection');
       btn.onclick = () => {
@@ -432,7 +432,7 @@
     if (game.attackValue !== null && game.attackValue !== undefined && game.defenseValue !== null && game.defenseValue !== undefined) {
       const diff = game.attackPierce ? game.attackValue : Math.max(0, game.attackValue - game.defenseValue);
       const tag = game.attackPierce ? '洞穿' : '差值';
-      dom.battleCenterScore.textContent = `${game.attackValue} : ${game.defenseValue} 路 ${tag} ${diff}`;
+      dom.battleCenterScore.textContent = `${game.attackValue} vs ${game.defenseValue}  ${tag} ${diff}`;
       return;
     }
 
@@ -461,6 +461,19 @@
     }
 
     dom.battleCenterScore.textContent = phaseText;
+  }
+
+  function getMapNumber(gameMap, playerId) {
+    if (!gameMap || gameMap[playerId] === undefined || gameMap[playerId] === null) return 0;
+    return gameMap[playerId];
+  }
+
+  function getAttackBonusDetails(game, playerId) {
+    return {
+      power: getMapNumber(game.power, playerId),
+      overload: getMapNumber(game.overload, playerId),
+      desperate: getMapNumber(game.desperateBonus, playerId),
+    };
   }
 
   function renderActionRail(game, me, enemy) {
@@ -736,11 +749,9 @@
     const poison = game.poison && game.poison[player.id];
     const resilience = game.resilience && game.resilience[player.id];
     const thorns = game.thorns && game.thorns[player.id];
-    const power = game.power && game.power[player.id];
     if (poison > 0) extras.push(`中毒${poison}`);
     if (resilience > 0) extras.push(`韧性${resilience}`);
     if (thorns > 0) extras.push(`荆棘${thorns}`);
-    if (power > 0) extras.push(`力量${power}`);
     if (game.forceField && game.forceField[player.id]) extras.push('力场');
     if (game.hackActive && game.hackActive[player.id]) extras.push('骇入');
     if (game.danhengCounterReady && game.danhengCounterReady[player.id]) extras.push('反击准备');
@@ -751,6 +762,31 @@
       extraLine.className = 'metaLine extraLine';
       extraLine.innerHTML = GPP.wrapGlossaryTerms(`状态：${extras.join(' ｜ ')}`);
       zoneEl.appendChild(extraLine);
+    }
+
+    const attackBonus = getAttackBonusDetails(game, player.id);
+    const attackBonusParts = [];
+    if (attackBonus.power > 0) attackBonusParts.push(`力量+${attackBonus.power}`);
+    if (attackBonus.overload > 0) attackBonusParts.push(`超载+${attackBonus.overload}`);
+    if (attackBonus.desperate > 0) attackBonusParts.push(`背水+${attackBonus.desperate}`);
+    if (attackBonusParts.length) {
+      const bonusLine = document.createElement('p');
+      bonusLine.className = 'metaLine bonusLine';
+      bonusLine.innerHTML = GPP.wrapGlossaryTerms(`攻击加成：${attackBonusParts.join(' ｜ ')}`);
+      zoneEl.appendChild(bonusLine);
+    }
+
+    const detailHints = [];
+    if (attackBonus.overload > 0) detailHints.push(`超载防御自伤${Math.ceil(attackBonus.overload * 0.5)}`);
+    const xilianCumulative = getMapNumber(game.xilianCumulative, player.id);
+    if (player.characterId === 'xilian' || xilianCumulative > 0) {
+      detailHints.push(`昔涟累计${xilianCumulative}/25`);
+    }
+    if (detailHints.length) {
+      const detailLine = document.createElement('p');
+      detailLine.className = 'metaLine detailLine';
+      detailLine.innerHTML = GPP.wrapGlossaryTerms(`提示：${detailHints.join(' ｜ ')}`);
+      zoneEl.appendChild(detailLine);
     }
 
     const displayed = GPP.getDisplayedDiceForPlayer(game, player.id);

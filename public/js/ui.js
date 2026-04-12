@@ -248,7 +248,7 @@
       '第1回合无天气。',
       '在回合2/4/6/8开始前切换天气。',
       '每个阶段会从对应候选池随机生效1个天气。',
-      '本面板用于规则介绍，是否已上线以当前对局引擎为准。',
+      '当前对局已接入天气系统，以下内容与实装规则同步。',
     ],
     stages: {
       2: [
@@ -596,7 +596,7 @@
     weatherBroadcastTimer = setTimeout(() => {
       hideWeatherBroadcast(node);
       weatherBroadcastTimer = null;
-    }, 2000);
+    }, 4500);
   }
 
   function getMechanicGuideData() {

@@ -118,6 +118,35 @@ function applyCharacterAttackSkill(room, game, attacker, selectedDice) {
   triggerCharacterHook('onAttackConfirm', attacker, game, attacker, selectedDice, room);
 }
 
+function buildAttackBonusParts(game, playerId) {
+  return {
+    power: (game.power && game.power[playerId]) || 0,
+    overload: (game.overload && game.overload[playerId]) || 0,
+    desperate: (game.desperateBonus && game.desperateBonus[playerId]) || 0,
+  };
+}
+
+function applyGlobalAttackBonuses(game, attacker, previousParts = null) {
+  const currentParts = buildAttackBonusParts(game, attacker.id);
+  const prev = previousParts || { power: 0, overload: 0, desperate: 0 };
+
+  const powerDelta = currentParts.power - prev.power;
+  const overloadDelta = currentParts.overload - prev.overload;
+  const desperateDelta = currentParts.desperate - prev.desperate;
+  const totalDelta = powerDelta + overloadDelta + desperateDelta;
+
+  if (totalDelta > 0) {
+    game.attackValue += totalDelta;
+    const labels = [];
+    if (powerDelta > 0) labels.push(`力量+${powerDelta}`);
+    if (overloadDelta > 0) labels.push(`超载+${overloadDelta}`);
+    if (desperateDelta > 0) labels.push(`背水+${desperateDelta}`);
+    game.log.push(`${attacker.name}获得攻击加成：${labels.join('｜')}，攻击值${game.attackValue}。`);
+  }
+
+  return currentParts;
+}
+
 function applyXiadieDefendPassives(room, game, defender, attacker, appliedHitValues) {
   triggerCharacterHook('onDamageApplied', defender, game, defender, attacker, appliedHitValues, room);
 }
@@ -142,6 +171,7 @@ module.exports = {
   applyThornsDamage,
   checkGameOver,
   applyCharacterAttackSkill,
+  applyGlobalAttackBonuses,
   applyXiadieDefendPassives,
   calcHits,
 };

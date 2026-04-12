@@ -108,7 +108,7 @@ wss.on('connection', (ws) => {
     try {
       msg = JSON.parse(raw.toString());
     } catch {
-      return send(ws, { type: 'error', message: '娑堟伅鏍煎紡閿欒。' });
+      return send(ws, { type: 'error', message: '消息格式错误。' });
     }
 
     switch (msg.type) {
@@ -117,7 +117,7 @@ wss.on('connection', (ws) => {
           handlers.handleCreateRoom(ws, msg);
         } catch (err) {
           console.error('[Error] handleCreateRoom:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'create_ai_room':
@@ -125,7 +125,7 @@ wss.on('connection', (ws) => {
           handlers.handleCreateAIRoom(ws, msg);
         } catch (err) {
           console.error('[Error] handleCreateAIRoom:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'join_room':
@@ -133,7 +133,7 @@ wss.on('connection', (ws) => {
           handlers.handleJoinRoom(ws, msg);
         } catch (err) {
           console.error('[Error] handleJoinRoom:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'choose_character':
@@ -141,7 +141,7 @@ wss.on('connection', (ws) => {
           handlers.handleChooseCharacter(ws, msg);
         } catch (err) {
           console.error('[Error] handleChooseCharacter:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'choose_aurora_die':
@@ -149,7 +149,7 @@ wss.on('connection', (ws) => {
           handlers.handleChooseAurora(ws, msg);
         } catch (err) {
           console.error('[Error] handleChooseAurora:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'create_custom_character':
@@ -160,7 +160,7 @@ wss.on('connection', (ws) => {
           }
         } catch (err) {
           console.error('[Error] handleCreateCustomCharacter:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'leave_room':
@@ -169,7 +169,7 @@ wss.on('connection', (ws) => {
           send(ws, { type: 'left_room' });
         } catch (err) {
           console.error('[Error] leaveRoom:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'resume_session':
@@ -185,7 +185,7 @@ wss.on('connection', (ws) => {
           handlers.handlePlayAgain(ws);
         } catch (err) {
           console.error('[Error] handlePlayAgain:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'disband_room':
@@ -193,7 +193,7 @@ wss.on('connection', (ws) => {
           handlers.handleDisbandRoom(ws);
         } catch (err) {
           console.error('[Error] handleDisbandRoom:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'roll_attack':
@@ -201,7 +201,7 @@ wss.on('connection', (ws) => {
           handlers.handleRollAttack(ws);
         } catch (err) {
           console.error('[Error] handleRollAttack:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'use_aurora_die':
@@ -209,7 +209,7 @@ wss.on('connection', (ws) => {
           handlers.handleUseAurora(ws);
         } catch (err) {
           console.error('[Error] handleUseAurora:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'reroll_attack':
@@ -217,7 +217,7 @@ wss.on('connection', (ws) => {
           handlers.handleRerollAttack(ws, msg);
         } catch (err) {
           console.error('[Error] handleRerollAttack:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'update_live_selection':
@@ -232,7 +232,7 @@ wss.on('connection', (ws) => {
           handlers.handleConfirmAttack(ws, msg);
         } catch (err) {
           console.error('[Error] handleConfirmAttack:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'roll_defense':
@@ -240,7 +240,7 @@ wss.on('connection', (ws) => {
           handlers.handleRollDefense(ws);
         } catch (err) {
           console.error('[Error] handleRollDefense:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       case 'confirm_defense_selection':
@@ -248,11 +248,11 @@ wss.on('connection', (ws) => {
           handlers.handleConfirmDefense(ws, msg);
         } catch (err) {
           console.error('[Error] handleConfirmDefense:', err);
-          send(ws, { type: 'error', message: '鏈嶅姟鍙戠敓鍐呴儴閿欒。' });
+          send(ws, { type: 'error', message: '服务器发生内部错误。' });
         }
         break;
       default:
-        send(ws, { type: 'error', message: '鏈煡娑堟伅绫诲瀷。' });
+        send(ws, { type: 'error', message: '未知消息类型。' });
     }
   });
 

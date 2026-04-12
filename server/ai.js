@@ -7,6 +7,13 @@ const {
 } = require('./registry');
 const { canUseAurora } = require('./skills');
 const { getEffectiveSelectionCount } = require('./dice');
+const {
+  enumerateActions,
+  getActionOpcode,
+  getActionMask,
+  indicesToMask,
+  OPCODES,
+} = require('./battle-engine');
 
 const AI_DELAY_MIN = 600;
 const AI_DELAY_MAX = 1500;
@@ -169,6 +176,159 @@ function aiShouldUseAurora(aiPlayer, game, role) {
   return true;
 }
 
+function isPureRoom(room) {
+  return !!(room && room.engineState && room.engineUi);
+}
+
+function chooseBestPureSelection(room, actionBuffer, count, opcode, scorer) {
+  let bestMask = 0;
+  let bestScore = -Infinity;
+  for (let i = 0; i < count; i += 1) {
+    const action = actionBuffer[i];
+    if (getActionOpcode(action) !== opcode) continue;
+    const mask = getActionMask(action);
+    const indices = room.engineState.catalog.indicesByMask[mask];
+    const score = scorer(indices);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMask = mask;
+    }
+  }
+  return bestMask;
+}
+
+function chooseBestPureReroll(room, actionBuffer, count, game, aiPlayer) {
+  const desired = aiChooseRerollIndices(game, aiPlayer);
+  const desiredMask = indicesToMask(desired, room.engineState.attackRoll.count);
+  if (desiredMask > 0) {
+    for (let i = 0; i < count; i += 1) {
+      const action = actionBuffer[i];
+      if (getActionOpcode(action) === OPCODES.REROLL_ATTACK && getActionMask(action) === desiredMask) {
+        return desiredMask;
+      }
+    }
+  }
+
+  let bestMask = 0;
+  let bestScore = -Infinity;
+  for (let i = 0; i < count; i += 1) {
+    const action = actionBuffer[i];
+    if (getActionOpcode(action) !== OPCODES.REROLL_ATTACK) continue;
+    const mask = getActionMask(action);
+    const indices = room.engineState.catalog.indicesByMask[mask];
+    let score = 0;
+    for (let j = 0; j < indices.length; j += 1) {
+      const die = game.attackDice[indices[j]];
+      if (!die || die.isAurora) continue;
+      score += ((die.maxValue + 1) / 2) - die.value;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestMask = mask;
+    }
+  }
+  return bestMask;
+}
+
+function schedulePureAIAction(room, rooms, handlers, aiPlayer, aiWs) {
+  const state = room.engineState;
+  const game = room.game;
+  const actionBuffer = room.engineUi.actionBuffer || new Uint16Array(128);
+  const count = enumerateActions(state, actionBuffer);
+  if (!count) return;
+  const aiId = aiPlayer.id;
+  const aiIndex = room.engineUi.playerIdToIndex[aiId];
+
+  if (state.phase === 0 && state.attacker === aiIndex) {
+    setTimeout(() => {
+      if (!rooms.has(room.code)) return;
+      handlers.handleRollAttack(aiWs);
+    }, aiDelay());
+    return;
+  }
+
+  if (state.phase === 1 && state.attacker === aiIndex) {
+    const delay = aiDelay();
+    let hasUseAurora = false;
+    for (let i = 0; i < count; i += 1) {
+      if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_ATTACK) {
+        hasUseAurora = true;
+        break;
+      }
+    }
+    if (hasUseAurora && aiShouldUseAurora(aiPlayer, game, 'attack')) {
+      setTimeout(() => {
+        if (!rooms.has(room.code)) return;
+        handlers.handleUseAurora(aiWs);
+      }, delay);
+      return;
+    }
+
+    const rerollMask = chooseBestPureReroll(room, actionBuffer, count, game, aiPlayer);
+    if (rerollMask > 0) {
+      const rerollIndices = room.engineState.catalog.indicesByMask[rerollMask];
+      setTimeout(() => {
+        if (!rooms.has(room.code)) return;
+        handlers.handleRerollAttack(aiWs, { indices: rerollIndices });
+      }, delay);
+      return;
+    }
+
+    const selectionMask = chooseBestPureSelection(
+      room,
+      actionBuffer,
+      count,
+      OPCODES.CONFIRM_ATTACK,
+      (indices) => scoreAttackCombo(game.attackDice, indices, aiPlayer.characterId, game, aiPlayer.id),
+    );
+    const indices = room.engineState.catalog.indicesByMask[selectionMask];
+    setTimeout(() => {
+      if (!rooms.has(room.code)) return;
+      handlers.handleConfirmAttack(aiWs, { indices });
+    }, delay);
+    return;
+  }
+
+  if (state.phase === 2 && state.defender === aiIndex) {
+    setTimeout(() => {
+      if (!rooms.has(room.code)) return;
+      handlers.handleRollDefense(aiWs);
+    }, aiDelay());
+    return;
+  }
+
+  if (state.phase === 3 && state.defender === aiIndex) {
+    const delay = aiDelay();
+    let hasUseAurora = false;
+    for (let i = 0; i < count; i += 1) {
+      if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_DEFENSE) {
+        hasUseAurora = true;
+        break;
+      }
+    }
+    if (hasUseAurora && aiShouldUseAurora(aiPlayer, game, 'defense')) {
+      setTimeout(() => {
+        if (!rooms.has(room.code)) return;
+        handlers.handleUseAurora(aiWs);
+      }, delay);
+      return;
+    }
+
+    const selectionMask = chooseBestPureSelection(
+      room,
+      actionBuffer,
+      count,
+      OPCODES.CONFIRM_DEFENSE,
+      (indices) => scoreDefenseCombo(game.defenseDice, indices, aiPlayer.characterId, game, aiPlayer.id),
+    );
+    const indices = room.engineState.catalog.indicesByMask[selectionMask];
+    setTimeout(() => {
+      if (!rooms.has(room.code)) return;
+      handlers.handleConfirmDefense(aiWs, { indices });
+    }, delay);
+  }
+}
+
 function scheduleAIAction(room, rooms, handlers) {
   if (!room || !room.game) return;
   if (room.status !== 'in_game') return;
@@ -179,6 +339,11 @@ function scheduleAIAction(room, rooms, handlers) {
   if (!aiPlayer) return;
   const aiWs = aiPlayer.ws;
   const aiId = aiPlayer.id;
+
+  if (isPureRoom(room)) {
+    schedulePureAIAction(room, rooms, handlers, aiPlayer, aiWs);
+    return;
+  }
 
   if (game.phase === 'attack_roll' && game.attackerId === aiId) {
     setTimeout(() => {

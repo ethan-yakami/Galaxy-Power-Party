@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "test:battle-engine": "node scripts/test_battle_engine.js",
     "build:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build_portable.ps1"
   },
   "dependencies": {

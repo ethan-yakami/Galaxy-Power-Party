@@ -314,6 +314,7 @@ function countSides(sides) {
 
 const CharacterRegistry = {};
 const AuroraRegistry = {};
+let registryRevision = 0;
 
 function reloadRegistry() {
   SkillRegistry.clear();
@@ -325,6 +326,7 @@ function reloadRegistry() {
 
   Object.assign(CharacterRegistry, nextCharacters);
   Object.assign(AuroraRegistry, nextAuroras);
+  registryRevision += 1;
 }
 
 reloadRegistry();
@@ -487,9 +489,14 @@ function saveCustomVariant(variant) {
   reloadRegistry();
 }
 
+function getRegistryRevision() {
+  return registryRevision;
+}
+
 module.exports = {
   reloadRegistry,
   saveCustomVariant,
+  getRegistryRevision,
   CharacterRegistry,
   AuroraRegistry,
   countSides,

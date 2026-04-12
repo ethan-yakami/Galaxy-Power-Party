@@ -8,14 +8,8 @@ module.exports = {
   auroraUses:   2,
   attackLevel:  2,
   defenseLevel: 2,
-  skillText:    '攻击时力量层数加成攻击值；攻击后累积攻击值50%为力量（全6则100%+治疗6）',
+  skillText:    '攻击后累积攻击值50%为力量（全6则100%+治疗6）',
   hooks: {
-    onMainAttackConfirm(game, attacker) {
-      if (game.power[attacker.id] > 0) {
-        game.attackValue += game.power[attacker.id];
-        game.log.push(`${attacker.name}触发【力量】加成+${game.power[attacker.id]}，攻击值${game.attackValue}。`);
-      }
-    },
     onAttackAfterDamageResolved(game, attacker) {
       const { pushEffectEvent } = require('../../rooms');
       const atkSelectedDice = game.attackSelection.map((idx) => game.attackDice[idx]);

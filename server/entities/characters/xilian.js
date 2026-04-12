@@ -13,8 +13,10 @@ module.exports = {
     shouldAscend(game, player) {
       return !!game.xilianAscensionActive[player.id];
     },
-    onMainAttackConfirm(game, attacker) {
-      game.xilianCumulative[attacker.id] += game.attackValue;
+    onMainAttackConfirm(game, attacker, selectedDice) {
+      let rolledTotal = 0;
+      for (const die of selectedDice) rolledTotal += die.value;
+      game.xilianCumulative[attacker.id] += rolledTotal;
       if (!game.xilianAscensionActive[attacker.id] && game.xilianCumulative[attacker.id] > 24) {
         game.xilianAscensionActive[attacker.id] = true;
         game.attackLevel[attacker.id]           = 5;
@@ -22,12 +24,14 @@ module.exports = {
       }
     },
 
-    onMainDefenseConfirm(game, defender) {
-      game.xilianCumulative[defender.id] += game.defenseValue;
+    onMainDefenseConfirm(game, defender, selectedDice) {
+      let rolledTotal = 0;
+      for (const die of selectedDice) rolledTotal += die.value;
+      game.xilianCumulative[defender.id] += rolledTotal;
       if (!game.xilianAscensionActive[defender.id] && game.xilianCumulative[defender.id] > 24) {
         game.xilianAscensionActive[defender.id] = true;
         game.attackLevel[defender.id]           = 5;
-        game.log.push(`${defender.name}累计攻防值超过24，攻击防等级变为5，此后每回合获得跃升！`);
+        game.log.push(`${defender.name}累计攻防值超过24，攻击等级变为5，此后每回合获得跃升！`);
       }
     },
   },

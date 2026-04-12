@@ -35,6 +35,7 @@ const {
   applyThornsDamage,
   checkGameOver,
   applyCharacterAttackSkill,
+  applyGlobalAttackBonuses,
   applyXiadieDefendPassives,
   calcHits,
 } = require('./skills');
@@ -55,6 +56,17 @@ const {
   reRandomizeAIPlayer,
   scheduleAIAction,
 } = require('./ai');
+const {
+  createBattle,
+  enumerateActions,
+  applyActionInPlace,
+  projectStateToLegacyRoom,
+  createRuntime: createBattleRuntime,
+  encodeAction,
+  indicesToMask,
+  OPCODES,
+} = require('./battle-engine');
+const { STATUS_ENDED, PHASE_ENDED } = require('./battle-engine/constants');
 
 const ALLOWED_VARIANT_OVERRIDE_KEYS = new Set([
   'hp',
@@ -130,12 +142,125 @@ function parseOverrides(rawOverrides) {
   return { ok: true, error: '', overrides };
 }
 
+function countMaskBits(mask) {
+  let value = mask >>> 0;
+  let count = 0;
+  while (value) {
+    count += value & 1;
+    value >>>= 1;
+  }
+  return count;
+}
+
 module.exports = function createHandlers(rooms) {
 
 let _handlerRefs = null;
+const DEFAULT_ENGINE_MODE = process.env.GPP_ENGINE_MODE === 'pure' ? 'pure' : 'legacy';
 
 const SESSION_GRACE_MS = 90 * 1000;
 const OFFLINE_AUTO_DELAY_MS = 900;
+
+function isPureRoom(room) {
+  return !!(room && room.engineMode === 'pure');
+}
+
+function buildRoomEngineUi(room) {
+  const indexToPlayerId = [room.players[0].id, room.players[1].id];
+  return {
+    indexToPlayerId,
+    playerIdToIndex: {
+      [indexToPlayerId[0]]: 0,
+      [indexToPlayerId[1]]: 1,
+    },
+    playerNames: [room.players[0].name, room.players[1].name],
+    attackPreviewMask: 0,
+    defensePreviewMask: 0,
+    logs: [],
+    effectEvents: [],
+    effectEventSeq: 0,
+    actionBuffer: new Uint16Array(128),
+    lastWeatherNoticeRound: 0,
+    runtime: null,
+  };
+}
+
+function getEnginePlayerIndex(room, playerId) {
+  if (!room || !room.engineUi) return -1;
+  const value = room.engineUi.playerIdToIndex[playerId];
+  return Number.isInteger(value) ? value : -1;
+}
+
+function getOrCreateRoomRuntime(room) {
+  if (room.engineUi && room.engineUi.runtime) return room.engineUi.runtime;
+  room.engineUi.runtime = createBattleRuntime({
+    getPlayerName: (index) => room.engineUi.playerNames[index] || `P${index + 1}`,
+    getPlayerId: (index) => room.engineUi.indexToPlayerId[index] || `P${index + 1}`,
+    log: (message) => {
+      room.engineUi.logs.push(message);
+    },
+    effect: (event) => {
+      room.engineUi.effectEventSeq += 1;
+      const wrapped = { id: room.engineUi.effectEventSeq, type: event.type };
+      if (event.sourcePlayerIndex !== undefined) wrapped.sourcePlayerId = room.engineUi.indexToPlayerId[event.sourcePlayerIndex];
+      if (event.targetPlayerIndex !== undefined) wrapped.targetPlayerId = room.engineUi.indexToPlayerId[event.targetPlayerIndex];
+      if (event.playerIndex !== undefined) wrapped.playerId = room.engineUi.indexToPlayerId[event.playerIndex];
+      if (event.amount !== undefined) wrapped.amount = event.amount;
+      if (event.hpBefore !== undefined) wrapped.hpBefore = event.hpBefore;
+      if (event.hpAfter !== undefined) wrapped.hpAfter = event.hpAfter;
+      if (event.attackValue !== undefined) wrapped.attackValue = event.attackValue;
+      if (event.defenseValue !== undefined) wrapped.defenseValue = event.defenseValue;
+      if (event.hits !== undefined) wrapped.hits = event.hits;
+      if (event.forceField !== undefined) wrapped.forceField = event.forceField;
+      if (event.pierce !== undefined) wrapped.pierce = event.pierce;
+      if (event.attackerIndex !== undefined) wrapped.attackerId = room.engineUi.indexToPlayerId[event.attackerIndex];
+      if (event.defenderIndex !== undefined) wrapped.defenderId = room.engineUi.indexToPlayerId[event.defenderIndex];
+      room.engineUi.effectEvents.push(wrapped);
+      if (room.engineUi.effectEvents.length > 50) room.engineUi.effectEvents.shift();
+    },
+  });
+  return room.engineUi.runtime;
+}
+
+function syncPureRoom(room) {
+  if (!room || !room.engineState || !room.engineUi) return;
+  room.game = projectStateToLegacyRoom(room.engineState, room.engineUi);
+  room.status = room.engineState.status === STATUS_ENDED ? 'ended' : 'in_game';
+  if (
+    room.engineState.weatherChangedRound === room.engineState.round
+    && room.engineUi.lastWeatherNoticeRound !== room.engineState.round
+  ) {
+    room.game.pendingWeatherChanged = buildWeatherChangedPayload(room.game);
+  }
+}
+
+function applyPureAction(room, ws, action) {
+  const count = enumerateActions(room.engineState, room.engineUi.actionBuffer);
+  let found = false;
+  for (let i = 0; i < count; i += 1) {
+    if (room.engineUi.actionBuffer[i] === action) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) return { ok: false, reason: 'invalid_action' };
+  const result = applyActionInPlace(room.engineState, action, getOrCreateRoomRuntime(room));
+  syncPureRoom(room);
+  return result;
+}
+
+function startPureGame(room, seed, startingAttacker) {
+  room.status = 'in_game';
+  room.waitingReason = '';
+  room.engineUi = buildRoomEngineUi(room);
+  room.engineState = createBattle({
+    players: room.players.map((player) => ({
+      characterId: player.characterId,
+      auroraDiceId: player.auroraDiceId,
+    })),
+  }, seed, { startingAttacker });
+  room.engineUi.logs.push(`游戏开始。先手攻击方：${room.engineUi.playerNames[room.engineState.attacker]}。`);
+  syncPureRoom(room);
+}
 
 function clearPlayerTimers(player) {
   if (!player) return;
@@ -239,7 +364,21 @@ function notifyPresenceChanged(room, player, reason) {
 }
 
 function forfeitByDisconnect(room, loser, reasonText) {
-  if (!room || !room.game || room.status !== 'in_game') return;
+  if (!room || room.status !== 'in_game') return;
+  if (isPureRoom(room) && room.engineState) {
+    if (room.engineState.status === STATUS_ENDED) return;
+    const loserIndex = getEnginePlayerIndex(room, loser.id);
+    if (loserIndex === -1) return;
+    const winnerIndex = loserIndex === 0 ? 1 : 0;
+    room.engineState.status = STATUS_ENDED;
+    room.engineState.phase = PHASE_ENDED;
+    room.engineState.winner = winnerIndex;
+    room.engineState.hp[loserIndex] = 0;
+    room.engineUi.logs.push(reasonText || `${loser.name} 断线超时，${room.engineUi.playerNames[winnerIndex]} 获胜。`);
+    syncPureRoom(room);
+    return;
+  }
+  if (!room.game) return;
   const game = room.game;
   if (game.status === 'ended') return;
 
@@ -279,6 +418,9 @@ function broadcastRoom(room) {
   if (room.game && room.game.pendingWeatherChanged) {
     for (const p of room.players) {
       send(p.ws, room.game.pendingWeatherChanged);
+    }
+    if (isPureRoom(room) && room.engineUi && room.engineState) {
+      room.engineUi.lastWeatherNoticeRound = room.engineState.round;
     }
     room.game.pendingWeatherChanged = null;
   }
@@ -395,6 +537,12 @@ function startGameIfReady(room) {
 
   const c1 = CharacterRegistry[p1.characterId];
   const c2 = CharacterRegistry[p2.characterId];
+
+  if (isPureRoom(room)) {
+    const startingAttacker = first.id === p1.id ? 0 : 1;
+    startPureGame(room, `${Date.now()}:${room.code}:${first.id}`, startingAttacker);
+    return;
+  }
 
   room.status = 'in_game';
   room.waitingReason = '';
@@ -621,11 +769,14 @@ function handleCreateRoom(ws, msg) {
     waitingReason: '等待另一位玩家加入。',
     players: [],
     game: null,
+    engineMode: DEFAULT_ENGINE_MODE,
+    engineState: null,
+    engineUi: null,
   };
 
   rooms.set(code, room);
 
-  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `鐜╁${ws.playerId}`));
+  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `玩家${ws.playerId}`));
   ws.playerRoomCode = code;
 
   startGameIfReady(room);
@@ -641,7 +792,7 @@ function handleJoinRoom(ws, msg) {
 
   const room = rooms.get(code);
   if (!room) return send(ws, { type: 'error', message: '房间不存在。' });
-  if (room.players.length >= 2) return send(ws, { type: 'error', message: '鎴块棿宸叉弧。' });
+  if (room.players.length >= 2) return send(ws, { type: 'error', message: '房间已满。' });
 
   if (getPlayerRoom(ws, rooms)) leaveRoom(ws, { reason: 'switch_room' });
 
@@ -704,10 +855,10 @@ function handleResumeSession(ws, msg) {
 function handleChooseCharacter(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
   if (!room) return send(ws, { type: 'error', message: '浣犱笉鍦ㄦ埧闂村唴。' });
-  if (room.status !== 'lobby') return send(ws, { type: 'error', message: '娓告垙宸插紑濮嬶紝涓嶈兘鏇存崲瑙掕壊。' });
+  if (room.status !== 'lobby') return send(ws, { type: 'error', message: '娓告垙宸插紑濮嬶紝涓嶈兘鏇存崲角色。' });
 
   const characterId = msg.characterId;
-  if (!CharacterRegistry[characterId]) return send(ws, { type: 'error', message: '鏃犳晥瑙掕壊。' });
+  if (!CharacterRegistry[characterId]) return send(ws, { type: 'error', message: '鏃犳晥角色。' });
 
   const me = getPlayerById(room, ws.playerId);
   if (!me) return;
@@ -750,7 +901,7 @@ function handleCreateCustomCharacter(ws, msg) {
     return false;
   }
   if (CharacterRegistry[id]) {
-    send(ws, { type: 'error', message: `瑙掕壊 ID 宸插瓨鍦細${id}` });
+    send(ws, { type: 'error', message: `角色 ID 宸插瓨鍦細${id}` });
     return false;
   }
 
@@ -804,6 +955,16 @@ function handleCreateCustomCharacter(ws, msg) {
 function handleRollAttack(ws) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
+  if (isPureRoom(room) && room.engineState) {
+    const actorIndex = getEnginePlayerIndex(room, ws.playerId);
+    if (actorIndex !== room.engineState.attacker || room.engineState.phase !== 0) return;
+    room.engineUi.attackPreviewMask = 0;
+    room.engineUi.defensePreviewMask = 0;
+    const result = applyPureAction(room, ws, encodeAction(OPCODES.ROLL_ATTACK, 0));
+    if (!result.ok) return send(ws, { type: 'error', message: result.reason || '操作失败。' });
+    broadcastRoom(room);
+    return;
+  }
   const game = room.game;
 
   if (room.status !== 'in_game' || game.phase !== 'attack_roll') return;
@@ -856,6 +1017,23 @@ function handleRollAttack(ws) {
 function handleUseAurora(ws) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
+  if (isPureRoom(room) && room.engineState) {
+    const actorIndex = getEnginePlayerIndex(room, ws.playerId);
+    let action = null;
+    if (room.engineState.phase === 1 && actorIndex === room.engineState.attacker) {
+      room.engineUi.attackPreviewMask = 0;
+      action = encodeAction(OPCODES.USE_AURORA_ATTACK, 0);
+    } else if (room.engineState.phase === 3 && actorIndex === room.engineState.defender) {
+      room.engineUi.defensePreviewMask = 0;
+      action = encodeAction(OPCODES.USE_AURORA_DEFENSE, 0);
+    } else {
+      return;
+    }
+    const result = applyPureAction(room, ws, action);
+    if (!result.ok) return send(ws, { type: 'error', message: result.reason || '操作失败。' });
+    broadcastRoom(room);
+    return;
+  }
   const game = room.game;
 
   if (room.status !== 'in_game') return;
@@ -897,6 +1075,17 @@ function handleUseAurora(ws) {
 function handleRerollAttack(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
+  if (isPureRoom(room) && room.engineState) {
+    const actorIndex = getEnginePlayerIndex(room, ws.playerId);
+    if (actorIndex !== room.engineState.attacker || room.engineState.phase !== 1) return;
+    const mask = indicesToMask(msg.indices, room.engineState.attackRoll.count);
+    if (mask < 0 || mask === 0) return send(ws, { type: 'error', message: '重投参数无效。' });
+    room.engineUi.attackPreviewMask = 0;
+    const result = applyPureAction(room, ws, encodeAction(OPCODES.REROLL_ATTACK, mask));
+    if (!result.ok) return send(ws, { type: 'error', message: result.reason || '操作失败。' });
+    broadcastRoom(room);
+    return;
+  }
   const game = room.game;
 
   if (room.status !== 'in_game' || game.phase !== 'attack_reroll_or_select') return;
@@ -943,6 +1132,19 @@ function handleRerollAttack(ws, msg) {
 function handleConfirmAttack(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
+  if (isPureRoom(room) && room.engineState) {
+    const actorIndex = getEnginePlayerIndex(room, ws.playerId);
+    if (actorIndex !== room.engineState.attacker || room.engineState.phase !== 1) return;
+    const mask = indicesToMask(msg.indices, room.engineState.attackRoll.count);
+    if (mask < 0) return send(ws, { type: 'error', message: '必须选择有效的骰子。' });
+    const result = applyPureAction(room, ws, encodeAction(OPCODES.CONFIRM_ATTACK, mask));
+    if (!result.ok) return send(ws, { type: 'error', message: result.reason || '操作失败。' });
+    room.engineUi.attackPreviewMask = mask;
+    room.engineUi.defensePreviewMask = 0;
+    syncPureRoom(room);
+    broadcastRoom(room);
+    return;
+  }
   const game = room.game;
 
   if (room.status !== 'in_game' || game.phase !== 'attack_reroll_or_select') return;
@@ -973,10 +1175,14 @@ function handleConfirmAttack(ws, msg) {
   game.attackSelection = indices;
   game.attackPreviewSelection = indices.slice();
   game.attackValue = sumByIndices(game.attackDice, indices);
+  let attackBonusParts = applyGlobalAttackBonuses(game, attacker);
 
   triggerCharacterHook('onMainAttackConfirm', attacker, game, attacker, selectedDice, room);
+  attackBonusParts = applyGlobalAttackBonuses(game, attacker, attackBonusParts);
   applyAuroraAEffectOnAttack(room, game, attacker, selectedDice);
+  attackBonusParts = applyGlobalAttackBonuses(game, attacker, attackBonusParts);
   onAttackSelect(room, game, attacker, defender, selectedDice);
+  applyGlobalAttackBonuses(game, attacker, attackBonusParts);
 
   if (checkGameOver(room, game)) {
     broadcastRoom(room);
@@ -993,6 +1199,15 @@ function handleConfirmAttack(ws, msg) {
 function handleRollDefense(ws) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
+  if (isPureRoom(room) && room.engineState) {
+    const actorIndex = getEnginePlayerIndex(room, ws.playerId);
+    if (actorIndex !== room.engineState.defender || room.engineState.phase !== 2) return;
+    room.engineUi.defensePreviewMask = 0;
+    const result = applyPureAction(room, ws, encodeAction(OPCODES.ROLL_DEFENSE, 0));
+    if (!result.ok) return send(ws, { type: 'error', message: result.reason || '操作失败。' });
+    broadcastRoom(room);
+    return;
+  }
   const game = room.game;
 
   if (room.status !== 'in_game' || game.phase !== 'defense_roll') return;
@@ -1082,6 +1297,23 @@ function goNextRound(room, game, newAttacker, newDefender) {
 function handleConfirmDefense(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
+  if (isPureRoom(room) && room.engineState) {
+    const actorIndex = getEnginePlayerIndex(room, ws.playerId);
+    if (actorIndex !== room.engineState.defender || room.engineState.phase !== 3) return;
+    const mask = indicesToMask(msg.indices, room.engineState.defenseRoll.count);
+    if (mask < 0) return send(ws, { type: 'error', message: '必须选择有效的骰子。' });
+    const result = applyPureAction(room, ws, encodeAction(OPCODES.CONFIRM_DEFENSE, mask));
+    if (!result.ok) return send(ws, { type: 'error', message: result.reason || '操作失败。' });
+    if (room.engineState.phase === 0 || room.engineState.phase === 4) {
+      room.engineUi.attackPreviewMask = 0;
+      room.engineUi.defensePreviewMask = 0;
+    } else {
+      room.engineUi.defensePreviewMask = mask;
+    }
+    syncPureRoom(room);
+    broadcastRoom(room);
+    return;
+  }
   const game = room.game;
 
   if (room.status !== 'in_game' || game.phase !== 'defense_select') return;
@@ -1244,6 +1476,31 @@ function handleConfirmDefense(ws, msg) {
 function handleUpdateLiveSelection(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
   if (!room || !room.game) return;
+  if (isPureRoom(room) && room.engineState) {
+    const indices = msg.indices;
+    if (!Array.isArray(indices)) return;
+    const actorIndex = getEnginePlayerIndex(room, ws.playerId);
+    if (room.engineState.phase === 1 && actorIndex === room.engineState.attacker) {
+      const mask = indicesToMask(indices, room.engineState.attackRoll.count);
+      if (mask < 0) return;
+      room.engineUi.attackPreviewMask = mask;
+      syncPureRoom(room);
+      broadcastRoom(room);
+      return;
+    }
+    if (room.engineState.phase === 3 && actorIndex === room.engineState.defender) {
+      const mask = indicesToMask(indices, room.engineState.defenseRoll.count);
+      if (mask < 0) return;
+      const need = room.engineState.defenseLevel[room.engineState.defender] > room.engineState.defenseRoll.count
+        ? room.engineState.defenseRoll.count
+        : room.engineState.defenseLevel[room.engineState.defender];
+      if (countMaskBits(mask) > need) return;
+      room.engineUi.defensePreviewMask = mask;
+      syncPureRoom(room);
+      broadcastRoom(room);
+    }
+    return;
+  }
 
   const game = room.game;
   if (room.status !== 'in_game') return;
@@ -1274,6 +1531,8 @@ function handlePlayAgain(ws) {
 
   room.status = 'lobby';
   room.game = null;
+  room.engineState = null;
+  room.engineUi = null;
   room.waitingReason = '绛夊緟鍙屾柟纭寮€灞€閰嶇疆。';
 
   for (const p of room.players) {
@@ -1313,11 +1572,14 @@ function handleCreateAIRoom(ws, msg) {
     waitingReason: '',
     players: [],
     game: null,
+    engineMode: DEFAULT_ENGINE_MODE,
+    engineState: null,
+    engineUi: null,
   };
 
   rooms.set(code, room);
 
-  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `鐜╁${ws.playerId}`));
+  room.players.push(createNewRoomPlayer(ws, msg.name.trim().slice(0, 20) || `玩家${ws.playerId}`));
   ws.playerRoomCode = code;
 
   const aiPlayer = createAIPlayer(code);

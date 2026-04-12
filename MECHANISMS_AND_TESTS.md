@@ -129,27 +129,29 @@
 
 ### 5.1 当前状态
 
-- 当前版本未实现天气系统。
-- 代码中无 `weather`/`climate`/`environment` 业务字段、流程或结算钩子。
+- 当前版本已实现天气系统，并已接入房间状态同步、对局流程与结算钩子。
+- 服务端会维护 `game.weather` / `weatherState`，并通过 `room_state.room.game.weather` 向客户端同步当前天气信息。
 
-### 5.2 预留接口建议（用于后续扩展）
+### 5.2 现有接口与扩展方向
 
-- 建议状态字段：`game.weatherId`、`game.weatherRoundRemaining`、`game.weatherMeta`
-- 建议触发时机：
+- 当前状态字段：`game.weather`、`game.weatherState`
+- 当前触发时机：
+  - `onStageEnter`
   - `onRoundStart`
-  - `onAttackBeforeValue`
-  - `onDefenseBeforeValue`
-  - `onRoundEnd`
-- 建议同步协议：
+  - `onAttackSelect`
+  - `onDefenseSelect`
+  - `onAfterDamageResolved`
+  - `onStageExit`
+- 当前同步协议：
   - `welcome.weatherCatalog`
   - `room_state.room.game.weather`
 
 ### 5.3 天气测试占位说明
 
 - 天气相关自动化测试ID统一放在第 7.8 节，避免与其他章节重复。
-- 当前代码仍未上线天气逻辑；第 7.8 节新增“规范一致性断言”用于文档回归。
+- 第 7.8 节用于覆盖天气实现与文档的一致性回归。
 
-### 5.4 天气规则修订摘要（文档已更新，代码未上线）
+### 5.4 天气规则修订摘要（文档与代码已同步）
 
 - 详细规范见：[WEATHER_SYSTEM_SPEC.md](/C:/Users/user/Desktop/Galaxy-Power-Party-master/WEATHER_SYSTEM_SPEC.md)
 - 本轮确认的4条规则：
@@ -157,7 +159,7 @@
   - `雷雨`：选骰确认时生效；攻击确认攻方攻击值 +4，防守确认守方防守值 +4。
   - `烈日(虹吸)`：与白厄一致；伤后回复 `floor(伤害*0.5)`，且回复不超过 `maxHp`。
   - `晴雷`：凝伤定义为瞬伤，走 `instant_damage` 事件。
-- 注意：以上仅为规范定义，不代表当前服务端已实现。
+- 以上规则已经接入当前服务端实现，并以 `room_state.room.game.weather` 对外同步。
 
 ## 6. 联机同步机制
 
@@ -258,7 +260,7 @@
 | WEATHER-005 | 已有天气规范文档 | 检查`烈日`定义 | 明确为白厄同款虹吸：`floor(伤害*0.5)`并受`maxHp`上限约束 |
 | WEATHER-006 | 已有天气规范文档 | 检查`晴雷`定义 | 明确为瞬伤（`instant_damage`），非攻防差值伤害 |
 | WEATHER-007 | 已有天气规范文档 | 搜索过期TODO关键词 | 不存在`TODO(虹吸)`与`TODO(凝伤)` |
-| WEATHER-008 | 天气规范与总表并存 | 交叉检查两文档 | 两文档语义一致且均保留“天气代码未上线”声明 |
+| WEATHER-008 | 天气规范与总表并存 | 交叉检查两文档 | 两文档语义一致且均标记天气已上线 |
 
 ## 8. 已知风险与覆盖缺口
 
