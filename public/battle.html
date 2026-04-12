@@ -15,14 +15,25 @@
 
     <main class="appShell">
       <header class="globalHeader">
-        <div>
-          <p class="brandSub">GALAXY POWER PARTY</p>
-          <h1>银河战力党</h1>
+        <div class="headerMainRow">
+          <div>
+            <p class="brandSub">GALAXY POWER PARTY</p>
+            <h1>银河战力党</h1>
+          </div>
+          <div class="globalHeaderActions">
+            <p id="myId" class="myIdPill">玩家ID：-</p>
+            <button id="backToLauncherBtn" class="secondaryBtn" type="button">返回启动台</button>
+            <button id="docBtn" class="docBtn" type="button">规则文档</button>
+          </div>
         </div>
-        <div class="globalHeaderActions">
-          <p id="myId" class="myIdPill">玩家ID：-</p>
-          <button id="backToLauncherBtn" class="secondaryBtn" type="button">返回启动台</button>
-          <button id="docBtn" class="docBtn" type="button">规则文档</button>
+        <div id="headerRoomInfo" class="headerRoomRow hidden">
+          <div class="roomIdentity">
+            <span class="roomTag">房间</span>
+            <span id="roomCode" class="roomCodeValue">-</span>
+          </div>
+          <div class="roomTopActions">
+            <button id="leaveBtn" class="danger" type="button">退出房间</button>
+          </div>
         </div>
       </header>
 
@@ -49,15 +60,6 @@
       </section>
 
       <section id="roomPanel" class="scene sceneRoom hidden">
-        <div class="roomTopBar panel">
-          <div class="roomIdentity">
-            <span class="roomTag">房间</span>
-            <span id="roomCode" class="roomCodeValue">-</span>
-          </div>
-          <div class="roomTopActions">
-            <button id="leaveBtn" class="danger" type="button">退出房间</button>
-          </div>
-        </div>
 
         <div class="roomGrid">
           <aside class="panel roomSide">

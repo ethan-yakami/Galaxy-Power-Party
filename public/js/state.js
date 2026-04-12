@@ -55,6 +55,7 @@ const dom = {
   msgPanel: document.getElementById('msgPanel'),
   connectionPanel: document.getElementById('connectionPanel'),
   roomPanel: document.getElementById('roomPanel'),
+  headerRoomInfo: document.getElementById('headerRoomInfo'),
   roomCodeEl: document.getElementById('roomCode'),
   playersList: document.getElementById('playersList'),
   weatherStatusCard: document.getElementById('weatherStatusCard'),

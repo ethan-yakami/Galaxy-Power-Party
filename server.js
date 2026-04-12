@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const compression = require('compression');
 const http = require('http');
 const path = require('path');
