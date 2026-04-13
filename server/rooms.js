@@ -64,7 +64,7 @@ function sanitizeRoom(room, viewerPlayerId) {
         name: p.name,
         characterId: hideLoadout ? null : p.characterId,
         characterName: hideLoadout
-          ? '未公开'
+          ? '???'
           : (CharacterRegistry[p.characterId] && CharacterRegistry[p.characterId].name) || p.characterId,
         auroraDiceId: hideLoadout ? null : p.auroraDiceId,
         auroraDiceName: hideLoadout
@@ -97,8 +97,21 @@ function newRoomCode(rooms) {
 }
 
 function getPlayerRoom(ws, rooms) {
-  if (!ws || !ws.playerRoomCode) return null;
-  return rooms.get(ws.playerRoomCode) || null;
+  if (!ws) return null;
+  if (ws.playerRoomCode) {
+    const directRoom = rooms.get(ws.playerRoomCode) || null;
+    if (directRoom) return directRoom;
+  }
+  if (ws.playerId) {
+    for (const room of rooms.values()) {
+      if (!room || !Array.isArray(room.players)) continue;
+      if (room.players.some((p) => p && p.id === ws.playerId)) {
+        ws.playerRoomCode = room.code;
+        return room;
+      }
+    }
+  }
+  return null;
 }
 
 function getPlayerById(room, playerId) {
@@ -113,14 +126,14 @@ function isAuroraEquipRequired(player) {
 }
 
 function readyToStart(room) {
-  if (room.players.length !== 2) return { ok: false, reason: '等待另一位玩家加入。' };
+  if (room.players.length !== 2) return { ok: false, reason: '??????????' };
 
   for (const player of room.players) {
-    if (!player.characterId) return { ok: false, reason: `${player.name}尚未选择角色。` };
+    if (!player.characterId) return { ok: false, reason: `${player.name}???????` };
     const ch = CharacterRegistry[player.characterId];
-    if (!ch) return { ok: false, reason: `${player.name}角色无效。` };
+    if (!ch) return { ok: false, reason: `${player.name}?????` };
     if (isAuroraEquipRequired(player) && !player.auroraDiceId) {
-      return { ok: false, reason: `${player.name}尚未装备曜彩骰。` };
+      return { ok: false, reason: `${player.name}????????` };
     }
   }
 

@@ -80,8 +80,6 @@
   }
 
   if (workshopBtn) {
-    workshopBtn.onclick = () => {
-      openWorkshopPage();
-    };
+    workshopBtn.hidden = true;
   }
 })();

@@ -9,9 +9,10 @@ const {
   countUniqueValues,
   countOddValues,
   upgradeSide,
-  findMinSelectedIndex,
+  findMinSelectedNormalIndices,
   sumMask,
 } = require('./helpers');
+const { nextInt } = require('../rng');
 
 function playerName(runtime, playerIndex) {
   return runtime.getPlayerName(playerIndex);
@@ -26,7 +27,9 @@ function shouldAscend(state, actor) {
 
 function applyAscension(state, ctx, runtime) {
   if (!shouldAscend(state, ctx.actor)) return;
-  const minIndex = findMinSelectedIndex(ctx.roll, ctx.mask);
+  const minCandidates = findMinSelectedNormalIndices(ctx.roll, ctx.mask);
+  if (!minCandidates.length) return;
+  const minIndex = minCandidates[nextInt(state, minCandidates.length)];
   if (minIndex === -1) return;
   ctx.roll.values[minIndex] = ctx.roll.maxValues[minIndex];
   if (runtime.logEnabled) {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>银河战力党 · 战斗页</title>
-    <link rel="stylesheet" href="styles.css?v=v_final_check_1775989679004" />
+  <link rel="stylesheet" href="styles.css?v=ui_fix_20260413_v15" />
   </head>
   <body>
     <div class="bgLayer" aria-hidden="true">
@@ -32,6 +32,7 @@
             <span id="roomCode" class="roomCodeValue">-</span>
           </div>
           <div class="roomTopActions">
+            <button id="confirmLoadoutTopBtn" class="primaryBtn hidden" type="button" disabled>确认当前选择</button>
             <button id="leaveBtn" class="danger" type="button">退出房间</button>
           </div>
         </div>
@@ -72,7 +73,7 @@
               <div id="selectionSummary" class="selectionSummary"></div>
               <div class="actions">
                 <button id="confirmLoadoutBtn" class="primaryBtn" type="button">确认当前选择</button>
-                <button id="createVariantBtn" class="secondaryBtn" type="button">新建自定义角色</button>
+                <button id="createVariantBtn" class="secondaryBtn" type="button">新建角色</button>
                 <button id="weatherGuideBtn" class="secondaryBtn" type="button">天气与机制</button>
               </div>
               <p id="confirmHint" class="confirmHint"></p>
@@ -121,11 +122,11 @@
       </section>
     </main>
 
-    <script src="js/state.js?v=v_final_check_1775989679004"></script>
-    <script src="js/ui.js?v=v_final_check_1775989679004"></script>
-    <script src="js/effects.js?v=v_final_check_1775989679004"></script>
-    <script src="js/dice-ui.js?v=v_final_check_1775989679004"></script>
-    <script src="js/render.js?v=v_final_check_1775989679004"></script>
-    <script src="js/connection.js?v=v_final_check_1775989679004"></script>
+  <script src="js/state.js?v=ui_fix_20260413_v15"></script>
+  <script src="js/ui.js?v=ui_fix_20260413_v15"></script>
+  <script src="js/effects.js?v=ui_fix_20260413_v15"></script>
+  <script src="js/dice-ui.js?v=ui_fix_20260413_v15"></script>
+  <script src="js/render.js?v=ui_fix_20260413_v15"></script>
+  <script src="js/connection.js?v=ui_fix_20260413_v15"></script>
   </body>
 </html>

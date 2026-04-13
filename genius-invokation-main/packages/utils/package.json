@@ -1,0 +1,25 @@
+{
+  "name": "@gi-tcg/utils",
+  "version": "0.19.1",
+  "description": "Utility functions for Genius Invokation TCG",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bun": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./reset.css": "./src/reset.css"
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "@gi-tcg/typings": "workspace:*"
+  },
+  "dependencies": {
+    "@ark/schema": "^0.56.0",
+    "arktype": "^2.2.0"
+  }
+}

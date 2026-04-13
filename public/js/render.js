@@ -8,9 +8,158 @@
     defense_select: '防御选择',
     ended: '结算',
   };
+  let floatingTooltipState = null;
+  let floatingTooltipEventsBound = false;
+  let glossaryTooltipDelegationBound = false;
 
   function getPhaseLabel(phase) {
     return PHASE_LABELS[phase] || phase;
+  }
+
+  function getPlayerName(room, playerId) {
+    if (!room || !Array.isArray(room.players)) return '-';
+    const player = room.players.find((p) => p && p.id === playerId);
+    return player ? sanitizeDisplayName(player.name) : '-';
+  }
+
+  function getMapNumber(map, key, fallback = 0) {
+    if (!map || key === undefined || key === null) return fallback;
+    const value = map[key];
+    return typeof value === 'number' ? value : fallback;
+  }
+
+  function formatDiceLabels(dice) {
+    if (!Array.isArray(dice) || !dice.length) return '--';
+    return dice
+      .map((die) => (die && die.label ? die.label : '?'))
+      .join(' ');
+  }
+
+  function formatSelectedDice(dice, indices) {
+    if (!Array.isArray(dice) || !Array.isArray(indices) || !indices.length) return '--';
+    const picked = indices
+      .map((idx) => (Number.isInteger(idx) && dice[idx] ? dice[idx].label : null))
+      .filter(Boolean);
+    if (!picked.length) return '--';
+    const sum = indices.reduce((acc, idx) => {
+      const die = Number.isInteger(idx) ? dice[idx] : null;
+      return acc + (die && typeof die.value === 'number' ? die.value : 0);
+    }, 0);
+    return `${picked.join(' + ')} = ${sum}`;
+  }
+
+  function formatStatusLine(game, room, playerId) {
+    const parts = [];
+    const poison = getMapNumber(game.poison, playerId, 0);
+    const resilience = getMapNumber(game.resilience, playerId, 0);
+    const thorns = getMapNumber(game.thorns, playerId, 0);
+    const power = getMapNumber(game.power, playerId, 0);
+    const overload = getMapNumber(game.overload, playerId, 0);
+    const desperate = getMapNumber(game.desperateBonus, playerId, 0);
+    const aCount = getMapNumber(game.auroraAEffectCount, playerId, 0);
+    const auroraLeft = getMapNumber(game.auroraUsesRemaining, playerId, 0);
+
+    if (poison > 0) parts.push(`中毒${poison}`);
+    if (resilience > 0) parts.push(`韧性${resilience}`);
+    if (thorns > 0) parts.push(`荆棘${thorns}`);
+    if (power > 0) parts.push(`力量${power}`);
+    if (overload > 0) parts.push(`超载${overload}`);
+    if (desperate > 0) parts.push(`背水+${desperate}`);
+    if (game.forceField && game.forceField[playerId]) parts.push('力场');
+    if (game.hackActive && game.hackActive[playerId]) parts.push('骇入待触发');
+    if (game.danhengCounterReady && game.danhengCounterReady[playerId]) parts.push('反击就绪');
+    if (game.xilianAscensionActive && game.xilianAscensionActive[playerId]) parts.push('跃升');
+    parts.push(`曜彩剩余${auroraLeft}`);
+    parts.push(`A触发${aCount}`);
+
+    return `${getPlayerName(room, playerId)}：${parts.join(' ｜ ')}`;
+  }
+
+  function buildDetailedBattleLog(room, game) {
+    if (!game) return '';
+    const lines = [];
+    const weatherDisplay = GPP.getWeatherDisplay ? GPP.getWeatherDisplay(game) : null;
+    const attackerName = getPlayerName(room, game.attackerId);
+    const defenderName = getPlayerName(room, game.defenderId);
+
+    lines.push(`第 ${game.round} 回合｜阶段：${getPhaseLabel(game.phase)}`);
+    lines.push(`攻击方：${attackerName} ｜ 防守方：${defenderName} ｜ 重投剩余：${game.rerollsLeft || 0}`);
+
+    if (weatherDisplay && weatherDisplay.name) {
+      lines.push(`天气：${weatherDisplay.name} ｜ 类型：${weatherDisplay.type || '-'} ｜ ${weatherDisplay.effect}`);
+    }
+
+    if (room && Array.isArray(room.players) && room.players.length) {
+      const hpLine = room.players.map((p) => {
+        const hp = getMapNumber(game.hp, p.id, 0);
+        const maxHp = getMapNumber(game.maxHp, p.id, hp);
+        return `${sanitizeDisplayName(p.name)} ${hp}/${maxHp}`;
+      });
+      lines.push(`生命：${hpLine.join(' ｜ ')}`);
+
+      const lvLine = room.players.map((p) => {
+        const atk = getMapNumber(game.attackLevel, p.id, 0);
+        const def = getMapNumber(game.defenseLevel, p.id, 0);
+        return `${sanitizeDisplayName(p.name)} 攻${atk} 防${def}`;
+      });
+      lines.push(`等级：${lvLine.join(' ｜ ')}`);
+    }
+
+    lines.push('');
+    lines.push('投骰详情');
+    lines.push(`攻击骰池：${formatDiceLabels(game.attackDice)}`);
+    lines.push(`攻击已确认：${formatSelectedDice(game.attackDice, game.attackSelection)} ｜ 攻击值：${typeof game.attackValue === 'number' ? game.attackValue : '--'}${game.attackPierce ? '（洞穿）' : ''}`);
+    lines.push(`攻击预览：${formatSelectedDice(game.attackDice, game.attackPreviewSelection)}`);
+    lines.push(`防御骰池：${formatDiceLabels(game.defenseDice)}`);
+    lines.push(`防御已确认：${formatSelectedDice(game.defenseDice, game.defenseSelection)} ｜ 防御值：${typeof game.defenseValue === 'number' ? game.defenseValue : '--'}`);
+    lines.push(`防御预览：${formatSelectedDice(game.defenseDice, game.defensePreviewSelection)}`);
+    lines.push(`最终伤害：${typeof game.lastDamage === 'number' ? game.lastDamage : '--'}`);
+
+    if (room && Array.isArray(room.players) && room.players.length) {
+      lines.push('');
+      lines.push('状态快照');
+      room.players.forEach((p) => {
+        lines.push(formatStatusLine(game, room, p.id));
+      });
+    }
+
+    const logs = Array.isArray(game.log) ? game.log : [];
+    if (logs.length) {
+      lines.push('');
+      lines.push(`战斗日志（最近 ${Math.min(logs.length, 120)} 条）`);
+      const startLine = Math.max(0, logs.length - 120);
+      for (let i = startLine; i < logs.length; i += 1) {
+        lines.push(`${i + 1}. ${logs[i]}`);
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  const PORTRAIT_NAME_ALIAS = {
+    '丹恒·腾荒': '丹恒',
+  };
+
+  function sanitizeDisplayName(str) {
+    if (!str) return '';
+    return String(str).replace(/[\[\]【】]/g, '').trim();
+  }
+
+  function getPortraitUrl(name) {
+    const sanitized = sanitizeDisplayName(name);
+    if (!sanitized || sanitized === '未公开') return null;
+    const fileName = PORTRAIT_NAME_ALIAS[sanitized] || sanitized;
+    return `/picture/${encodeURIComponent(fileName)}.png`;
+  }
+
+  function syncHeaderVisibility() {
+    if (!dom.headerRoomInfo) return;
+    const inRoom = !!state.room;
+    if (inRoom) {
+      dom.headerRoomInfo.classList.remove('hidden');
+    } else {
+      dom.headerRoomInfo.classList.add('hidden');
+    }
   }
 
   function getPhaseMessage(game, me) {
@@ -43,22 +192,32 @@
     const node = document.createElement('div');
     node.className = 'portrait';
 
-    const portraitUrl = player && (player.portraitUrl || null);
+    const characterName = sanitizeDisplayName(player && player.characterName);
+    const portraitUrl = (player && player.portraitUrl) || getPortraitUrl(characterName);
     if (portraitUrl) {
       const img = document.createElement('img');
       img.src = portraitUrl;
       img.alt = player.name || '头像';
+      img.loading = 'lazy';
+      img.onerror = () => {
+        if (img.parentNode === node) {
+          img.remove();
+          const text = document.createElement('span');
+          const source = characterName || sanitizeDisplayName(player && player.name) || '?';
+          text.textContent = (source.charAt(0) || '?').toUpperCase();
+          node.appendChild(text);
+        }
+      };
       node.appendChild(img);
       return node;
     }
 
     const text = document.createElement('span');
-    const source = (player && (player.characterName || player.name)) || '?';
+    const source = characterName || sanitizeDisplayName(player && player.name) || '?';
     text.textContent = (source.trim().charAt(0) || '?').toUpperCase();
     node.appendChild(text);
     return node;
   }
-
   function createInfoChip(text, tone) {
     const chip = document.createElement('span');
     chip.className = `infoChip${tone ? ` ${tone}` : ''}`;
@@ -163,20 +322,21 @@
 
       const left = document.createElement('div');
       left.className = 'playerIdentity';
-      left.appendChild(createPortrait(p));
+      const previewLoadout = getLobbyLoadoutPreview(p);
+      left.appendChild(createPortrait(Object.assign({}, p, { characterName: previewLoadout.characterName })));
 
       const labels = document.createElement('div');
       labels.className = 'playerLabelStack';
 
       const name = document.createElement('p');
       name.className = 'playerName';
-      name.textContent = `${p.name}${GPP.isMe(p.id) ? '（你）' : ''}`;
+      name.textContent = `${sanitizeDisplayName(p.name)}${GPP.isMe(p.id) ? '（你）' : ''}`;
 
-            const loadout = document.createElement('p');
+      const loadout = document.createElement('p');
       loadout.className = 'playerLoadout';
-      const charText = p.characterName || '未公开';
-      const auraText = p.auroraDiceName || (GPP.isMe(p.id) ? '未装备' : '未公开');
-      loadout.textContent = `角色：${charText}｜曜彩：${auraText}`;
+      const charText = sanitizeDisplayName(previewLoadout.characterName);
+      const auraText = sanitizeDisplayName(previewLoadout.auroraName);
+      loadout.textContent = `角色：${charText} ｜ 曜彩：${auraText}`;
 
       const presence = document.createElement('p');
       const online = p.isOnline !== false;
@@ -185,7 +345,7 @@
         presence.textContent = '在线';
       } else {
         const grace = formatGraceCountdown(p.graceDeadline);
-        presence.textContent = grace ? `离线保留中（${grace}）` : '离线';
+        presence.textContent = grace ? `断线保留：${grace}` : '离线';
       }
 
       labels.appendChild(name);
@@ -199,6 +359,32 @@
     });
   }
 
+  function getLobbyLoadoutPreview(player) {
+    if (!player) return { characterName: '未选择', auroraName: '未选择' };
+    if (!GPP.isMe(player.id)) {
+      return {
+        characterName: player.characterName || '未选择',
+        auroraName: player.auroraDiceName || '未选择',
+      };
+    }
+
+    const pendingCharacterName = state.ui.pendingCharacterId ? getCharacterNameById(state.ui.pendingCharacterId) : '';
+    const characterName = player.characterName || pendingCharacterName || '未公开';
+
+    let auroraName = player.auroraDiceName || '';
+    if (!auroraName && state.ui.pendingAuroraDiceId) {
+      auroraName = getAuroraNameById(state.ui.pendingAuroraDiceId);
+    }
+    if (!auroraName) {
+      const candidateCharacterId = state.ui.pendingCharacterId || player.characterId;
+      auroraName = doesCharacterNeedAurora(candidateCharacterId) ? '未公开' : '无需曜彩';
+    }
+
+    return {
+      characterName,
+      auroraName,
+    };
+  }
   function escapeHtml(text) {
     return String(text || '')
       .replace(/&/g, '&amp;')
@@ -290,7 +476,10 @@
   }
 
   function renderLoadoutConfirmArea(me) {
-    if (!dom.selectionSummary || !dom.confirmLoadoutBtn || !dom.confirmHint) return;
+    if (!dom.selectionSummary || !dom.confirmHint) return;
+
+    const sideBtn = dom.confirmLoadoutBtn;
+    const topBtn = document.getElementById('confirmLoadoutTopBtn');
 
     const pendingCharacterId = state.ui.pendingCharacterId;
     const pendingAuroraId = state.ui.pendingAuroraDiceId;
@@ -303,14 +492,19 @@
       ? (pendingAuroraId ? getAuroraNameById(pendingAuroraId) : '未选择')
       : '无需曜彩';
 
-    dom.selectionSummary.innerHTML = [
-      `<p><b>待确认</b>：角色 ${escapeHtml(pendingCharacterName)} ｜曜彩 ${escapeHtml(pendingAuroraName)}</p>`,
-      `<p><b>已确认</b>：角色 ${escapeHtml(confirmedCharacterName)} ｜曜彩 ${escapeHtml(confirmedAuroraName)}</p>`,
-    ].join('');
+    const portraitUrl = getPortraitUrl(pendingCharacterName);
+
+    dom.selectionSummary.innerHTML = `
+      <div class="summaryMain">
+        <p><b>待确认</b>：${escapeHtml(sanitizeDisplayName(pendingCharacterName))} ｜ 曜彩：${escapeHtml(sanitizeDisplayName(pendingAuroraName))}</p>
+        <p><b>已确认</b>：${escapeHtml(sanitizeDisplayName(confirmedCharacterName))} ｜ 曜彩：${escapeHtml(sanitizeDisplayName(confirmedAuroraName))}</p>
+      </div>
+      <div class="summaryPortraitCluster">
+        ${portraitUrl ? `<img src="${portraitUrl}" class="summaryPortraitImg" alt="Portrait">` : ''}
+      </div>
+    `;
 
     const verdict = getLoadoutConfirmState(me);
-    dom.confirmLoadoutBtn.disabled = !verdict.canConfirm;
-    dom.confirmLoadoutBtn.textContent = '确认当前选择';
 
     if (verdict.canConfirm) {
       dom.confirmHint.textContent = state.ui.confirmHint || '点击确认后才会提交到房间。';
@@ -318,7 +512,7 @@
       dom.confirmHint.textContent = verdict.reason || state.ui.confirmHint || '';
     }
 
-    dom.confirmLoadoutBtn.onclick = () => {
+    const handleConfirm = () => {
       const latest = getLoadoutConfirmState(me);
       if (!latest.canConfirm) {
         state.ui.confirmHint = latest.reason;
@@ -337,11 +531,146 @@
 
       state.ui.pendingDirty = false;
       state.ui.confirmHint = pickedCharacter && pickedCharacter.auroraUses > 0 && pickedAuroraId
-        ? `已提交选择）'{pickedCharacter.name} + ${getAuroraNameById(pickedAuroraId)}`
-        : `已提交选择）'{pickedCharacter ? pickedCharacter.name : '角色'}`;
+        ? `已提交选择：${pickedCharacter.name} + ${getAuroraNameById(pickedAuroraId)}`
+        : `已提交选择：${pickedCharacter ? pickedCharacter.name : '角色'}`;
 
       GPP.render();
     };
+
+    if (sideBtn) {
+      sideBtn.disabled = !verdict.canConfirm;
+      sideBtn.textContent = '确认当前选择';
+      sideBtn.onclick = handleConfirm;
+    }
+
+    if (topBtn) {
+      topBtn.disabled = !verdict.canConfirm;
+      topBtn.textContent = '确认当前选择';
+      topBtn.onclick = handleConfirm;
+      topBtn.classList.remove('hidden');
+    }
+  }
+  function getFloatingTooltipNode() {
+    let node = document.getElementById('floatingTooltip');
+    if (node) return node;
+
+    node = document.createElement('div');
+    node.id = 'floatingTooltip';
+    node.className = 'floatingTooltip hidden';
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function positionFloatingTooltip(anchorRect) {
+    const node = getFloatingTooltipNode();
+    const gap = 8;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+
+    node.style.left = '-9999px';
+    node.style.top = '-9999px';
+    const tipRect = node.getBoundingClientRect();
+
+    let top = anchorRect.bottom + gap;
+    if (top + tipRect.height > viewportHeight - gap) {
+      top = Math.max(gap, anchorRect.top - tipRect.height - gap);
+    }
+
+    let left = anchorRect.left;
+    if (left + tipRect.width > viewportWidth - gap) {
+      left = viewportWidth - tipRect.width - gap;
+    }
+    if (left < gap) left = gap;
+
+    node.style.top = `${Math.round(top)}px`;
+    node.style.left = `${Math.round(left)}px`;
+  }
+
+  function hideFloatingTooltip() {
+    const node = document.getElementById('floatingTooltip');
+    if (node) {
+      node.classList.add('hidden');
+      node.innerHTML = '';
+    }
+    floatingTooltipState = null;
+  }
+
+  function ensureFloatingTooltipEventsBound() {
+    if (floatingTooltipEventsBound) return;
+    floatingTooltipEventsBound = true;
+    window.addEventListener('scroll', syncFloatingTooltipPosition, true);
+    window.addEventListener('resize', syncFloatingTooltipPosition);
+  }
+
+  function syncFloatingTooltipPosition() {
+    if (!floatingTooltipState || !floatingTooltipState.anchorEl) return;
+    if (!document.body.contains(floatingTooltipState.anchorEl)) {
+      hideFloatingTooltip();
+      return;
+    }
+    positionFloatingTooltip(floatingTooltipState.anchorEl.getBoundingClientRect());
+  }
+
+  function showFloatingTooltip(anchorEl, html) {
+    if (!anchorEl || !html) return;
+    const node = getFloatingTooltipNode();
+    node.innerHTML = html;
+    node.classList.remove('hidden');
+    floatingTooltipState = { anchorEl };
+    positionFloatingTooltip(anchorEl.getBoundingClientRect());
+  }
+
+  function bindAdaptiveTooltip(wrap, tip) {
+    if (!wrap || !tip || wrap.dataset.tooltipBound === '1') return;
+    wrap.dataset.tooltipBound = '1';
+    ensureFloatingTooltipEventsBound();
+
+    const show = () => showFloatingTooltip(wrap, tip.innerHTML);
+    wrap.addEventListener('mouseenter', show);
+    wrap.addEventListener('focusin', show);
+    wrap.addEventListener('mouseleave', hideFloatingTooltip);
+    wrap.addEventListener('focusout', hideFloatingTooltip);
+  }
+
+  function bindGlossaryTooltipDelegation() {
+    if (glossaryTooltipDelegationBound) return;
+    glossaryTooltipDelegationBound = true;
+    ensureFloatingTooltipEventsBound();
+
+    document.addEventListener('mouseover', (event) => {
+      const target = event.target && event.target.closest ? event.target.closest('.glossTip') : null;
+      if (!target) return;
+      if (target.contains(event.relatedTarget)) return;
+      const tip = target.querySelector('.glossTipText');
+      if (!tip || !tip.innerHTML) return;
+      showFloatingTooltip(target, tip.innerHTML);
+    });
+
+    document.addEventListener('mouseout', (event) => {
+      const target = event.target && event.target.closest ? event.target.closest('.glossTip') : null;
+      if (!target) return;
+      const to = event.relatedTarget;
+      if (to && target.contains(to)) return;
+      if (floatingTooltipState && floatingTooltipState.anchorEl === target) {
+        hideFloatingTooltip();
+      }
+    });
+
+    document.addEventListener('focusin', (event) => {
+      const target = event.target && event.target.closest ? event.target.closest('.glossTip') : null;
+      if (!target) return;
+      const tip = target.querySelector('.glossTipText');
+      if (!tip || !tip.innerHTML) return;
+      showFloatingTooltip(target, tip.innerHTML);
+    });
+
+    document.addEventListener('focusout', (event) => {
+      const target = event.target && event.target.closest ? event.target.closest('.glossTip') : null;
+      if (!target) return;
+      if (floatingTooltipState && floatingTooltipState.anchorEl === target) {
+        hideFloatingTooltip();
+      }
+    });
   }
 
   function renderCharacterButtons() {
@@ -357,7 +686,7 @@
       const btn = document.createElement('button');
       btn.className = 'selectionBtn';
       btn.type = 'button';
-      btn.innerHTML = `${escapeHtml(c.name)} &nbsp; ${formatShortSpecHtml(c.shortSpec)}`;
+      btn.innerHTML = `${escapeHtml(sanitizeDisplayName(c.name))} &nbsp; ${formatShortSpecHtml(c.shortSpec)}`;
       if (me.characterId === c.id) btn.classList.add('confirmedSelection');
       if (state.ui.pendingCharacterId === c.id) btn.classList.add('pendingSelection');
       btn.onclick = () => {
@@ -372,7 +701,8 @@
 
       const tip = document.createElement('div');
       tip.className = 'tooltip';
-      tip.innerHTML = `<b>${escapeHtml(c.name)}</b><br>HP ${c.hp} | ${formatShortSpecHtml(c.shortSpec)}<br>技能：${escapeHtml(c.skillText)}`;
+      tip.innerHTML = `<b>${escapeHtml(sanitizeDisplayName(c.name))}</b><br>HP ${c.hp} | ${formatShortSpecHtml(c.shortSpec)}<br>技能：${escapeHtml(c.skillText)}`;
+      bindAdaptiveTooltip(wrap, tip);
 
       wrap.appendChild(btn);
       wrap.appendChild(tip);
@@ -403,7 +733,7 @@
       const btn = document.createElement('button');
       btn.className = 'selectionBtn';
       btn.type = 'button';
-      btn.textContent = `${a.name}  ${a.facesText}`;
+      btn.textContent = `${sanitizeDisplayName(a.name)}  ${a.facesText}`;
       if (me.auroraDiceId === a.id) btn.classList.add('confirmedSelection');
       if (state.ui.pendingAuroraDiceId === a.id) btn.classList.add('pendingSelection');
       btn.onclick = () => {
@@ -415,14 +745,14 @@
 
       const tip = document.createElement('div');
       tip.className = 'tooltip';
-      tip.innerHTML = `<b>${escapeHtml(a.name)}</b><br>骰面：${escapeHtml(a.facesText)}<br>${escapeHtml(a.effectText)}<br>条件：${escapeHtml(a.conditionText)}`;
+      tip.innerHTML = `<b>${escapeHtml(sanitizeDisplayName(a.name))}</b><br>骰面：${escapeHtml(a.facesText)}<br>${escapeHtml(a.effectText)}<br>条件：${escapeHtml(a.conditionText)}`;
+      bindAdaptiveTooltip(wrap, tip);
 
       wrap.appendChild(btn);
       wrap.appendChild(tip);
       dom.auroraButtons.appendChild(wrap);
     });
   }
-
   function renderBattleCenter(game) {
     if (!dom.battleCenterScore || !game) return;
 
@@ -436,8 +766,8 @@
       return;
     }
 
-    let phaseText = getPhaseLabel(game.phase);
-    
+    const phaseText = getPhaseLabel(game.phase);
+
     if (game.phase === 'attack_roll' && game.attackerId === state.me) {
       dom.battleCenterScore.textContent = '点击投掷攻击骰';
       dom.battleCenterScore.classList.add('clickableCenter');
@@ -462,7 +792,6 @@
 
     dom.battleCenterScore.textContent = phaseText;
   }
-
   function getMapNumber(gameMap, playerId) {
     if (!gameMap || gameMap[playerId] === undefined || gameMap[playerId] === null) return 0;
     return gameMap[playerId];
@@ -474,6 +803,107 @@
       overload: getMapNumber(game.overload, playerId),
       desperate: getMapNumber(game.desperateBonus, playerId),
     };
+  }
+
+  function getDiceByIndices(dice, indices) {
+    if (!Array.isArray(dice) || !Array.isArray(indices)) return [];
+    const picked = [];
+    for (const idx of indices) {
+      if (!Number.isInteger(idx)) continue;
+      if (idx < 0 || idx >= dice.length) continue;
+      if (!dice[idx]) continue;
+      picked.push(dice[idx]);
+    }
+    return picked;
+  }
+
+  function calcDistinctPairCount(selectedDice) {
+    if (!Array.isArray(selectedDice) || !selectedDice.length) return 0;
+    const freq = {};
+    for (const die of selectedDice) {
+      const value = die && Number.isFinite(die.value) ? die.value : null;
+      if (value === null) continue;
+      freq[value] = (freq[value] || 0) + 1;
+    }
+    let pairedValues = 0;
+    for (const v of Object.values(freq)) {
+      if (v >= 2) pairedValues += 1;
+    }
+    return pairedValues;
+  }
+
+  function hasAuroraA(selectedDice, auroraId) {
+    return selectedDice.some((die) => !!(die && die.isAurora && die.hasA && die.auroraId === auroraId));
+  }
+
+  function buildValueExpression(base, addTotal, mul) {
+    const hasAdd = addTotal > 0;
+    if (mul > 1 && hasAdd) return `(${base} + ${addTotal}) \u00D7 ${mul}`;
+    if (mul > 1) return `${base} \u00D7 ${mul}`;
+    if (hasAdd) return `${base} + ${addTotal}`;
+    return `${base}`;
+  }
+
+  function computeRealtimeFormula(game, player, lane, selectedIndices) {
+    if (!game || !player || !Array.isArray(selectedIndices) || selectedIndices.length === 0) {
+      return null;
+    }
+
+    if (lane === 'attack' && game.attackerId === player.id && Array.isArray(game.attackDice)) {
+      const selectedDice = getDiceByIndices(game.attackDice, selectedIndices);
+      if (!selectedDice.length) return null;
+
+      const base = selectedDice.reduce((sum, die) => sum + (Number.isFinite(die.value) ? die.value : 0), 0);
+      const attackBonus = getAttackBonusDetails(game, player.id);
+      const liuyingBonus = (
+        player.characterId === 'liuying'
+        && getMapNumber(game.hp, player.id) === getMapNumber(game.maxHp, player.id)
+      ) ? 5 : 0;
+      const addTotal = attackBonus.power + attackBonus.overload + attackBonus.desperate + liuyingBonus;
+      const mul = (hasAuroraA(selectedDice, 'legacy') || hasAuroraA(selectedDice, 'evolution')) ? 2 : 1;
+      const singleHit = (base + addTotal) * mul;
+
+      const liuyingCombo = player.characterId === 'liuying' && calcDistinctPairCount(selectedDice) >= 2;
+      const repeaterCombo = hasAuroraA(selectedDice, 'repeater');
+      const comboHits = (liuyingCombo || repeaterCombo) ? 2 : 1;
+      const hasDetail = addTotal > 0 || mul > 1 || comboHits > 1;
+
+      const detailParts = [];
+      if (addTotal > 0 || mul > 1) {
+        detailParts.push(buildValueExpression(base, addTotal, mul));
+      }
+      if (comboHits > 1) {
+        detailParts.push(`\u8FDE\u51FB\u00D72=${singleHit * 2}`);
+      }
+
+      return {
+        primaryKind: '\u653B\u51FB',
+        primaryValue: singleHit,
+        detailText: detailParts.join(' \uFF5C '),
+        hasDetail,
+      };
+    }
+
+    if (lane === 'defense' && game.defenderId === player.id && Array.isArray(game.defenseDice)) {
+      const selectedDice = getDiceByIndices(game.defenseDice, selectedIndices);
+      if (!selectedDice.length) return null;
+
+      const base = selectedDice.reduce((sum, die) => sum + (Number.isFinite(die.value) ? die.value : 0), 0);
+      const shajinBonus = player.characterId === 'shajin' ? getMapNumber(game.resilience, player.id) : 0;
+      const addTotal = shajinBonus;
+      const mul = (hasAuroraA(selectedDice, 'legacy') || hasAuroraA(selectedDice, 'evolution')) ? 2 : 1;
+      const defenseFinal = (base + addTotal) * mul;
+      const hasDetail = addTotal > 0 || mul > 1;
+
+      return {
+        primaryKind: '\u9632\u5FA1',
+        primaryValue: defenseFinal,
+        detailText: hasDetail ? buildValueExpression(base, addTotal, mul) : '',
+        hasDetail,
+      };
+    }
+
+    return null;
   }
 
   function renderActionRail(game, me, enemy) {
@@ -616,7 +1046,6 @@
 
     dom.actionRail.appendChild(actions);
   }
-
   function getTurnOwnership(game) {
     if (!game) return { ownerId: null, ownerType: 'neutral', label: '等待开局' };
     if (game.phase === 'attack_roll' || game.phase === 'attack_reroll_or_select') {
@@ -677,7 +1106,6 @@
       ].join('');
     }
   }
-
   function renderPlayerZone(game, player, zoneEl, isSelf) {
     zoneEl.innerHTML = '';
     zoneEl.classList.remove('activeTurnZone');
@@ -709,7 +1137,7 @@
     role.textContent = isSelf ? '我方' : '敌方';
 
     const name = document.createElement('h3');
-    name.textContent = player.name;
+    name.textContent = sanitizeDisplayName(player.name);
 
     profileText.appendChild(role);
     profileText.appendChild(name);
@@ -720,16 +1148,23 @@
     hp.setAttribute('data-player-id', player.id);
     hp.textContent = `HP ${game.hp[player.id]}`;
 
-    header.appendChild(profile);
-    header.appendChild(hp);
-    zoneEl.appendChild(header);
-
-    const stats = document.createElement('div');
-    stats.className = 'atkDefBox';
     const atkLevel = game.attackLevel && game.attackLevel[player.id] !== undefined ? game.attackLevel[player.id] : '-';
     const defLevel = game.defenseLevel && game.defenseLevel[player.id] !== undefined ? game.defenseLevel[player.id] : '-';
-    stats.textContent = `攻击等级 ${atkLevel} ｜ 防御等级 ${defLevel}`;
-    zoneEl.appendChild(stats);
+    const stats = document.createElement('div');
+    stats.className = 'atkDefBox';
+    stats.innerHTML = [
+      `<span class="atkDefItem">攻击等级 ${atkLevel}</span>`,
+      `<span class="atkDefItem">防御等级 ${defLevel}</span>`,
+    ].join('');
+
+    const statusCluster = document.createElement('div');
+    statusCluster.className = 'zoneHeaderStatus';
+    statusCluster.appendChild(hp);
+    statusCluster.appendChild(stats);
+
+    header.appendChild(profile);
+    header.appendChild(statusCluster);
+    zoneEl.appendChild(header);
 
     const meta = document.createElement('p');
     meta.className = 'metaLine';
@@ -740,8 +1175,8 @@
       ? game.auroraAEffectCount[player.id]
       : 0;
 
-    const charHtml = GPP.charTooltipHtml(player.characterId, player.characterName);
-    const auraHtml = GPP.auroraTooltipHtml(player.auroraDiceId, player.auroraDiceName);
+    const charHtml = GPP.charTooltipHtml(player.characterId, sanitizeDisplayName(player.characterName));
+    const auraHtml = GPP.auroraTooltipHtml(player.auroraDiceId, sanitizeDisplayName(player.auroraDiceName));
     meta.innerHTML = `角色：${charHtml} ｜ 曜彩：${auraHtml} ｜ 剩余曜彩 ${uses} ｜ A触发 ${aCount}`;
     zoneEl.appendChild(meta);
 
@@ -799,10 +1234,10 @@
     }
 
     const laneText = displayed.lane === 'attack'
-      ? '攻击骰'
+      ? '\u653B\u51FB\u9AB0'
       : displayed.lane === 'attack_selected'
-        ? '已确认攻击骰'
-        : '防御骰';
+        ? '\u5DF2\u786E\u8BA4\u653B\u51FB\u9AB0'
+        : '\u9632\u5FA1\u9AB0';
 
     const diceTitle = document.createElement('p');
     diceTitle.className = 'metaLine diceTitle';
@@ -831,33 +1266,62 @@
       selectedSet = new Set(preview.indices);
     }
 
-    const wrap = document.createElement('div');
-    wrap.className = 'diceRowWrap';
-    wrap.appendChild(GPP.renderDice(displayed.dice, maxSelectable, clickable, selectedSet));
+    const laneLayout = document.createElement('div');
+    laneLayout.className = 'diceLaneLayout';
+
+    const diceAnchor = document.createElement('div');
+    diceAnchor.className = 'diceAnchor';
+    diceAnchor.appendChild(GPP.renderDice(displayed.dice, maxSelectable, clickable, selectedSet));
+
+    const valueSide = document.createElement('div');
+    valueSide.className = 'realtimeValueSide';
 
     const committed = GPP.getCommittedSumForPlayer(game, player.id);
-    const sumBadge = document.createElement('div');
-    sumBadge.className = `sumBadge${committed && committed.pierce ? ' pierce' : ''}`;
-
     if (committed) {
-      sumBadge.textContent = `${committed.kind} ${committed.sum}`;
-    } else if (clickable) {
-      const liveSum = GPP.sumSelectedIndices(displayed.dice, [...state.selectedDice]);
-      sumBadge.textContent = `实时 ${liveSum}`;
-    } else if (preview) {
-      sumBadge.textContent = `实时 ${preview.sum}`;
+      const committedKind = (
+        game.attackerId === player.id
+        && Array.isArray(game.attackSelection)
+        && game.attackSelection.length
+      ) ? '\u653B\u51FB' : '\u9632\u5FA1';
+
+      const committedBadge = document.createElement('div');
+      committedBadge.className = `sumBadge${committed && committed.pierce ? ' pierce' : ''}`;
+      committedBadge.textContent = `${committedKind} ${committed.sum}`;
+      valueSide.appendChild(committedBadge);
     } else {
-      sumBadge.textContent = '--';
+      let realtimeData = null;
+      if (clickable) {
+        realtimeData = computeRealtimeFormula(game, player, displayed.lane, [...state.selectedDice]);
+      } else if (preview) {
+        realtimeData = computeRealtimeFormula(game, player, displayed.lane, preview.indices || []);
+      }
+
+      const realtimeBadge = document.createElement('div');
+      realtimeBadge.className = 'sumBadge mainValueBadge';
+
+      if (realtimeData) {
+        realtimeBadge.textContent = `${realtimeData.primaryKind} ${realtimeData.primaryValue}`;
+        valueSide.appendChild(realtimeBadge);
+        if (realtimeData.hasDetail && realtimeData.detailText) {
+          const detail = document.createElement('p');
+          detail.className = 'realtimeFormulaDetail';
+          detail.textContent = realtimeData.detailText;
+          valueSide.appendChild(detail);
+        }
+      } else {
+        realtimeBadge.textContent = '--';
+        valueSide.appendChild(realtimeBadge);
+      }
     }
 
-    wrap.appendChild(sumBadge);
-    center.appendChild(wrap);
+    laneLayout.appendChild(diceAnchor);
+    laneLayout.appendChild(valueSide);
+    center.appendChild(laneLayout);
     zoneEl.appendChild(center);
 
     const hints = GPP.renderAuroraHints(displayed.dice);
     if (hints) zoneEl.appendChild(hints);
   }
-
   function renderHomeScene() {
     state.ui.scene = 'home';
     state.ui.logDrawerOpen = false;
@@ -892,6 +1356,7 @@
 
       const me = GPP.findPlayer(state.me);
       ensurePendingLoadout(me);
+      renderPlayersList(room);
       renderCharacterButtons();
       renderAuroraButtons();
       renderLoadoutConfirmArea(me);
@@ -904,6 +1369,8 @@
 
     dom.lobbyArea.classList.add('hidden');
     if (dom.lobbyControls) dom.lobbyControls.classList.add('hidden');
+    const topBtn = document.getElementById('confirmLoadoutTopBtn');
+    if (topBtn) topBtn.classList.add('hidden');
     dom.gameArea.classList.remove('hidden');
 
     const attacker = GPP.findPlayer(game.attackerId);
@@ -912,7 +1379,7 @@
     const enemy = room.players.find((p) => p.id !== state.me) || null;
 
     dom.roundInfo.textContent = `第${game.round}回合 ｜ ${getPhaseLabel(game.phase)}`;
-    dom.turnInfo.textContent = `攻击方：${attacker ? attacker.name : '-'} ｜ 防守方：${defender ? defender.name : '-'}`;
+    dom.turnInfo.textContent = `攻击方：${attacker ? sanitizeDisplayName(attacker.name) : '-'} ｜ 防守方：${defender ? sanitizeDisplayName(defender.name) : '-'}`;
     renderWeatherPanels(game);
     renderTurnOwnershipCard(game);
 
@@ -921,14 +1388,16 @@
     renderActionRail(game, me, enemy);
     renderBattleCenter(game);
 
-    dom.logBox.textContent = (game.log || []).slice(-80).join('\n');
+    dom.logBox.textContent = buildDetailedBattleLog(room, game);
 
     syncLogDrawer();
   }
-
   function render() {
+    hideFloatingTooltip();
     ensureStaticBindings();
+    bindGlossaryTooltipDelegation();
     ensureWeatherAnchors();
+    syncHeaderVisibility();
     GPP.hideWinnerOverlay();
 
     if (!state.room) {
@@ -940,11 +1409,20 @@
 
     if (state.room.game && state.room.game.status === 'ended') {
       const winner = GPP.findPlayer(state.room.game.winnerId);
-      GPP.showWinnerOverlay(`恭喜${(winner && winner.name) || '未知玩家'}胜利`);
+      GPP.showWinnerOverlay(`恭喜${sanitizeDisplayName((winner && winner.name) || '未知玩家')}胜利`);
     }
   }
 
   GPP.render = render;
 })();
+
+
+
+
+
+
+
+
+
 
 

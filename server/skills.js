@@ -33,13 +33,34 @@ function applyAscension(room, game, player, selectedDice) {
   const shouldAscend = characterShouldAscend(player, game);
   if (!shouldAscend || !selectedDice.length) return;
 
-  let minDie = selectedDice[0];
-  for (const d of selectedDice) {
-    if (d.value < minDie.value) minDie = d;
+  // Ascension must never apply to aurora dice.
+  const normalDice = selectedDice.filter((d) => d && !isAuroraDie(d) && Number.isFinite(d.value));
+  if (!normalDice.length) return;
+
+  let minValue = normalDice[0].value;
+  for (const d of normalDice) {
+    if (d.value < minValue) minValue = d.value;
   }
-  minDie.value = minDie.maxValue;
-  minDie.label = minDie.hasA ? `${minDie.value}A` : `${minDie.value}`;
-  game.log.push(`${player.name}触发【跃升】，将最小点骰子提升到最大值${minDie.maxValue}。`);
+
+  // If multiple dice share the minimum value, pick one randomly.
+  const minCandidates = normalDice.filter((d) => d.value === minValue);
+  const targetDie = minCandidates[Math.floor(Math.random() * minCandidates.length)];
+  if (!targetDie) return;
+
+  const targetMax = Number.isFinite(targetDie.maxValue) ? targetDie.maxValue : targetDie.value;
+  targetDie.value = targetMax;
+  targetDie.label = targetDie.hasA ? `${targetDie.value}A` : `${targetDie.value}`;
+  game.log.push(`${player.name}触发【跃升】，将最小点普通骰提升到最大值${targetMax}。`);
+}
+
+function isAuroraDie(die) {
+  if (!die || typeof die !== 'object') return false;
+  if (die.isAurora === true) return true;
+  return typeof die.auroraId === 'string' && die.auroraId.length > 0;
+}
+
+function isHackTargetableDie(die) {
+  return !!(die && Number.isFinite(die.value) && !isAuroraDie(die));
 }
 
 function applyHackEffects(game, attacker, defender) {
@@ -47,7 +68,7 @@ function applyHackEffects(game, attacker, defender) {
     let maxDie = null;
     for (const idx of game.defenseSelection) {
       const d = game.defenseDice[idx];
-      if (!d.isAurora && (!maxDie || d.value > maxDie.value)) maxDie = d;
+      if (isHackTargetableDie(d) && (!maxDie || d.value > maxDie.value)) maxDie = d;
     }
     if (maxDie && maxDie.value > 2) {
       const diff = maxDie.value - 2;
@@ -61,7 +82,7 @@ function applyHackEffects(game, attacker, defender) {
     let maxDie = null;
     for (const idx of game.attackSelection) {
       const d = game.attackDice[idx];
-      if (!d.isAurora && (!maxDie || d.value > maxDie.value)) maxDie = d;
+      if (isHackTargetableDie(d) && (!maxDie || d.value > maxDie.value)) maxDie = d;
     }
     if (maxDie && maxDie.value > 2) {
       const diff = maxDie.value - 2;

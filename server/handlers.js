@@ -854,11 +854,11 @@ function handleResumeSession(ws, msg) {
 
 function handleChooseCharacter(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
-  if (!room) return send(ws, { type: 'error', message: '浣犱笉鍦ㄦ埧闂村唴。' });
-  if (room.status !== 'lobby') return send(ws, { type: 'error', message: '娓告垙宸插紑濮嬶紝涓嶈兘鏇存崲角色。' });
+  if (!room) return send(ws, { type: 'error', message: '你不在房间内。' });
+  if (room.status !== 'lobby') return send(ws, { type: 'error', message: '游戏已开始，不能更换角色。' });
 
   const characterId = msg.characterId;
-  if (!CharacterRegistry[characterId]) return send(ws, { type: 'error', message: '鏃犳晥角色。' });
+  if (!CharacterRegistry[characterId]) return send(ws, { type: 'error', message: '无效角色。' });
 
   const me = getPlayerById(room, ws.playerId);
   if (!me) return;
@@ -871,7 +871,7 @@ function handleChooseCharacter(ws, msg) {
 
 function handleChooseAurora(ws, msg) {
   const room = getPlayerRoom(ws, rooms);
-  if (!room) return send(ws, { type: 'error', message: '浣犱笉鍦ㄦ埧闂村唴。' });
+  if (!room) return send(ws, { type: 'error', message: '你不在房间内。' });
   if (room.status !== 'lobby') return send(ws, { type: 'error', message: '游戏已开始，不能更换曜彩骰。' });
 
   const me = getPlayerById(room, ws.playerId);
@@ -901,7 +901,7 @@ function handleCreateCustomCharacter(ws, msg) {
     return false;
   }
   if (CharacterRegistry[id]) {
-    send(ws, { type: 'error', message: `角色 ID 宸插瓨鍦細${id}` });
+    send(ws, { type: 'error', message: `角色 ID 已存在：${id}` });
     return false;
   }
 
@@ -939,7 +939,7 @@ function handleCreateCustomCharacter(ws, msg) {
     saveCustomVariant(variantToSave);
   } catch (err) {
     console.error('[Error] saveCustomVariant:', err);
-    send(ws, { type: 'error', message: '淇濆瓨鑷畾涔夎鑹插け璐ワ紝璇锋鏌ユ湇鍔＄鏃ュ織。' });
+    send(ws, { type: 'error', message: '保存自定义角色失败，请检查服务端日志。' });
     return false;
   }
 
@@ -1090,17 +1090,17 @@ function handleRerollAttack(ws, msg) {
 
   if (room.status !== 'in_game' || game.phase !== 'attack_reroll_or_select') return;
   if (game.attackerId !== ws.playerId) return;
-  if (game.rerollsLeft <= 0) return send(ws, { type: 'error', message: '娌℃湁鍓╀綑閲嶆姇娆℃暟。' });
+  if (game.rerollsLeft <= 0) return send(ws, { type: 'error', message: '没有剩余重投次数。' });
 
   const attacker = getPlayerById(room, game.attackerId);
   const indices = msg.indices;
   const uniqueIndices = [];
   const seen = new Set();
 
-  if (!Array.isArray(indices)) return send(ws, { type: 'error', message: '閲嶆姇鍙傛暟鏃犳晥。' });
+  if (!Array.isArray(indices)) return send(ws, { type: 'error', message: '重投参数无效。' });
   for (const idx of indices) {
     if (!Number.isInteger(idx) || idx < 0 || idx >= game.attackDice.length) {
-      return send(ws, { type: 'error', message: '閲嶆姇绱㈠紩鏃犳晥。' });
+      return send(ws, { type: 'error', message: '重投索引无效。' });
     }
     if (!seen.has(idx)) {
       seen.add(idx);
@@ -1527,7 +1527,7 @@ function handleUpdateLiveSelection(ws, msg) {
 function handlePlayAgain(ws) {
   const room = getPlayerRoom(ws, rooms);
   if (!room) return;
-  if (room.status !== 'ended') return send(ws, { type: 'error', message: '褰撳墠涓嶅湪缁撶畻闃舵。' });
+  if (room.status !== 'ended') return send(ws, { type: 'error', message: '当前不在结算阶段。' });
 
   room.status = 'lobby';
   room.game = null;

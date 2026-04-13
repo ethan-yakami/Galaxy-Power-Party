@@ -1,0 +1,37 @@
+{
+  "name": "@gi-tcg/card-data-viewer",
+  "version": "0.19.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "bun": "./src/index.tsx",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "check": "tsc --noEmit",
+    "build": "bunx --bun vite build"
+  },
+  "peerDependencies": {
+    "solid-js": "catalog:"
+  },
+  "dependencies": {
+    "@gi-tcg/assets-manager": "workspace:*",
+    "@gi-tcg/utils": "workspace:*",
+    "@solid-primitives/i18n": "^2.2.1"
+  },
+  "devDependencies": {
+    "@gi-tcg/core": "workspace:*",
+    "@gi-tcg/typings": "workspace:*",
+    "unocss": "catalog:",
+    "vite": "catalog:",
+    "unplugin-dts": "catalog:",
+    "vite-plugin-solid": "catalog:",
+    "rollup-plugin-node-externals": "catalog:"
+  }
+}

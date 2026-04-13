@@ -145,12 +145,15 @@
     const box = document.createElement('div');
     box.className = 'auroraDesc';
 
+    const sanitizeDisplayName = (name) => String(name || '').replace(/[\[\]【】]/g, '').trim();
+
     dice.forEach((d) => {
       if (!d.isAurora || !d.auroraId || seen[d.auroraId]) return;
       seen[d.auroraId] = true;
 
       const p = document.createElement('p');
-      p.textContent = `曜彩骰【${d.auroraName}】：${d.effectText}；条件：${d.conditionText}`;
+      const auroraName = sanitizeDisplayName(d.auroraName);
+      p.textContent = `曜彩骰 ${auroraName}：${d.effectText}；条件：${d.conditionText}`;
       box.appendChild(p);
     });
 

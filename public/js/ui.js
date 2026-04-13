@@ -1056,10 +1056,14 @@
     });
   }
 
+  function sanitizeDisplayName(name) {
+    return String(name || '').replace(/[\[\]【】]/g, '').trim();
+  }
+
   function charTooltipHtml(characterId, characterName) {
     const c = state.characters[characterId];
-    if (!c) return escapeHtml(characterName || '');
-    return '<span class="glossTip">' + escapeHtml(c.name)
+    if (!c) return escapeHtml(sanitizeDisplayName(characterName));
+    return '<span class="glossTip">' + escapeHtml(sanitizeDisplayName(c.name))
       + '<span class="glossTipText">'
       + escapeHtml('HP ' + c.hp + ' | ' + c.shortSpec)
       + '<br>' + escapeHtml('技能：' + c.skillText)
@@ -1067,10 +1071,10 @@
   }
 
   function auroraTooltipHtml(auroraDiceId, auroraDiceName) {
-    if (!auroraDiceId || !auroraDiceName) return escapeHtml(auroraDiceName || '无');
+    if (!auroraDiceId || !auroraDiceName) return escapeHtml(sanitizeDisplayName(auroraDiceName || '无'));
     const a = state.auroraDice.find((d) => d.id === auroraDiceId);
-    if (!a) return escapeHtml(auroraDiceName);
-    return '<span class="glossTip">' + escapeHtml(a.name)
+    if (!a) return escapeHtml(sanitizeDisplayName(auroraDiceName));
+    return '<span class="glossTip">' + escapeHtml(sanitizeDisplayName(a.name))
       + '<span class="glossTipText">'
       + escapeHtml('骰面：' + a.facesText)
       + '<br>' + escapeHtml(a.effectText)

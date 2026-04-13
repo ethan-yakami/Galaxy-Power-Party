@@ -32,6 +32,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
     }
   },
 }));
+app.use('/picture', express.static(path.join(__dirname, 'picture')));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({

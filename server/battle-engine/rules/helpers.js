@@ -1,4 +1,4 @@
-const { MAX_NORMAL_DICE, SOURCE_AURORA } = require('../constants');
+const { MAX_NORMAL_DICE, SOURCE_NORMAL, SOURCE_AURORA } = require('../constants');
 const { INDICES_BY_MASK } = require('../actions');
 
 function playerOffset(playerIndex) {
@@ -155,12 +155,33 @@ function findMinSelectedIndex(roll, mask) {
   return best;
 }
 
+function findMinSelectedNormalIndices(roll, mask) {
+  const indices = getSelectedIndices(mask);
+  const result = [];
+  let minValue = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < indices.length; i += 1) {
+    const index = indices[i];
+    if (roll.sourceKinds[index] !== SOURCE_NORMAL) continue;
+    const value = roll.values[index];
+    if (value < minValue) {
+      minValue = value;
+      result.length = 0;
+      result.push(index);
+    } else if (value === minValue) {
+      result.push(index);
+    }
+  }
+  return result;
+}
+
 function findHighestSelectedNonAuroraIndex(roll, mask) {
   const indices = getSelectedIndices(mask);
   let best = -1;
   for (let i = 0; i < indices.length; i += 1) {
     const index = indices[i];
     if (roll.sourceKinds[index] === SOURCE_AURORA) continue;
+    if (roll.sourceKinds[index] !== SOURCE_NORMAL) continue;
+    if (roll.auroraIndices[index] >= 0) continue;
     if (best === -1 || roll.values[index] > roll.values[best]) {
       best = index;
     }
@@ -190,6 +211,7 @@ module.exports = {
   areAllValuesSix,
   upgradeSide,
   findMinSelectedIndex,
+  findMinSelectedNormalIndices,
   findHighestSelectedNonAuroraIndex,
   getSelectedCount,
 };
