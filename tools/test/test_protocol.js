@@ -1,4 +1,4 @@
-﻿const assert = require('assert');
+const assert = require('assert');
 const { normalizeIncomingMessage } = require('../../src/server/transport/protocol/messages');
 const { buildErrorPayload, ERROR_CODES } = require('../../src/server/transport/protocol/errors');
 
@@ -95,6 +95,21 @@ function testInvalidPayloadExportReplayRequestSource() {
   assert.strictEqual(result.errorCode, ERROR_CODES.INVALID_PAYLOAD);
 }
 
+function testSubmitBattleActionPayload() {
+  const okResult = normalizeIncomingMessage(JSON.stringify({
+    type: 'submit_battle_action',
+    payload: { turnId: 3, actionId: '3:1:64' },
+  }));
+  assert.strictEqual(okResult.ok, true);
+
+  const badResult = normalizeIncomingMessage(JSON.stringify({
+    type: 'submit_battle_action',
+    payload: { turnId: '3', actionId: '' },
+  }));
+  assert.strictEqual(badResult.ok, false);
+  assert.strictEqual(badResult.errorCode, ERROR_CODES.INVALID_PAYLOAD);
+}
+
 function testErrorPayload() {
   const payload = buildErrorPayload(ERROR_CODES.INVALID_SELECTION, 'Invalid selection.', {
     meta: { requestId: 'req-2', protocolVersion: '2' },
@@ -121,6 +136,7 @@ function run() {
   testInvalidPayloadResumeSessionMissingFields();
   testInvalidPayloadIndices();
   testInvalidPayloadExportReplayRequestSource();
+  testSubmitBattleActionPayload();
   testErrorPayload();
   testDefaultInvalidPayloadMessage();
   console.log('test_protocol passed');

@@ -8,6 +8,7 @@ const {
 } = require('../services/registry');
 const { canUseAurora } = require('../services/skills');
 const { getEffectiveSelectionCount } = require('../services/dice');
+const { buildPendingActionSet } = require('../services/battle-actions');
 const {
   cloneState,
   enumerateActions,
@@ -18,6 +19,7 @@ const {
   getActionMask,
   indicesToMask,
   OPCODES,
+  PHASE_NAMES,
 } = require('../../core/battle-engine');
 
 const AI_DELAY_MIN = 180;
@@ -113,6 +115,22 @@ function clearAIActionTimer(room, aiPlayer) {
 
 function getPendingActionKind(room) {
   if (!room) return null;
+  const pendingIsFresh = !!(
+    room.pendingActionSet
+    && room.pendingActionSet.phase
+    && room.engineState
+    && room.pendingActionSet.phase === PHASE_NAMES[room.engineState.phase]
+    && room.pendingActionSet.round === room.engineState.round
+  );
+  if (pendingIsFresh) {
+    switch (room.pendingActionSet.phase) {
+      case 'attack_roll': return 'attack_roll';
+      case 'attack_reroll_or_select': return 'attack_select';
+      case 'defense_roll': return 'defense_roll';
+      case 'defense_select': return 'defense_select';
+      default: return null;
+    }
+  }
   if (room.engineState) {
     switch (room.engineState.phase) {
       case 0: return 'attack_roll';
@@ -135,15 +153,25 @@ function getPendingActionKind(room) {
 function getPendingActionLabel(kind) {
   switch (kind) {
     case 'attack_roll': return '掷攻击骰';
-    case 'attack_select': return '选择攻击骰';
+    case 'attack_select': return '选择攻击动作';
     case 'defense_roll': return '掷防御骰';
-    case 'defense_select': return '选择防御骰';
+    case 'defense_select': return '选择防御动作';
     default: return null;
   }
 }
 
 function getPendingActorId(room) {
   if (!room) return null;
+  const pendingIsFresh = !!(
+    room.pendingActionSet
+    && room.pendingActionSet.actorId
+    && room.engineState
+    && room.pendingActionSet.phase === PHASE_NAMES[room.engineState.phase]
+    && room.pendingActionSet.round === room.engineState.round
+  );
+  if (pendingIsFresh) {
+    return room.pendingActionSet.actorId;
+  }
   if (room.engineState && room.engineUi && Array.isArray(room.engineUi.indexToPlayerId)) {
     const actorIndex = (room.engineState.phase === 0 || room.engineState.phase === 1)
       ? room.engineState.attacker
@@ -164,6 +192,7 @@ function buildAIActionKey(room, aiPlayer, actionKind) {
   const state = room && room.engineState;
   const ui = room && room.engineUi;
   const game = room && room.game;
+  const pending = room && room.pendingActionSet ? room.pendingActionSet : null;
   return [
     room && room.code ? room.code : 'unknown',
     aiPlayer && aiPlayer.id ? aiPlayer.id : 'AI',
@@ -180,6 +209,8 @@ function buildAIActionKey(room, aiPlayer, actionKind) {
     state ? state.defenseValue : (game && game.defenseValue) || '',
     ui ? ui.attackPreviewMask : '',
     ui ? ui.defensePreviewMask : '',
+    pending ? pending.turnId : '',
+    pending ? pending.snapshotHash : '',
   ].join('|');
 }
 
@@ -341,7 +372,7 @@ function createAIPlayer(roomCode) {
   return {
     id: 'AI',
     ws,
-    name: 'AI 对手',
+    name: 'AI 瀵规墜',
     characterId: loadout.characterId,
     auroraDiceId: loadout.auroraDiceId,
     reconnectToken: `ai_${roomCode}`,
@@ -533,6 +564,36 @@ function findPureActionByMask(actionBuffer, count, opcode, mask) {
   return 0;
 }
 
+function findTicketForEncodedAction(room, encodedAction) {
+  const pending = room && room.pendingActionSet;
+  if (!pending || !pending.byId) return null;
+  for (const action of pending.byId.values()) {
+    if (action.encodedAction === encodedAction) {
+      return {
+        turnId: pending.turnId,
+        actionId: action.actionId,
+      };
+    }
+  }
+  return null;
+}
+
+function submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, phaseLabel, encodedAction) {
+  let ticket = findTicketForEncodedAction(room, encodedAction);
+  if (!ticket) {
+    buildPendingActionSet(room);
+    ticket = findTicketForEncodedAction(room, encodedAction);
+  }
+  if (!ticket) {
+    logPureAiIssue(room, phaseLabel, aiPlayer, 'missing ticket for encoded action', {
+      encodedAction,
+      turnId: room && room.pendingActionSet ? room.pendingActionSet.turnId : '',
+    });
+    return;
+  }
+  handlers.handleSubmitBattleAction(aiWs, ticket);
+}
+
 function chooseHeuristicPureAction(state, actionBuffer, count) {
   if (!count) return 0;
   const actor = (state.phase === 2 || state.phase === 3) ? state.defender : state.attacker;
@@ -703,6 +764,227 @@ function chooseBestPureReroll(room, actionBuffer, count, game, aiPlayer) {
   return bestMask;
 }
 
+function schedulePureAttackRoll(context) {
+  const {
+    room,
+    rooms,
+    handlers,
+    aiPlayer,
+    aiWs,
+    state,
+    aiIndex,
+    actionBuffer,
+    count,
+  } = context;
+  if (state.attacker !== aiIndex) return false;
+  const rollAction = getFirstPureActionByOpcode(actionBuffer, count, OPCODES.ROLL_ATTACK);
+  schedulePureAiHandler(room, rooms, aiDelay(), 'attack_roll', aiPlayer, 'handleRollAttack', () => {
+    submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'attack_roll', rollAction);
+  });
+  return true;
+}
+
+function schedulePureAttackSelect(context) {
+  const {
+    room,
+    rooms,
+    handlers,
+    aiPlayer,
+    aiWs,
+    state,
+    game,
+    aiIndex,
+    actionBuffer,
+    count,
+  } = context;
+  if (state.attacker !== aiIndex) return false;
+  const delay = aiDelay();
+  let auroraAction = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_ATTACK) {
+      auroraAction = actionBuffer[i];
+      break;
+    }
+  }
+  if (auroraAction && aiShouldUseAurora(aiPlayer, game, 'attack')) {
+    schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleUseAurora', () => {
+      submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'attack_reroll_or_select', auroraAction);
+    });
+    return true;
+  }
+
+  const candidates = [];
+  const rerollMask = chooseBestPureReroll(room, actionBuffer, count, game, aiPlayer);
+  if (rerollMask > 0) {
+    const rerollAction = findPureActionByMask(actionBuffer, count, OPCODES.REROLL_ATTACK, rerollMask);
+    if (rerollAction) {
+      candidates.push({
+        action: rerollAction,
+        mask: rerollMask,
+        score: scorePureRerollMask(state, rerollMask),
+      });
+    }
+  }
+  const confirmCandidates = getSortedPureActionCandidates(
+    state,
+    actionBuffer,
+    count,
+    OPCODES.CONFIRM_ATTACK,
+    (mask) => scoreAttackCombo(game.attackDice, state.catalog.indicesByMask[mask], aiPlayer.characterId, game, aiPlayer.id),
+    PURE_AI_CANDIDATE_LIMIT,
+  );
+  for (let i = 0; i < confirmCandidates.length; i += 1) {
+    candidates.push(confirmCandidates[i]);
+  }
+
+  const heuristicAction = rerollMask > 0
+    ? findPureActionByMask(actionBuffer, count, OPCODES.REROLL_ATTACK, rerollMask)
+    : findPureActionByMask(
+      actionBuffer,
+      count,
+      OPCODES.CONFIRM_ATTACK,
+      chooseBestPureSelection(
+        room,
+        actionBuffer,
+        count,
+        OPCODES.CONFIRM_ATTACK,
+        (indices) => scoreAttackCombo(game.attackDice, indices, aiPlayer.characterId, game, aiPlayer.id),
+      ),
+    );
+  const chosen = choosePurePhaseAction({
+    room,
+    state,
+    actionBuffer,
+    count,
+    aiIndex,
+    aiPlayer,
+    phaseLabel: 'attack_reroll_or_select',
+    rolloutCandidates: candidates,
+    rolloutIterations: PURE_AI_ATTACK_ROLLOUTS,
+    rolloutSeed: `${room.code}:r${state.round}:p${state.phase}:a${aiIndex}`,
+    heuristicAction,
+    validOpcodes: [OPCODES.REROLL_ATTACK, OPCODES.CONFIRM_ATTACK],
+  });
+  if (!chosen.action) {
+    clearAIActionTimer(room, aiPlayer);
+    logPureAiIssue(room, 'attack_reroll_or_select', aiPlayer, 'no legal pure attack action');
+    return true;
+  }
+
+  if (chosen.action && getActionOpcode(chosen.action) === OPCODES.REROLL_ATTACK) {
+    schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, `handleRerollAttack:${chosen.selectedBy}`, () => {
+      submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'attack_reroll_or_select', chosen.action);
+    });
+    return true;
+  }
+
+  schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, `handleConfirmAttack:${chosen.selectedBy}`, () => {
+    submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'attack_reroll_or_select', chosen.action);
+  });
+  return true;
+}
+
+function schedulePureDefenseRoll(context) {
+  const {
+    room,
+    rooms,
+    handlers,
+    aiPlayer,
+    aiWs,
+    state,
+    aiIndex,
+    actionBuffer,
+    count,
+  } = context;
+  if (state.defender !== aiIndex) return false;
+  const rollAction = getFirstPureActionByOpcode(actionBuffer, count, OPCODES.ROLL_DEFENSE);
+  schedulePureAiHandler(room, rooms, aiDelay(), 'defense_roll', aiPlayer, 'handleRollDefense', () => {
+    submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'defense_roll', rollAction);
+  });
+  return true;
+}
+
+function schedulePureDefenseSelect(context) {
+  const {
+    room,
+    rooms,
+    handlers,
+    aiPlayer,
+    aiWs,
+    state,
+    game,
+    aiIndex,
+    actionBuffer,
+    count,
+  } = context;
+  if (state.defender !== aiIndex) return false;
+  const delay = aiDelay();
+  let auroraAction = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_DEFENSE) {
+      auroraAction = actionBuffer[i];
+      break;
+    }
+  }
+  if (auroraAction && aiShouldUseAurora(aiPlayer, game, 'defense')) {
+    schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, 'handleUseAurora', () => {
+      submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'defense_select', auroraAction);
+    });
+    return true;
+  }
+
+  const confirmCandidates = getSortedPureActionCandidates(
+    state,
+    actionBuffer,
+    count,
+    OPCODES.CONFIRM_DEFENSE,
+    (mask) => scoreDefenseCombo(game.defenseDice, state.catalog.indicesByMask[mask], aiPlayer.characterId, game, aiPlayer.id),
+    PURE_AI_CANDIDATE_LIMIT,
+  );
+  const heuristicAction = findPureActionByMask(
+    actionBuffer,
+    count,
+    OPCODES.CONFIRM_DEFENSE,
+    chooseBestPureSelection(
+      room,
+      actionBuffer,
+      count,
+      OPCODES.CONFIRM_DEFENSE,
+      (indices) => scoreDefenseCombo(game.defenseDice, indices, aiPlayer.characterId, game, aiPlayer.id),
+    ),
+  );
+  const chosen = choosePurePhaseAction({
+    room,
+    state,
+    actionBuffer,
+    count,
+    aiIndex,
+    aiPlayer,
+    phaseLabel: 'defense_select',
+    rolloutCandidates: confirmCandidates,
+    rolloutIterations: PURE_AI_DEFENSE_ROLLOUTS,
+    rolloutSeed: `${room.code}:r${state.round}:p${state.phase}:d${aiIndex}`,
+    heuristicAction,
+    validOpcodes: [OPCODES.CONFIRM_DEFENSE],
+  });
+  if (!chosen.action) {
+    clearAIActionTimer(room, aiPlayer);
+    logPureAiIssue(room, 'defense_select', aiPlayer, 'no legal pure defense action');
+    return true;
+  }
+  schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, `handleConfirmDefense:${chosen.selectedBy}`, () => {
+    submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'defense_select', chosen.action);
+  });
+  return true;
+}
+
+const PURE_PHASE_STRATEGY_MAP = Object.freeze({
+  0: schedulePureAttackRoll,
+  1: schedulePureAttackSelect,
+  2: schedulePureDefenseRoll,
+  3: schedulePureDefenseSelect,
+});
+
 function schedulePureAIAction(room, rooms, handlers, aiPlayer, aiWs) {
   const state = room.engineState;
   const game = projectPureGame(state);
@@ -721,173 +1003,91 @@ function schedulePureAIAction(room, rooms, handlers, aiPlayer, aiWs) {
     return;
   }
 
-  if (state.phase === 0 && state.attacker === aiIndex) {
+  const strategy = PURE_PHASE_STRATEGY_MAP[state.phase];
+  if (!strategy) {
+    clearAIActionTimer(room, aiPlayer);
+    return;
+  }
+
+  const handled = strategy({
+    room,
+    rooms,
+    handlers,
+    aiPlayer,
+    aiWs,
+    state,
+    game,
+    aiIndex,
+    actionBuffer,
+    count,
+  });
+  if (!handled) {
+    clearAIActionTimer(room, aiPlayer);
+  }
+}
+
+const LEGACY_PHASE_STRATEGY_MAP = Object.freeze({
+  attack_roll(context) {
+    const { room, rooms, handlers, aiPlayer, aiWs, aiId, game } = context;
+    if (game.attackerId !== aiId) return false;
     schedulePureAiHandler(room, rooms, aiDelay(), 'attack_roll', aiPlayer, 'handleRollAttack', () => {
       handlers.handleRollAttack(aiWs);
     });
-    return;
-  }
-
-  if (state.phase === 1 && state.attacker === aiIndex) {
+    return true;
+  },
+  attack_reroll_or_select(context) {
+    const { room, rooms, handlers, aiPlayer, aiWs, aiId, game } = context;
+    if (game.attackerId !== aiId) return false;
     const delay = aiDelay();
-    let auroraAction = 0;
-    for (let i = 0; i < count; i += 1) {
-      if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_ATTACK) {
-        auroraAction = actionBuffer[i];
-        break;
-      }
-    }
-    if (auroraAction && aiShouldUseAurora(aiPlayer, game, 'attack')) {
+    if (!game.roundAuroraUsed[aiId] && aiShouldUseAurora(aiPlayer, game, 'attack')) {
       schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleUseAurora', () => {
         handlers.handleUseAurora(aiWs);
       });
-      return;
+      return true;
     }
 
-    const candidates = [];
-    const rerollMask = chooseBestPureReroll(room, actionBuffer, count, game, aiPlayer);
-    if (rerollMask > 0) {
-      const rerollAction = findPureActionByMask(actionBuffer, count, OPCODES.REROLL_ATTACK, rerollMask);
-      if (rerollAction) {
-        candidates.push({
-          action: rerollAction,
-          mask: rerollMask,
-          score: scorePureRerollMask(state, rerollMask),
+    if (game.rerollsLeft > 0) {
+      const rerollIndices = aiChooseRerollIndices(game, aiPlayer);
+      if (rerollIndices.length > 0) {
+        schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleRerollAttack', () => {
+          handlers.handleRerollAttack(aiWs, { indices: rerollIndices });
         });
+        return true;
       }
     }
-    const confirmCandidates = getSortedPureActionCandidates(
-      state,
-      actionBuffer,
-      count,
-      OPCODES.CONFIRM_ATTACK,
-      (mask) => scoreAttackCombo(game.attackDice, state.catalog.indicesByMask[mask], aiPlayer.characterId, game, aiPlayer.id),
-      PURE_AI_CANDIDATE_LIMIT,
-    );
-    for (let i = 0; i < confirmCandidates.length; i += 1) {
-      candidates.push(confirmCandidates[i]);
-    }
 
-    const heuristicAction = rerollMask > 0
-      ? findPureActionByMask(actionBuffer, count, OPCODES.REROLL_ATTACK, rerollMask)
-      : findPureActionByMask(
-        actionBuffer,
-        count,
-        OPCODES.CONFIRM_ATTACK,
-        chooseBestPureSelection(
-          room,
-          actionBuffer,
-          count,
-          OPCODES.CONFIRM_ATTACK,
-          (indices) => scoreAttackCombo(game.attackDice, indices, aiPlayer.characterId, game, aiPlayer.id),
-        ),
-      );
-    const chosen = choosePurePhaseAction({
-      room,
-      state,
-      actionBuffer,
-      count,
-      aiIndex,
-      aiPlayer,
-      phaseLabel: 'attack_reroll_or_select',
-      rolloutCandidates: candidates,
-      rolloutIterations: PURE_AI_ATTACK_ROLLOUTS,
-      rolloutSeed: `${room.code}:r${state.round}:p${state.phase}:a${aiIndex}`,
-      heuristicAction,
-      validOpcodes: [OPCODES.REROLL_ATTACK, OPCODES.CONFIRM_ATTACK],
-    });
-    if (!chosen.action) {
-      clearAIActionTimer(room, aiPlayer);
-      logPureAiIssue(room, 'attack_reroll_or_select', aiPlayer, 'no legal pure attack action');
-      return;
-    }
-
-    if (chosen.action && getActionOpcode(chosen.action) === OPCODES.REROLL_ATTACK) {
-      const rerollIndices = safeMaskIndices(room.engineState, getActionMask(chosen.action));
-      schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, `handleRerollAttack:${chosen.selectedBy}`, () => {
-        handlers.handleRerollAttack(aiWs, { indices: rerollIndices });
-      });
-      return;
-    }
-
-    const selectionMask = chosen.action && getActionOpcode(chosen.action) === OPCODES.CONFIRM_ATTACK
-      ? getActionMask(chosen.action)
-      : 0;
-    const indices = safeMaskIndices(room.engineState, selectionMask);
-    schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, `handleConfirmAttack:${chosen.selectedBy}`, () => {
+    const indices = aiChooseAttackSelection(game, aiPlayer);
+    schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleConfirmAttack', () => {
       handlers.handleConfirmAttack(aiWs, { indices });
     });
-    return;
-  }
-
-  if (state.phase === 2 && state.defender === aiIndex) {
+    return true;
+  },
+  defense_roll(context) {
+    const { room, rooms, handlers, aiPlayer, aiWs, aiId, game } = context;
+    if (game.defenderId !== aiId) return false;
     schedulePureAiHandler(room, rooms, aiDelay(), 'defense_roll', aiPlayer, 'handleRollDefense', () => {
       handlers.handleRollDefense(aiWs);
     });
-    return;
-  }
-
-  if (state.phase === 3 && state.defender === aiIndex) {
+    return true;
+  },
+  defense_select(context) {
+    const { room, rooms, handlers, aiPlayer, aiWs, aiId, game } = context;
+    if (game.defenderId !== aiId) return false;
     const delay = aiDelay();
-    let auroraAction = 0;
-    for (let i = 0; i < count; i += 1) {
-      if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_DEFENSE) {
-        auroraAction = actionBuffer[i];
-        break;
-      }
-    }
-    if (auroraAction && aiShouldUseAurora(aiPlayer, game, 'defense')) {
+    if (!game.roundAuroraUsed[aiId] && aiShouldUseAurora(aiPlayer, game, 'defense')) {
       schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, 'handleUseAurora', () => {
         handlers.handleUseAurora(aiWs);
       });
-      return;
+      return true;
     }
 
-    const confirmCandidates = getSortedPureActionCandidates(
-      state,
-      actionBuffer,
-      count,
-      OPCODES.CONFIRM_DEFENSE,
-      (mask) => scoreDefenseCombo(game.defenseDice, state.catalog.indicesByMask[mask], aiPlayer.characterId, game, aiPlayer.id),
-      PURE_AI_CANDIDATE_LIMIT,
-    );
-    const heuristicAction = findPureActionByMask(
-      actionBuffer,
-      count,
-      OPCODES.CONFIRM_DEFENSE,
-      chooseBestPureSelection(
-        room,
-        actionBuffer,
-        count,
-        OPCODES.CONFIRM_DEFENSE,
-        (indices) => scoreDefenseCombo(game.defenseDice, indices, aiPlayer.characterId, game, aiPlayer.id),
-      ),
-    );
-    const chosen = choosePurePhaseAction({
-      room,
-      state,
-      actionBuffer,
-      count,
-      aiIndex,
-      aiPlayer,
-      phaseLabel: 'defense_select',
-      rolloutCandidates: confirmCandidates,
-      rolloutIterations: PURE_AI_DEFENSE_ROLLOUTS,
-      rolloutSeed: `${room.code}:r${state.round}:p${state.phase}:d${aiIndex}`,
-      heuristicAction,
-      validOpcodes: [OPCODES.CONFIRM_DEFENSE],
-    });
-    if (!chosen.action) {
-      clearAIActionTimer(room, aiPlayer);
-      logPureAiIssue(room, 'defense_select', aiPlayer, 'no legal pure defense action');
-      return;
-    }
-    const indices = safeMaskIndices(room.engineState, chosen.action ? getActionMask(chosen.action) : 0);
-    schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, `handleConfirmDefense:${chosen.selectedBy}`, () => {
+    const indices = aiChooseDefenseSelection(game, aiPlayer);
+    schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, 'handleConfirmDefense', () => {
       handlers.handleConfirmDefense(aiWs, { indices });
     });
-  }
-}
+    return true;
+  },
+});
 
 function scheduleAIAction(room, rooms, handlers) {
   if (!room || room.status !== 'in_game') {
@@ -910,6 +1110,7 @@ function scheduleAIAction(room, rooms, handlers) {
   }
 
   if (isPureRoom(room)) {
+    buildPendingActionSet(room);
     const pendingActorId = getPendingActorId(room);
     if (pendingActorId !== aiId) {
       clearAIActionTimer(room, aiPlayer);
@@ -925,63 +1126,24 @@ function scheduleAIAction(room, rooms, handlers) {
     return;
   }
 
-  if (game.phase === 'attack_roll' && game.attackerId === aiId) {
-    schedulePureAiHandler(room, rooms, aiDelay(), 'attack_roll', aiPlayer, 'handleRollAttack', () => {
-      handlers.handleRollAttack(aiWs);
-    });
+  const strategy = LEGACY_PHASE_STRATEGY_MAP[game.phase];
+  if (!strategy) {
+    clearAIActionTimer(room, aiPlayer);
     return;
   }
 
-  if (game.phase === 'attack_reroll_or_select' && game.attackerId === aiId) {
-    const delay = aiDelay();
-    if (!game.roundAuroraUsed[aiId] && aiShouldUseAurora(aiPlayer, game, 'attack')) {
-      schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleUseAurora', () => {
-        handlers.handleUseAurora(aiWs);
-      });
-      return;
-    }
-
-    if (game.rerollsLeft > 0) {
-      const rerollIndices = aiChooseRerollIndices(game, aiPlayer);
-      if (rerollIndices.length > 0) {
-        schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleRerollAttack', () => {
-          handlers.handleRerollAttack(aiWs, { indices: rerollIndices });
-        });
-        return;
-      }
-    }
-
-    const indices = aiChooseAttackSelection(game, aiPlayer);
-    schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleConfirmAttack', () => {
-      handlers.handleConfirmAttack(aiWs, { indices });
-    });
-    return;
+  const handled = strategy({
+    room,
+    rooms,
+    handlers,
+    aiPlayer,
+    aiWs,
+    aiId,
+    game,
+  });
+  if (!handled) {
+    clearAIActionTimer(room, aiPlayer);
   }
-
-  if (game.phase === 'defense_roll' && game.defenderId === aiId) {
-    schedulePureAiHandler(room, rooms, aiDelay(), 'defense_roll', aiPlayer, 'handleRollDefense', () => {
-      handlers.handleRollDefense(aiWs);
-    });
-    return;
-  }
-
-  if (game.phase === 'defense_select' && game.defenderId === aiId) {
-    const delay = aiDelay();
-    if (!game.roundAuroraUsed[aiId] && aiShouldUseAurora(aiPlayer, game, 'defense')) {
-      schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, 'handleUseAurora', () => {
-        handlers.handleUseAurora(aiWs);
-      });
-      return;
-    }
-
-    const indices = aiChooseDefenseSelection(game, aiPlayer);
-    schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, 'handleConfirmDefense', () => {
-      handlers.handleConfirmDefense(aiWs, { indices });
-    });
-    return;
-  }
-
-  clearAIActionTimer(room, aiPlayer);
 }
 
 module.exports = {
@@ -993,4 +1155,5 @@ module.exports = {
   getPendingActionLabel,
   getPendingActorId,
 };
+
 

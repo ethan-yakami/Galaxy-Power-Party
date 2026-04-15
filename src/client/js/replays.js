@@ -1,4 +1,4 @@
-﻿(function() {
+(function() {
   const replayHistory = window.GPPReplayHistory;
   const schema = window.GPPReplaySchema || {};
   const REPLAY_ERROR_CODES = schema.REPLAY_ERROR_CODES || {};

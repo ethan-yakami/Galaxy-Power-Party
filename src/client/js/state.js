@@ -11,6 +11,7 @@ const state = {
   lastProcessedEffectId: 0,
   animationChain: Promise.resolve(),
   pendingAction: null,
+  battleActions: null,
   ui: {
     scene: 'home',
     logDrawerOpen: false,
@@ -33,6 +34,7 @@ const state = {
     roomAckPending: false,
     resumePending: false,
     reconnectToken: '',
+    autoReplayExportRequested: false,
   },
 };
 

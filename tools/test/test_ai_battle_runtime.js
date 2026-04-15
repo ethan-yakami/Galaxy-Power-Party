@@ -3,10 +3,6 @@ const WebSocket = require('ws');
 
 const { startServer } = require('../../src/server/app/bootstrap');
 
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function chooseFirstIndices(dice, count) {
   const out = [];
   const limit = Math.min(count, Array.isArray(dice) ? dice.length : 0);
@@ -14,35 +10,116 @@ function chooseFirstIndices(dice, count) {
   return out;
 }
 
+function indicesToMask(indices) {
+  if (!Array.isArray(indices)) return -1;
+  let mask = 0;
+  for (let i = 0; i < indices.length; i += 1) {
+    const idx = indices[i];
+    if (!Number.isInteger(idx) || idx < 0 || idx >= 6) return -1;
+    const bit = 1 << idx;
+    if (mask & bit) return -1;
+    mask |= bit;
+  }
+  return mask;
+}
+
+function findAction(ticket, kind, mask) {
+  if (!ticket || !Array.isArray(ticket.actions)) return null;
+  for (let i = 0; i < ticket.actions.length; i += 1) {
+    const action = ticket.actions[i];
+    if (!action || action.kind !== kind) continue;
+    if (mask == null || action.mask === mask) return action;
+  }
+  return null;
+}
+
 async function main() {
-  process.env.PORT = '3132';
+  const port = 32000 + Math.floor(Math.random() * 2000);
+  process.env.PORT = String(port);
   process.env.HOST = '127.0.0.1';
 
   const runtime = startServer();
   let ws = null;
   try {
-    ws = new WebSocket('ws://127.0.0.1:3132');
+    ws = new WebSocket(`ws://127.0.0.1:${port}`);
     let myId = null;
     let sawAiAttackSelect = false;
     let resolved = false;
+    let currentGame = null;
+    let currentTicket = null;
+    let lastSubmittedTurn = 0;
+    let lastObservedPhase = 'init';
+    let lastObservedRound = 0;
+    let lastObservedPendingActorId = null;
+
+    function submitAction(action) {
+      if (!action || !currentTicket) return;
+      if (currentTicket.turnId === lastSubmittedTurn) return;
+      lastSubmittedTurn = currentTicket.turnId;
+      ws.send(JSON.stringify({
+        type: 'submit_battle_action',
+        turnId: currentTicket.turnId,
+        actionId: action.actionId,
+      }));
+    }
+
+    function maybePlayMyTurn() {
+      if (!currentGame || !currentTicket) return;
+      if (currentTicket.actorId !== myId) return;
+
+      if (currentTicket.phase === 'attack_roll') {
+        submitAction(findAction(currentTicket, 'roll_attack'));
+        return;
+      }
+
+      if (currentTicket.phase === 'attack_reroll_or_select') {
+        const need = currentGame.attackLevel && currentGame.attackLevel[myId] ? currentGame.attackLevel[myId] : 3;
+        const indices = chooseFirstIndices(currentGame.attackDice, need);
+        const mask = indicesToMask(indices);
+        submitAction(findAction(currentTicket, 'confirm_attack', mask) || findAction(currentTicket, 'confirm_attack'));
+        return;
+      }
+
+      if (currentTicket.phase === 'defense_roll') {
+        submitAction(findAction(currentTicket, 'roll_defense'));
+        return;
+      }
+
+      if (currentTicket.phase === 'defense_select') {
+        const need = currentGame.defenseLevel && currentGame.defenseLevel[myId] ? currentGame.defenseLevel[myId] : 3;
+        const indices = chooseFirstIndices(currentGame.defenseDice, need);
+        const mask = indicesToMask(indices);
+        submitAction(findAction(currentTicket, 'confirm_defense', mask) || findAction(currentTicket, 'confirm_defense'));
+      }
+    }
 
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('runtime AI battle test timed out'));
-      }, 15000);
+        reject(new Error(`runtime AI battle test timed out at round=${lastObservedRound} phase=${lastObservedPhase} pendingActor=${lastObservedPendingActorId || 'none'}`));
+      }, 30000);
 
       ws.on('error', reject);
       ws.on('message', (raw) => {
         const msg = JSON.parse(String(raw));
         if (msg.type === 'welcome') {
           myId = msg.playerId;
-          ws.send(JSON.stringify({ type: 'create_ai_room', name: '玩家59' }));
+          ws.send(JSON.stringify({ type: 'create_ai_room', name: 'Player59' }));
+          return;
+        }
+
+        if (msg.type === 'battle_actions') {
+          currentTicket = msg;
+          maybePlayMyTurn();
           return;
         }
 
         if (msg.type !== 'room_state') return;
         const room = msg.room || {};
         const game = room.game || null;
+        currentGame = game;
+        lastObservedPhase = game && game.phase ? game.phase : room.status || 'unknown';
+        lastObservedRound = game && Number.isFinite(game.round) ? game.round : 0;
+        lastObservedPendingActorId = game && game.pendingActorId ? game.pendingActorId : null;
         const me = Array.isArray(room.players) ? room.players.find((player) => player.id === myId) : null;
 
         if (room.status === 'lobby' && me && !me.characterId) {
@@ -59,32 +136,19 @@ async function main() {
           assert.strictEqual(game.isAiThinking, true);
         }
 
-        if (game.phase === 'attack_roll' && game.attackerId === myId) {
-          ws.send(JSON.stringify({ type: 'roll_attack' }));
+        if (
+          game.phase === 'defense_roll'
+          && game.defenderId === myId
+          && sawAiAttackSelect
+          && game.round >= 2
+        ) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve();
           return;
         }
 
-        if (game.phase === 'attack_reroll_or_select' && game.attackerId === myId) {
-          const need = game.attackLevel && game.attackLevel[myId] ? game.attackLevel[myId] : 3;
-          ws.send(JSON.stringify({ type: 'confirm_attack_selection', indices: chooseFirstIndices(game.attackDice, need) }));
-          return;
-        }
-
-        if (game.phase === 'defense_roll' && game.defenderId === myId) {
-          if (sawAiAttackSelect && game.round >= 2) {
-            resolved = true;
-            clearTimeout(timeout);
-            resolve();
-            return;
-          }
-          ws.send(JSON.stringify({ type: 'roll_defense' }));
-          return;
-        }
-
-        if (game.phase === 'defense_select' && game.defenderId === myId) {
-          const need = game.defenseLevel && game.defenseLevel[myId] ? game.defenseLevel[myId] : 3;
-          ws.send(JSON.stringify({ type: 'confirm_defense_selection', indices: chooseFirstIndices(game.defenseDice, need) }));
-        }
+        maybePlayMyTurn();
       });
     });
 

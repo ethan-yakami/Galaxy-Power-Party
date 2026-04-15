@@ -1,2 +1,2 @@
-﻿module.exports = require('../server/services/weather');
+module.exports = require('../server/services/weather');
 

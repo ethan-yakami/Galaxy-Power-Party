@@ -1,4 +1,4 @@
-﻿const {
+const {
   assert,
   createHandlers,
   engine,
@@ -212,7 +212,10 @@ module.exports = [
       assert.strictEqual(typeof replay.replayId, 'string');
       assert(replay.replayId.length > 0, 'replayId should exist');
       assert.strictEqual(replay.version, 'ReplayV2');
+      assert.strictEqual(replay.protocolModel, 'action_ticket');
       assert(Array.isArray(replay.actions) && replay.actions.length > 0, 'replay actions should not be empty');
+      assert(replay.actions.every((action) => Number.isInteger(action.turnId)), 'replay actions should contain turnId');
+      assert(replay.actions.every((action) => typeof action.actionId === 'string' && action.actionId.length > 0), 'replay actions should contain actionId');
       assert(Array.isArray(replay.snapshots) && replay.snapshots.length > 0, 'replay snapshots should not be empty');
       assert.strictEqual(replay.snapshots.length, replay.actions.length + 1, 'snapshots should include step 0 + each action');
       assert.strictEqual(replay.snapshots[0].step, 0, 'first snapshot should be step 0');

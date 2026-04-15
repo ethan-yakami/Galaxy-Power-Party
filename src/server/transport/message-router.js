@@ -1,4 +1,4 @@
-﻿const { send } = require('../services/rooms');
+const { send } = require('../services/rooms');
 const { ERROR_CODES, sendError } = require('./protocol/errors');
 const createRoomLifecycleRoutes = require('./message-routes/room-lifecycle');
 const createLobbyRoutes = require('./message-routes/lobby');

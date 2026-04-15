@@ -8,6 +8,11 @@ const ERROR_CODES = Object.freeze({
   NOT_IN_ROOM: 'NOT_IN_ROOM',
   NOT_YOUR_TURN: 'NOT_YOUR_TURN',
   INVALID_SELECTION: 'INVALID_SELECTION',
+  BATTLE_NOT_ACTOR: 'BATTLE_NOT_ACTOR',
+  BATTLE_STALE_TURN: 'BATTLE_STALE_TURN',
+  BATTLE_INVALID_ACTION: 'BATTLE_INVALID_ACTION',
+  BATTLE_ACTION_CONSUMED: 'BATTLE_ACTION_CONSUMED',
+  BATTLE_PROTOCOL_DEPRECATED: 'BATTLE_PROTOCOL_DEPRECATED',
   SESSION_RESUME_FAILED: 'SESSION_RESUME_FAILED',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 });
@@ -20,6 +25,11 @@ const DEFAULT_ERROR_MESSAGES = Object.freeze({
   [ERROR_CODES.NOT_IN_ROOM]: 'You are not currently in a room.',
   [ERROR_CODES.NOT_YOUR_TURN]: 'It is not your turn.',
   [ERROR_CODES.INVALID_SELECTION]: 'Invalid selection.',
+  [ERROR_CODES.BATTLE_NOT_ACTOR]: 'Only the current actor can submit this battle action.',
+  [ERROR_CODES.BATTLE_STALE_TURN]: 'The submitted turnId is stale.',
+  [ERROR_CODES.BATTLE_INVALID_ACTION]: 'The submitted actionId is invalid for this turn.',
+  [ERROR_CODES.BATTLE_ACTION_CONSUMED]: 'This battle action turn has already been consumed.',
+  [ERROR_CODES.BATTLE_PROTOCOL_DEPRECATED]: 'Legacy battle protocol is deprecated. Please submit action tickets.',
   [ERROR_CODES.SESSION_RESUME_FAILED]: 'Session resume failed.',
   [ERROR_CODES.INTERNAL_ERROR]: 'Internal server error.',
 });

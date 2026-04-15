@@ -2,6 +2,7 @@
   const machine = window.GPPConnectionStateMachine;
   const { state, dom, send, setMessage } = GPP;
   const isBattlePage = /\/battle\.html$/i.test(location.pathname);
+  const replayHistory = window.GPPReplayHistory || null;
 
   const CONNECT_WELCOME_TIMEOUT_MS = 6000;
   const ROOM_ACK_TIMEOUT_MS = 8000;
@@ -117,6 +118,18 @@
     state.ui.pendingDirty = false;
     state.ui.loadoutSubmitting = false;
     state.ui.submittedLoadout = null;
+  }
+
+  function maybeRequestReplayExport(room) {
+    if (!room || !room.game) return;
+    const ended = room.game.status === 'ended' || room.game.phase === 'ended';
+    if (!ended) {
+      state.ui.autoReplayExportRequested = false;
+      return;
+    }
+    if (state.ui.autoReplayExportRequested) return;
+    state.ui.autoReplayExportRequested = true;
+    send('export_replay', {});
   }
 
   function syncMachineFlags() {
@@ -349,6 +362,7 @@
 
       if (msg.type === 'welcome') {
         state.me = msg.playerId;
+        state.battleActions = null;
         const freshReconnectToken = typeof msg.reconnectToken === 'string' ? msg.reconnectToken : '';
         state.ui.reconnectToken = freshReconnectToken || state.ui.reconnectToken || '';
         state.characters = {};
@@ -429,10 +443,13 @@
         }
 
         applyMachineEvent(machine.EVENTS.ROOM_STATE, { inRoom: !!state.room });
+        maybeRequestReplayExport(state.room);
 
         if (!state.room.game) {
+          state.battleActions = null;
           GPP.clearSelection();
           state.lastProcessedEffectId = 0;
+          state.ui.autoReplayExportRequested = false;
         } else if (state.room.game.phase === 'attack_reroll_or_select' && state.room.game.attackerId === state.me) {
           GPP.setSelection(state.room.game.attackPreviewSelection || []);
         } else if (state.room.game.phase === 'defense_select' && state.room.game.defenderId === state.me) {
@@ -460,6 +477,27 @@
         }
 
         GPP.processEffectEvents(state.room.game || {}, prevRoomCode === state.room.code && prevHadGame);
+        return;
+      }
+
+      if (msg.type === 'battle_actions') {
+        state.battleActions = msg;
+        GPP.render();
+        return;
+      }
+
+      if (msg.type === 'replay_export') {
+        try {
+          const replay = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+          const entry = replayHistory && typeof replayHistory.upsertReplay === 'function'
+            ? replayHistory.upsertReplay(replay)
+            : null;
+          if (entry) {
+            GPP.showErrorToast('本局回放已自动保存到对局回放。');
+          }
+        } catch (error) {
+          GPP.showErrorToast(`回放保存失败：${error && error.message ? error.message : String(error)}`);
+        }
         return;
       }
 
@@ -517,8 +555,10 @@
       if (msg.type === 'left_room') {
         state.pendingAction = null;
         state.room = null;
+        state.battleActions = null;
         GPP.clearSelection();
         state.lastProcessedEffectId = 0;
+        state.ui.autoReplayExportRequested = false;
         resetLobbyDraft();
         storageSet(LAST_ROOM_CODE_KEY, '');
         applyMachineEvent(machine.EVENTS.LEFT_ROOM, {});

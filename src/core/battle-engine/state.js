@@ -11,6 +11,82 @@ const {
 const { compileCatalog } = require('./catalog/compiler');
 const { hashSeed, nextInt } = require('./rng');
 
+const STATE_SCALAR_FIELDS = Object.freeze([
+  'rngState',
+  'status',
+  'phase',
+  'round',
+  'attacker',
+  'defender',
+  'winner',
+  'rerollsLeft',
+  'attackValue',
+  'defenseValue',
+  'lastDamage',
+  'attackSelectionMask',
+  'defenseSelectionMask',
+  'attackPierce',
+  'extraAttackQueued',
+  'weatherPresetIndex',
+  'weatherStageRound',
+  'weatherIndex',
+  'weatherEnteredRound',
+  'weatherChangedRound',
+  'weatherCandidateCount',
+]);
+
+const STATE_TYPED_ARRAY_FIELDS = Object.freeze([
+  'weatherCandidates',
+  'characterIndex',
+  'auroraIndex',
+  'maxAttackRerolls',
+  'hp',
+  'maxHp',
+  'attackLevel',
+  'defenseLevel',
+  'normalDiceCount',
+  'diceSides',
+  'auroraUsesRemaining',
+  'selectedFourCount',
+  'selectedOneCount',
+  'cumulativeDamageTaken',
+  'overload',
+  'desperateBonus',
+  'auroraAEffectCount',
+  'poison',
+  'resilience',
+  'thorns',
+  'power',
+  'xilianCumulative',
+  'yaoguangRerollsUsed',
+  'roundAuroraUsed',
+  'forceField',
+  'whiteeGuardUsed',
+  'whiteeGuardActive',
+  'unyielding',
+  'counterActive',
+  'hackActive',
+  'danhengCounterReady',
+  'xilianAscensionActive',
+  'weatherStageAttackBonus',
+  'weatherStageDefenseBonus',
+  'weatherStagePowerGranted',
+  'weatherPendingDefenseBonus',
+  'weatherActiveDefenseBonus',
+  'weatherPendingResilienceBonus',
+  'weatherActiveResilienceBonus',
+  'weatherAttackRerolledInRound',
+]);
+
+const ROLL_TYPED_ARRAY_FIELDS = Object.freeze([
+  'values',
+  'maxValues',
+  'sourceKinds',
+  'slotIndices',
+  'auroraIndices',
+  'hasA',
+]);
+
 function createRollBuffer() {
   return {
     count: 0,
@@ -191,227 +267,61 @@ function createBattle(config, seed, options = {}) {
 function cloneState(src, dst) {
   const target = dst || createEmptyState(src.catalog);
   target.catalog = src.catalog;
-  target.rngState = src.rngState;
-  target.status = src.status;
-  target.phase = src.phase;
-  target.round = src.round;
-  target.attacker = src.attacker;
-  target.defender = src.defender;
-  target.winner = src.winner;
-  target.rerollsLeft = src.rerollsLeft;
-  target.attackValue = src.attackValue;
-  target.defenseValue = src.defenseValue;
-  target.lastDamage = src.lastDamage;
-  target.attackSelectionMask = src.attackSelectionMask;
-  target.defenseSelectionMask = src.defenseSelectionMask;
-  target.attackPierce = src.attackPierce;
-  target.extraAttackQueued = src.extraAttackQueued;
-  target.weatherPresetIndex = src.weatherPresetIndex;
-  target.weatherStageRound = src.weatherStageRound;
-  target.weatherIndex = src.weatherIndex;
-  target.weatherEnteredRound = src.weatherEnteredRound;
-  target.weatherChangedRound = src.weatherChangedRound;
-  target.weatherCandidateCount = src.weatherCandidateCount;
-  target.weatherCandidates.set(src.weatherCandidates);
-  target.characterIndex.set(src.characterIndex);
-  target.auroraIndex.set(src.auroraIndex);
-  target.maxAttackRerolls.set(src.maxAttackRerolls);
-  target.hp.set(src.hp);
-  target.maxHp.set(src.maxHp);
-  target.attackLevel.set(src.attackLevel);
-  target.defenseLevel.set(src.defenseLevel);
-  target.normalDiceCount.set(src.normalDiceCount);
-  target.diceSides.set(src.diceSides);
-  target.auroraUsesRemaining.set(src.auroraUsesRemaining);
-  target.selectedFourCount.set(src.selectedFourCount);
-  target.selectedOneCount.set(src.selectedOneCount);
-  target.cumulativeDamageTaken.set(src.cumulativeDamageTaken);
-  target.overload.set(src.overload);
-  target.desperateBonus.set(src.desperateBonus);
-  target.auroraAEffectCount.set(src.auroraAEffectCount);
-  target.poison.set(src.poison);
-  target.resilience.set(src.resilience);
-  target.thorns.set(src.thorns);
-  target.power.set(src.power);
-  target.xilianCumulative.set(src.xilianCumulative);
-  target.yaoguangRerollsUsed.set(src.yaoguangRerollsUsed);
-  target.roundAuroraUsed.set(src.roundAuroraUsed);
-  target.forceField.set(src.forceField);
-  target.whiteeGuardUsed.set(src.whiteeGuardUsed);
-  target.whiteeGuardActive.set(src.whiteeGuardActive);
-  target.unyielding.set(src.unyielding);
-  target.counterActive.set(src.counterActive);
-  target.hackActive.set(src.hackActive);
-  target.danhengCounterReady.set(src.danhengCounterReady);
-  target.xilianAscensionActive.set(src.xilianAscensionActive);
-  target.weatherStageAttackBonus.set(src.weatherStageAttackBonus);
-  target.weatherStageDefenseBonus.set(src.weatherStageDefenseBonus);
-  target.weatherStagePowerGranted.set(src.weatherStagePowerGranted);
-  target.weatherPendingDefenseBonus.set(src.weatherPendingDefenseBonus);
-  target.weatherActiveDefenseBonus.set(src.weatherActiveDefenseBonus);
-  target.weatherPendingResilienceBonus.set(src.weatherPendingResilienceBonus);
-  target.weatherActiveResilienceBonus.set(src.weatherActiveResilienceBonus);
-  target.weatherAttackRerolledInRound.set(src.weatherAttackRerolledInRound);
+  for (const field of STATE_SCALAR_FIELDS) {
+    target[field] = src[field];
+  }
+  for (const field of STATE_TYPED_ARRAY_FIELDS) {
+    target[field].set(src[field]);
+  }
   copyRollBuffer(src.attackRoll, target.attackRoll);
   copyRollBuffer(src.defenseRoll, target.defenseRoll);
   return target;
 }
 
 function serializeRoll(roll) {
-  return {
-    count: roll.count,
-    values: Array.from(roll.values),
-    maxValues: Array.from(roll.maxValues),
-    sourceKinds: Array.from(roll.sourceKinds),
-    slotIndices: Array.from(roll.slotIndices),
-    auroraIndices: Array.from(roll.auroraIndices),
-    hasA: Array.from(roll.hasA),
-  };
+  const out = { count: roll.count };
+  for (const field of ROLL_TYPED_ARRAY_FIELDS) {
+    out[field] = Array.from(roll[field]);
+  }
+  return out;
 }
 
 function serializeState(state) {
-  return {
-    rngState: state.rngState,
-    status: state.status,
-    phase: state.phase,
-    round: state.round,
-    attacker: state.attacker,
-    defender: state.defender,
-    winner: state.winner,
-    rerollsLeft: state.rerollsLeft,
-    attackValue: state.attackValue,
-    defenseValue: state.defenseValue,
-    lastDamage: state.lastDamage,
-    attackSelectionMask: state.attackSelectionMask,
-    defenseSelectionMask: state.defenseSelectionMask,
-    attackPierce: state.attackPierce,
-    extraAttackQueued: state.extraAttackQueued,
-    weatherPresetIndex: state.weatherPresetIndex,
-    weatherStageRound: state.weatherStageRound,
-    weatherIndex: state.weatherIndex,
-    weatherEnteredRound: state.weatherEnteredRound,
-    weatherChangedRound: state.weatherChangedRound,
-    weatherCandidateCount: state.weatherCandidateCount,
-    weatherCandidates: Array.from(state.weatherCandidates),
-    characterIndex: Array.from(state.characterIndex),
-    auroraIndex: Array.from(state.auroraIndex),
-    maxAttackRerolls: Array.from(state.maxAttackRerolls),
-    hp: Array.from(state.hp),
-    maxHp: Array.from(state.maxHp),
-    attackLevel: Array.from(state.attackLevel),
-    defenseLevel: Array.from(state.defenseLevel),
-    normalDiceCount: Array.from(state.normalDiceCount),
-    diceSides: Array.from(state.diceSides),
-    auroraUsesRemaining: Array.from(state.auroraUsesRemaining),
-    selectedFourCount: Array.from(state.selectedFourCount),
-    selectedOneCount: Array.from(state.selectedOneCount),
-    cumulativeDamageTaken: Array.from(state.cumulativeDamageTaken),
-    overload: Array.from(state.overload),
-    desperateBonus: Array.from(state.desperateBonus),
-    auroraAEffectCount: Array.from(state.auroraAEffectCount),
-    poison: Array.from(state.poison),
-    resilience: Array.from(state.resilience),
-    thorns: Array.from(state.thorns),
-    power: Array.from(state.power),
-    xilianCumulative: Array.from(state.xilianCumulative),
-    yaoguangRerollsUsed: Array.from(state.yaoguangRerollsUsed),
-    roundAuroraUsed: Array.from(state.roundAuroraUsed),
-    forceField: Array.from(state.forceField),
-    whiteeGuardUsed: Array.from(state.whiteeGuardUsed),
-    whiteeGuardActive: Array.from(state.whiteeGuardActive),
-    unyielding: Array.from(state.unyielding),
-    counterActive: Array.from(state.counterActive),
-    hackActive: Array.from(state.hackActive),
-    danhengCounterReady: Array.from(state.danhengCounterReady),
-    xilianAscensionActive: Array.from(state.xilianAscensionActive),
-    weatherStageAttackBonus: Array.from(state.weatherStageAttackBonus),
-    weatherStageDefenseBonus: Array.from(state.weatherStageDefenseBonus),
-    weatherStagePowerGranted: Array.from(state.weatherStagePowerGranted),
-    weatherPendingDefenseBonus: Array.from(state.weatherPendingDefenseBonus),
-    weatherActiveDefenseBonus: Array.from(state.weatherActiveDefenseBonus),
-    weatherPendingResilienceBonus: Array.from(state.weatherPendingResilienceBonus),
-    weatherActiveResilienceBonus: Array.from(state.weatherActiveResilienceBonus),
-    weatherAttackRerolledInRound: Array.from(state.weatherAttackRerolledInRound),
-    attackRoll: serializeRoll(state.attackRoll),
-    defenseRoll: serializeRoll(state.defenseRoll),
-  };
+  const out = {};
+  for (const field of STATE_SCALAR_FIELDS) {
+    out[field] = state[field];
+  }
+  for (const field of STATE_TYPED_ARRAY_FIELDS) {
+    out[field] = Array.from(state[field]);
+  }
+  out.attackRoll = serializeRoll(state.attackRoll);
+  out.defenseRoll = serializeRoll(state.defenseRoll);
+  return out;
 }
 
 function deserializeRoll(snapshot, roll) {
   roll.count = snapshot.count;
-  roll.values.set(snapshot.values);
-  roll.maxValues.set(snapshot.maxValues);
-  roll.sourceKinds.set(snapshot.sourceKinds);
-  roll.slotIndices.set(snapshot.slotIndices);
-  roll.auroraIndices.set(snapshot.auroraIndices);
-  roll.hasA.set(snapshot.hasA);
+  for (const field of ROLL_TYPED_ARRAY_FIELDS) {
+    roll[field].set(snapshot[field]);
+  }
 }
 
 function deserializeState(snapshot, dst, options = {}) {
   const catalog = options.catalog || compileCatalog();
   const state = dst || createEmptyState(catalog);
   state.catalog = catalog;
-  state.rngState = snapshot.rngState >>> 0;
-  state.status = snapshot.status;
-  state.phase = snapshot.phase;
-  state.round = snapshot.round;
-  state.attacker = snapshot.attacker;
-  state.defender = snapshot.defender;
-  state.winner = snapshot.winner;
-  state.rerollsLeft = snapshot.rerollsLeft;
-  state.attackValue = snapshot.attackValue;
-  state.defenseValue = snapshot.defenseValue;
-  state.lastDamage = snapshot.lastDamage;
-  state.attackSelectionMask = snapshot.attackSelectionMask;
-  state.defenseSelectionMask = snapshot.defenseSelectionMask;
-  state.attackPierce = snapshot.attackPierce;
-  state.extraAttackQueued = snapshot.extraAttackQueued;
-  state.weatherPresetIndex = snapshot.weatherPresetIndex == null ? WEATHER_NONE : snapshot.weatherPresetIndex;
-  state.weatherStageRound = snapshot.weatherStageRound;
-  state.weatherIndex = snapshot.weatherIndex;
-  state.weatherEnteredRound = snapshot.weatherEnteredRound;
-  state.weatherChangedRound = snapshot.weatherChangedRound;
-  state.weatherCandidateCount = snapshot.weatherCandidateCount;
-  state.weatherCandidates.set(snapshot.weatherCandidates);
-  state.characterIndex.set(snapshot.characterIndex);
-  state.auroraIndex.set(snapshot.auroraIndex);
-  state.maxAttackRerolls.set(snapshot.maxAttackRerolls);
-  state.hp.set(snapshot.hp);
-  state.maxHp.set(snapshot.maxHp);
-  state.attackLevel.set(snapshot.attackLevel);
-  state.defenseLevel.set(snapshot.defenseLevel);
-  state.normalDiceCount.set(snapshot.normalDiceCount);
-  state.diceSides.set(snapshot.diceSides);
-  state.auroraUsesRemaining.set(snapshot.auroraUsesRemaining);
-  state.selectedFourCount.set(snapshot.selectedFourCount);
-  state.selectedOneCount.set(snapshot.selectedOneCount);
-  state.cumulativeDamageTaken.set(snapshot.cumulativeDamageTaken);
-  state.overload.set(snapshot.overload);
-  state.desperateBonus.set(snapshot.desperateBonus);
-  state.auroraAEffectCount.set(snapshot.auroraAEffectCount);
-  state.poison.set(snapshot.poison);
-  state.resilience.set(snapshot.resilience);
-  state.thorns.set(snapshot.thorns);
-  state.power.set(snapshot.power);
-  state.xilianCumulative.set(snapshot.xilianCumulative);
-  state.yaoguangRerollsUsed.set(snapshot.yaoguangRerollsUsed);
-  state.roundAuroraUsed.set(snapshot.roundAuroraUsed);
-  state.forceField.set(snapshot.forceField);
-  state.whiteeGuardUsed.set(snapshot.whiteeGuardUsed);
-  state.whiteeGuardActive.set(snapshot.whiteeGuardActive);
-  state.unyielding.set(snapshot.unyielding);
-  state.counterActive.set(snapshot.counterActive);
-  state.hackActive.set(snapshot.hackActive);
-  state.danhengCounterReady.set(snapshot.danhengCounterReady);
-  state.xilianAscensionActive.set(snapshot.xilianAscensionActive);
-  state.weatherStageAttackBonus.set(snapshot.weatherStageAttackBonus);
-  state.weatherStageDefenseBonus.set(snapshot.weatherStageDefenseBonus);
-  state.weatherStagePowerGranted.set(snapshot.weatherStagePowerGranted);
-  state.weatherPendingDefenseBonus.set(snapshot.weatherPendingDefenseBonus);
-  state.weatherActiveDefenseBonus.set(snapshot.weatherActiveDefenseBonus);
-  state.weatherPendingResilienceBonus.set(snapshot.weatherPendingResilienceBonus);
-  state.weatherActiveResilienceBonus.set(snapshot.weatherActiveResilienceBonus);
-  state.weatherAttackRerolledInRound.set(snapshot.weatherAttackRerolledInRound);
+  for (const field of STATE_SCALAR_FIELDS) {
+    if (field === 'rngState') {
+      state.rngState = snapshot.rngState >>> 0;
+    } else if (field === 'weatherPresetIndex') {
+      state.weatherPresetIndex = snapshot.weatherPresetIndex == null ? WEATHER_NONE : snapshot.weatherPresetIndex;
+    } else {
+      state[field] = snapshot[field];
+    }
+  }
+  for (const field of STATE_TYPED_ARRAY_FIELDS) {
+    state[field].set(snapshot[field]);
+  }
   deserializeRoll(snapshot.attackRoll, state.attackRoll);
   deserializeRoll(snapshot.defenseRoll, state.defenseRoll);
   return state;

@@ -1,5 +1,6 @@
 const WebSocket = require('ws');
 const { CharacterRegistry, AuroraRegistry, allowsNoAurora } = require('./registry');
+const { buildBattleActionsMessage } = require('./battle-actions');
 
 function send(ws, payload) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -85,11 +86,15 @@ function sanitizeRoom(room, viewerPlayerId) {
 }
 
 function broadcastRoom(room) {
+  const battleActions = buildBattleActionsMessage(room);
   for (const p of room.players) {
     send(p.ws, {
       type: 'room_state',
       room: sanitizeRoom(room, p.id),
     });
+    if (battleActions) {
+      send(p.ws, battleActions);
+    }
   }
 }
 

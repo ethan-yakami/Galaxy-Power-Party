@@ -1,2 +1,2 @@
-﻿module.exports = require('../server/services/dice');
+module.exports = require('../server/services/dice');
 

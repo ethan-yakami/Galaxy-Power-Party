@@ -1,4 +1,4 @@
-﻿# 银河战力党 (Galaxy Power Party)
+# 银河战力党 (Galaxy Power Party)
 
 ## 文档导航
 
@@ -24,6 +24,13 @@
 - 本机地址：`http://localhost:3000`
 - 局域网地址：`http://<你的IP>:3000`（同 Wi-Fi 设备可访问）
 
+如需跨网络联机测试：
+
+1. 先安装 `cloudflared`，或把 `cloudflared.exe` 放到项目根目录
+2. 双击 `start_online.bat`
+3. 终端会显示一个 `https://...trycloudflare.com` 的分享地址
+4. 把这个地址发给朋友，让对方直接从这个地址打开游戏
+
 ## 开发者：源码一键启动（需要 Node.js）
 
 适用场景：你从仓库直接运行或开发调试。
@@ -44,6 +51,7 @@ npm start
 
 - `PORT`：监听端口，默认 `3000`
 - `HOST`：监听地址，默认 `0.0.0.0`（允许局域网访问）
+- `CLOUDFLARED_EXE`：可选，指定 `cloudflared.exe` 的完整路径
 
 示例（命令行）：
 
@@ -84,6 +92,23 @@ npm run audit:portable
 - 确认两台设备在同一局域网
 - Windows 防火墙弹窗要允许访问
 - 启动时 `HOST` 保持默认 `0.0.0.0`（不要设为 `127.0.0.1`）
+
+### 4) `start_online.bat` 提示找不到 `cloudflared`
+
+- 先确认已安装 Cloudflare Tunnel 客户端
+- 或把 `cloudflared.exe` 放到项目根目录
+- 或先设置环境变量 `CLOUDFLARED_EXE` 再运行，例如：
+
+```bat
+set CLOUDFLARED_EXE=C:\tools\cloudflared\cloudflared.exe
+start_online.bat
+```
+
+### 5) 公网链接没出来或朋友打不开
+
+- 查看 `cloudflared.log` 是否有连接错误
+- 确认本机网络未拦截 Cloudflare 连接
+- Quick Tunnel 地址是临时的，重启后通常会变化，需要重新发送
 
 ## 技术栈
 

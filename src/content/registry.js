@@ -1,2 +1,2 @@
-﻿module.exports = require('../server/services/registry');
+module.exports = require('../server/services/registry');
 

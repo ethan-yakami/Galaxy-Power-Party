@@ -1,4 +1,4 @@
-﻿const {
+const {
   getActionMask,
   getActionOpcode,
   PHASE_NAMES,
@@ -14,7 +14,6 @@ const ACTION_CODE_BY_OPCODE = Object.freeze({
   [OPCODES.USE_AURORA_ATTACK]: 'use_aurora_attack',
   [OPCODES.REROLL_ATTACK]: 'reroll_attack',
   [OPCODES.CONFIRM_ATTACK]: 'confirm_attack_selection',
-  [OPCODES.REROLL_ATTACK]: 'reroll_attack',
   [OPCODES.ROLL_DEFENSE]: 'roll_defense',
   [OPCODES.USE_AURORA_DEFENSE]: 'use_aurora_defense',
   [OPCODES.CONFIRM_DEFENSE]: 'confirm_defense_selection',
@@ -174,6 +173,9 @@ function createReplayV1(room, options = {}) {
     replayId,
     version: replaySchema.REPLAY_VERSION,
     engineMode: room.engineMode || 'pure',
+    protocolModel: typeof options.protocolModel === 'string' && options.protocolModel
+      ? options.protocolModel
+      : 'action_ticket',
     seed: String(options.seed || ''),
     roomMeta: {
       roomCode: room.code || '',
@@ -215,8 +217,12 @@ function appendReplaySnapshot(room, replay, reason, step) {
 
 function appendReplayAction(room, replay, action, context = {}) {
   if (!room || !room.engineState || !replay) return;
-  const opcode = getActionOpcode(action);
-  const mask = getActionMask(action);
+  const actionRecord = (action && typeof action === 'object') ? action : { encodedAction: action };
+  const encodedAction = Number.isInteger(actionRecord.encodedAction)
+    ? actionRecord.encodedAction
+    : 0;
+  const opcode = getActionOpcode(encodedAction);
+  const mask = getActionMask(encodedAction);
   const step = replay.actions.length + 1;
   replay.actions.push({
     step,
@@ -226,7 +232,13 @@ function appendReplayAction(room, replay, action, context = {}) {
     opcode,
     actionMask: mask,
     indices: indicesFromMask(mask),
-    encodedAction: action,
+    encodedAction,
+    turnId: Number.isInteger(actionRecord.turnId) ? actionRecord.turnId : null,
+    actionId: typeof actionRecord.actionId === 'string' ? actionRecord.actionId : '',
+    actionSnapshotHash: typeof actionRecord.actionSnapshotHash === 'string' ? actionRecord.actionSnapshotHash : '',
+    mutationLog: actionRecord.mutationLog && typeof actionRecord.mutationLog === 'object'
+      ? JSON.parse(JSON.stringify(actionRecord.mutationLog))
+      : null,
     timestamp: Date.now(),
   });
   return step;

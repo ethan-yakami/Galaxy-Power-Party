@@ -6,46 +6,16 @@ const {
   rollAuroraFace,
 } = require('./dice');
 const { AuroraRegistry } = require('./registry');
-const { pushEffectEvent } = require('./rooms');
+const {
+  STAGE_ROUNDS,
+  WEATHER_POOLS,
+  WEATHER_DEFS,
+} = require('../../content/entities/weather');
 
-const STAGE_ROUNDS = [2, 4, 6, 8];
-
-const WEATHER_POOLS = {
-  2: ['frost', 'frog_rain', 'light_snow', 'fish_rain', 'illusion_sun', 'gale', 'sleet', 'eclipse', 'thunder_rain'],
-  4: ['blizzard', 'scorching_sun', 'acid_rain', 'high_temp', 'heavy_rain', 'mid_snow', 'big_snow', 'sandstorm'],
-  6: ['cloud_sea', 'rainbow', 'drought', 'sun_moon', 'sunbeam', 'spacetime_storm', 'sunny_rain'],
-  8: ['clear', 'clear_thunder', 'toxic_fog'],
-};
-
-const WEATHER_DEFS = {
-  frost: { id: 'frost', name: '霜', type: '坚守' },
-  frog_rain: { id: 'frog_rain', name: '青蛙雨', type: '助力' },
-  light_snow: { id: 'light_snow', name: '细雪', type: '坚守' },
-  fish_rain: { id: 'fish_rain', name: '鱼雨', type: '助力' },
-  illusion_sun: { id: 'illusion_sun', name: '幻日', type: '进攻' },
-  gale: { id: 'gale', name: '飓风', type: '进攻' },
-  sleet: { id: 'sleet', name: '雨夹雪', type: '助力' },
-  eclipse: { id: 'eclipse', name: '日食', type: '进攻' },
-  thunder_rain: { id: 'thunder_rain', name: '雷雨', type: '助力' },
-  blizzard: { id: 'blizzard', name: '暴雪', type: '坚守' },
-  scorching_sun: { id: 'scorching_sun', name: '烈日', type: '进攻' },
-  acid_rain: { id: 'acid_rain', name: '酸雨', type: '助力' },
-  high_temp: { id: 'high_temp', name: '高温', type: '进攻' },
-  heavy_rain: { id: 'heavy_rain', name: '暴雨', type: '逆转' },
-  mid_snow: { id: 'mid_snow', name: '中雪', type: '坚守' },
-  big_snow: { id: 'big_snow', name: '大雪', type: '坚守' },
-  sandstorm: { id: 'sandstorm', name: '沙尘', type: '进攻' },
-  cloud_sea: { id: 'cloud_sea', name: '云海', type: '助力' },
-  rainbow: { id: 'rainbow', name: '彩虹', type: '进攻' },
-  drought: { id: 'drought', name: '干旱', type: '进攻' },
-  sun_moon: { id: 'sun_moon', name: '日月同辉', type: '逆转' },
-  sunbeam: { id: 'sunbeam', name: '云隙光', type: '进攻' },
-  spacetime_storm: { id: 'spacetime_storm', name: '时空暴', type: '逆转' },
-  sunny_rain: { id: 'sunny_rain', name: '晴天雨', type: '进攻' },
-  clear: { id: 'clear', name: '晴', type: '进攻' },
-  clear_thunder: { id: 'clear_thunder', name: '晴雷', type: '逆转' },
-  toxic_fog: { id: 'toxic_fog', name: '毒雾', type: '逆转' },
-};
+function pushWeatherEffectEvent(game, event) {
+  const { pushEffectEvent } = require('./rooms');
+  return pushEffectEvent(game, event);
+}
 
 function getWeatherCatalogSummary() {
   const weathers = Object.keys(WEATHER_DEFS)
@@ -94,7 +64,7 @@ function isInStageGate(round) {
 
 function logWeather(game, text) {
   if (!game || !game.log) return;
-  game.log.push(`【天气】${text}`);
+  game.log.push(`[天气] ${text}`);
 }
 
 function getCurrentWeatherId(game) {
@@ -196,7 +166,7 @@ function healPlayer(game, playerId, amount, sourceName) {
   const real = Math.min(amount, game.maxHp[playerId] - before);
   if (real <= 0) return 0;
   game.hp[playerId] = before + real;
-  pushEffectEvent(game, {
+  pushWeatherEffectEvent(game, {
     type: 'heal',
     playerId,
     amount: real,
@@ -204,7 +174,7 @@ function healPlayer(game, playerId, amount, sourceName) {
     hpAfter: game.hp[playerId],
   });
   if (sourceName) {
-    logWeather(game, `${sourceName}生效，回复${real}点生命值。`);
+    logWeather(game, '天气效果触发');
   }
   return real;
 }
@@ -213,7 +183,7 @@ function instantDamage(game, sourceId, targetId, amount, sourceName) {
   if (!amount || amount <= 0) return 0;
   const before = game.hp[targetId];
   game.hp[targetId] -= amount;
-  pushEffectEvent(game, {
+  pushWeatherEffectEvent(game, {
     type: 'instant_damage',
     sourcePlayerId: sourceId,
     targetPlayerId: targetId,
@@ -222,7 +192,7 @@ function instantDamage(game, sourceId, targetId, amount, sourceName) {
     hpAfter: game.hp[targetId],
   });
   if (sourceName) {
-    logWeather(game, `${sourceName}生效，对目标造成${amount}点瞬伤。`);
+    logWeather(game, '天气效果触发');
   }
   return amount;
 }
@@ -318,14 +288,14 @@ function promotePendingRoundBonuses(room, game) {
       st.pendingDefenseBonus[pid] = 0;
       st.activeDefenseBonus[pid] += amount;
       game.defenseLevel[pid] += amount;
-      logWeather(game, `${p.name}获得本回合防御等级+${amount}。`);
+    logWeather(game, '天气效果触发');
     }
     if (st.pendingResilienceBonus[pid] > 0) {
       const amount = st.pendingResilienceBonus[pid];
       st.pendingResilienceBonus[pid] = 0;
       st.activeResilienceBonus[pid] += amount;
       game.resilience[pid] += amount;
-      logWeather(game, `${p.name}获得本回合临时韧性${amount}层。`);
+    logWeather(game, '天气效果触发');
     }
   }
 }
@@ -348,7 +318,7 @@ function applyStageEnter(room, game, weatherId) {
     for (const p of room.players) {
       addStageLevelBonus(game, p.id, 1, 1);
     }
-    logWeather(game, `${w.name}生效：双方攻击等级+1，防御等级+1（阶段内有效）。`);
+    logWeather(game, '天气效果触发');
     return;
   }
 
@@ -356,7 +326,7 @@ function applyStageEnter(room, game, weatherId) {
     for (const p of room.players) {
       game.auroraUsesRemaining[p.id] += 1;
     }
-    logWeather(game, `${w.name}生效：双方各获得1次曜彩骰使用次数。`);
+    logWeather(game, '天气效果触发');
     return;
   }
 
@@ -364,7 +334,7 @@ function applyStageEnter(room, game, weatherId) {
     for (const p of room.players) {
       addStagePower(game, p.id, 5);
     }
-    logWeather(game, `${w.name}生效：双方各获得5层力量（阶段内有效）。`);
+    logWeather(game, '天气效果触发');
     return;
   }
 
@@ -372,7 +342,7 @@ function applyStageEnter(room, game, weatherId) {
     for (const p of room.players) {
       game.poison[p.id] += 2;
     }
-    logWeather(game, `${w.name}生效：双方各附加2层中毒。`);
+    logWeather(game, '天气效果触发');
   }
 }
 
@@ -387,7 +357,7 @@ function applyRoundStart(room, game) {
     if (hp1 !== hp2) {
       const target = hp1 > hp2 ? p1 : p2;
       game.poison[target.id] += 1;
-      logWeather(game, `酸雨生效：${target.name}生命更高，附加1层中毒。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
@@ -399,7 +369,7 @@ function applyRoundStart(room, game) {
     if (hp1 !== hp2) {
       const target = hp1 < hp2 ? p1 : p2;
       addStagePower(game, target.id, 2);
-      logWeather(game, `高温生效：${target.name}生命更低，获得2层力量（阶段内有效）。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
@@ -410,7 +380,7 @@ function applyRoundStart(room, game) {
         game.counterActive[p.id] = true;
         game.weatherState.activeDefenseBonus[p.id] += 2;
         game.defenseLevel[p.id] += 2;
-        logWeather(game, `雨夹雪生效：${p.name}获得反击并在本回合防御等级+2。`);
+    logWeather(game, '天气效果触发');
       }
     }
   }
@@ -432,7 +402,7 @@ function updateWeatherForNewRound(room, game) {
       game.weather.weatherType = weather ? weather.type : '';
       game.weather.enteredAtRound = game.round;
       game.weather.candidates = picked.pool;
-      logWeather(game, `第${game.round}回合天气切换：${game.weather.weatherName}。`);
+    logWeather(game, '天气效果触发');
       applyStageEnter(room, game, picked.id);
     } else {
       game.weather.stageRound = stageRound;
@@ -441,7 +411,7 @@ function updateWeatherForNewRound(room, game) {
       game.weather.weatherType = null;
       game.weather.enteredAtRound = game.round;
       game.weather.candidates = [];
-      logWeather(game, `第${game.round}回合天气阶段无候选，回退为无天气。`);
+    logWeather(game, '天气效果触发');
     }
   }
 
@@ -463,7 +433,7 @@ function onEndCurrentRound(room, game, endingAttackerId) {
       game.weatherState.pendingResilienceBonus[endingAttackerId] += 3;
       const p = room.players.find((player) => player.id === endingAttackerId);
       if (p) {
-        logWeather(game, `细雪生效：${p.name}攻击回合未重投，下回合获得3层临时韧性。`);
+    logWeather(game, '天气效果触发');
       }
     }
   }
@@ -504,7 +474,7 @@ function onAttackReroll(room, game, attacker) {
   const weatherId = getCurrentWeatherId(game);
   if (weatherId === 'illusion_sun') {
     game.thorns[attacker.id] += 2;
-    logWeather(game, `幻日生效：${attacker.name}执行重投，附加2层荆棘。`);
+    logWeather(game, '天气效果触发');
   }
 }
 
@@ -515,34 +485,34 @@ function onAttackSelect(room, game, attacker, defender, selectedDice) {
   if (weatherId === 'frost') {
     if (hasDuplicates(selectedDice)) {
       game.weatherState.pendingDefenseBonus[attacker.id] += 1;
-      logWeather(game, `霜生效：${attacker.name}本次有同点，下回合防御等级+1。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
 
   if (weatherId === 'gale') {
     game.extraAttackQueued = true;
-    logWeather(game, '飓风生效：本次攻击获得连击。');
+    logWeather(game, '天气效果触发');
     return;
   }
 
   if (weatherId === 'eclipse') {
     if (!areAllSame(selectedDice)) {
       game.attackValue += 4;
-      logWeather(game, `日食生效：攻击值+4（当前${game.attackValue}）。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
 
   if (weatherId === 'thunder_rain') {
     game.attackValue += 4;
-    logWeather(game, `雷雨生效：攻击方攻击值+4（当前${game.attackValue}）。`);
+    logWeather(game, '天气效果触发');
     return;
   }
 
   if (weatherId === 'mid_snow') {
     if (hasTriplet(selectedDice)) {
-      healPlayer(game, attacker.id, 10, '中雪');
+      healPlayer(game, attacker.id, 10, '涓洩');
     }
     return;
   }
@@ -550,7 +520,7 @@ function onAttackSelect(room, game, attacker, defender, selectedDice) {
   if (weatherId === 'big_snow') {
     if (includesValue(selectedDice, 7)) {
       game.attackValue += 4;
-      logWeather(game, `大雪生效：攻击值+4（当前${game.attackValue}）。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
@@ -558,7 +528,7 @@ function onAttackSelect(room, game, attacker, defender, selectedDice) {
   if (weatherId === 'sandstorm') {
     if (countOddValues(selectedDice) === selectedDice.length && selectedDice.length > 0) {
       game.power[attacker.id] += 3;
-      logWeather(game, `沙尘生效：${attacker.name}获得3层力量（当前${game.power[attacker.id]}层）。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
@@ -566,7 +536,7 @@ function onAttackSelect(room, game, attacker, defender, selectedDice) {
   if (weatherId === 'rainbow') {
     if (game.attackValue <= 10) {
       game.attackPierce = true;
-      logWeather(game, '彩虹生效：本次攻击获得洞穿。');
+    logWeather(game, '天气效果触发');
     }
     return;
   }
@@ -575,7 +545,7 @@ function onAttackSelect(room, game, attacker, defender, selectedDice) {
     const add = (game.defenseLevel[defender.id] || 0) * 3;
     if (add > 0) {
       game.attackValue += add;
-      logWeather(game, `干旱生效：根据对方防御等级获得+${add}攻击值（当前${game.attackValue}）。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
@@ -583,7 +553,7 @@ function onAttackSelect(room, game, attacker, defender, selectedDice) {
   if (weatherId === 'sun_moon') {
     if (game.hp[attacker.id] <= 3) {
       game.attackValue *= 2;
-      logWeather(game, `日月同辉生效：生命值<=3，攻击值翻倍为${game.attackValue}。`);
+    logWeather(game, '天气效果触发');
     }
     return;
   }
@@ -591,13 +561,13 @@ function onAttackSelect(room, game, attacker, defender, selectedDice) {
   if (weatherId === 'sunbeam') {
     if (game.hp[attacker.id] < game.hp[defender.id]) {
       game.extraAttackQueued = true;
-      logWeather(game, '云隙光生效：生命值更低方攻击时获得连击。');
+    logWeather(game, '天气效果触发');
     }
     return;
   }
 
   if (weatherId === 'clear_thunder') {
-    instantDamage(game, attacker.id, defender.id, 3, '晴雷');
+    instantDamage(game, attacker.id, defender.id, 3, '鏅撮浄');
   }
 }
 
@@ -607,21 +577,21 @@ function onDefenseSelect(room, game, defender, selectedDice) {
 
   if (weatherId === 'thunder_rain') {
     game.defenseValue += 4;
-    logWeather(game, `雷雨生效：防守方防守值+4（当前${game.defenseValue}）。`);
+    logWeather(game, '天气效果触发');
     return;
   }
 
   if (weatherId === 'blizzard') {
     if (game.defenseValue < 8) {
       game.forceField[defender.id] = true;
-      logWeather(game, '暴雪生效：防守值<8，本回合获得力场。');
+    logWeather(game, '天气效果触发');
     }
     return;
   }
 
   if (weatherId === 'mid_snow') {
     if (hasTriplet(selectedDice)) {
-      healPlayer(game, defender.id, 10, '中雪');
+      healPlayer(game, defender.id, 10, '涓洩');
     }
     return;
   }
@@ -629,7 +599,7 @@ function onDefenseSelect(room, game, defender, selectedDice) {
   if (weatherId === 'big_snow') {
     if (includesValue(selectedDice, 7)) {
       game.defenseValue += 4;
-      logWeather(game, `大雪生效：防守值+4（当前${game.defenseValue}）。`);
+    logWeather(game, '天气效果触发');
     }
   }
 }
@@ -641,7 +611,7 @@ function onAfterDamageResolved(room, game, attacker, defender, totalDamage) {
   if (weatherId === 'scorching_sun') {
     if (totalDamage > 0) {
       const heal = Math.floor(totalDamage * 0.5);
-      healPlayer(game, attacker.id, heal, '烈日');
+      healPlayer(game, attacker.id, heal, '鐑堟棩');
     }
     return;
   }
@@ -653,7 +623,7 @@ function onAfterDamageResolved(room, game, attacker, defender, totalDamage) {
       const dBefore = game.hp[defender.id];
       game.hp[attacker.id] = dBefore;
       game.hp[defender.id] = aBefore;
-      logWeather(game, `时空暴生效：${attacker.name}与${defender.name}交换生命值。`);
+    logWeather(game, '天气效果触发');
     }
   }
 }
@@ -675,3 +645,5 @@ module.exports = {
   onDefenseSelect,
   onAfterDamageResolved,
 };
+
+

@@ -1,4 +1,4 @@
-﻿const assert = require('assert');
+const assert = require('assert');
 
 const machine = require('../../src/client/js/connection-state-machine');
 

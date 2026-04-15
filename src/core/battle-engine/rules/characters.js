@@ -97,15 +97,18 @@ const CHARACTER_RULES = {
   },
   fengjin: {
     onAttackAfterDamageResolved(state, ctx, runtime) {
+      const resolvedAttackValue = Number.isFinite(ctx.attackValue) && ctx.attackValue >= 0
+        ? ctx.attackValue
+        : state.attackValue;
       if (areAllValues(ctx.roll, ctx.mask, 6)) {
-        state.power[ctx.actor] += state.attackValue;
+        state.power[ctx.actor] += resolvedAttackValue;
         const healed = runtime.heal(state, ctx.actor, 6);
         if (runtime.logEnabled) {
           runtime.log(`${playerName(runtime, ctx.actor)}六六触发，力量累积${state.attackValue}（当前${state.power[ctx.actor]}层），治疗${healed}点。`);
         }
         return;
       }
-      const add = Math.floor(state.attackValue * 0.5);
+      const add = Math.floor(resolvedAttackValue * 0.5);
       state.power[ctx.actor] += add;
       if (runtime.logEnabled) {
         runtime.log(`${playerName(runtime, ctx.actor)}力量累积+${add}（当前${state.power[ctx.actor]}层）。`);

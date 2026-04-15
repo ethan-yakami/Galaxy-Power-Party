@@ -120,6 +120,15 @@ const PAYLOAD_VALIDATORS = Object.freeze({
     }
     return '';
   },
+  submit_battle_action(payload) {
+    if (!Number.isInteger(payload.turnId) || payload.turnId <= 0) {
+      return 'turnId must be a positive integer.';
+    }
+    if (typeof payload.actionId !== 'string' || !payload.actionId.trim()) {
+      return 'actionId must be a non-empty string.';
+    }
+    return '';
+  },
   export_replay(payload) {
     if (payload.requestSource !== undefined && typeof payload.requestSource !== 'string') {
       return 'requestSource must be a string.';

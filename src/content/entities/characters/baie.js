@@ -1,4 +1,4 @@
-﻿const { areAllSame } = require('../../dice');
+const { areAllSame } = require('../../dice');
 
 module.exports = {
   id:           'baie',

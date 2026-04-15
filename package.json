@@ -1,4 +1,4 @@
-﻿{
+{
     "name":  "galaxy-power-party",
     "version":  "1.0.0",
     "description":  "Galaxy Power Party web game",
@@ -7,8 +7,10 @@
                     "start":  "node server.js",
                     "audit:paths":  "node tools/dev/audit_paths.js",
                     "audit:portable":  "node tools/dev/audit_portable.js",
-                    "test":  "npm run test:battle-engine \u0026\u0026 npm run test:protocol \u0026\u0026 npm run test:connection-fsm \u0026\u0026 npm run test:replay-history \u0026\u0026 npm run test:battle-view-model \u0026\u0026 npm run test:ai-runtime",
+                    "audit:encoding":  "node tools/dev/audit_encoding.js",
+                    "test":  "npm run audit:encoding \u0026\u0026 npm run test:battle-engine \u0026\u0026 npm run test:weather-consistency \u0026\u0026 npm run test:protocol \u0026\u0026 npm run test:connection-fsm \u0026\u0026 npm run test:replay-history \u0026\u0026 npm run test:battle-view-model \u0026\u0026 npm run test:ai-runtime",
                     "test:battle-engine":  "node tools/test/test_battle_engine.js",
+                    "test:weather-consistency":  "node tools/test/test_weather_catalog_consistency.js",
                     "test:protocol":  "node tools/test/test_protocol.js",
                     "test:connection-fsm":  "node tools/test/test_connection_state_machine.js",
                     "test:replay-history":  "node tools/test/test_replay_history.js",
