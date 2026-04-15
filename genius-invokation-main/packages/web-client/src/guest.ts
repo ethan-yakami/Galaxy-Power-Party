@@ -64,7 +64,7 @@ type VersionResponse = Omit<DeckInfo, "id">;
 export const useGuestDecks = (): GuestDeck => {
   const addGuestDeck = async (deck: DeckWithName) => {
     const id = Date.now();
-    const { data } = await axios.post<VersionResponse>("decks/version", deck);
+    const { data } = await axios.post<VersionResponse>("/api/decks/version", deck);
     const deckInfo: DeckInfo = { ...data, ...deck, id };
     setGuestDeck((decks) => [...decks, deckInfo]);
     return deckInfo;
@@ -79,7 +79,7 @@ export const useGuestDecks = (): GuestDeck => {
       throw new Error("Deck not found");
     }
     const oldDeck = guestDeck[index];
-    const { data } = await axios.post<VersionResponse>("decks/version", {
+    const { data } = await axios.post<VersionResponse>("/api/decks/version", {
       ...oldDeck,
       ...newDeck,
     });

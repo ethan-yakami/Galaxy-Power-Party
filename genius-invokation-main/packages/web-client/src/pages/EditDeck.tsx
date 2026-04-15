@@ -167,7 +167,7 @@ export default function EditDeck() {
         if (type === "guest") {
           await addGuestDeck(deckInfo);
         } else if (type === "user") {
-          await axios.post("decks", deckInfo);
+          await axios.post("/api/decks", deckInfo);
         }
         setDirty(false);
       } else {

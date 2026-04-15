@@ -1,4 +1,12 @@
-# 银河战力党 (Galaxy Power Party)
+﻿# 银河战力党 (Galaxy Power Party)
+
+## 文档导航
+
+- [Windows 下载即用说明书](./WINDOWS_下载即用说明书.md)
+- [Windows 下载即用功能测试报告](./WINDOWS_下载即用功能测试报告.md)
+- [引擎流程文档（phase/结算顺序/状态转移）](./docs/engine-process.md)
+- [模块职责手册](./docs/module-manual.md)
+- [路径真相表（运行入口 / shim / 历史镜像）](./docs/path-truth-table.md)
 
 2 人 WebSocket 骰子对战网页游戏，Node.js + Express + 原生前端实现。
 
@@ -51,6 +59,7 @@ npm start
 
 ```bash
 npm run build:portable
+npm run audit:portable
 ```
 
 构建结果：
@@ -82,3 +91,31 @@ npm run build:portable
 - Express
 - ws (WebSocket)
 - HTML / CSS / JavaScript (Vanilla)
+
+## 当前目录结构
+
+- src/server：服务端运行时、协议与房间装配
+- src/core：纯战斗引擎与共享 schema
+- src/content：角色、曜彩、天气与自定义内容实体
+- src/client：多页面前端入口、样式与浏览器脚本
+- public/portraits：当前仍保留的立绘静态资源
+- tools：测试、构建与开发工具
+
+## 路径维护约定
+
+- 前端页面、样式、浏览器脚本只改 `src/client/`
+- 服务端运行时代码只改 `src/server/`
+- 战斗引擎只改 `src/core/battle-engine/`
+- 内容实体只改 `src/content/entities/`
+- `server/` 目录仅保留兼容 re-export
+- `public/` 根目录不再承载前端页面或脚本，当前只保留 `portraits/`
+
+额外校验命令：
+
+```bash
+npm run audit:paths
+npm run audit:portable
+```
+
+如需核对某个 URL 或模块当前到底从哪里运行，请直接查看 [docs/path-truth-table.md](./docs/path-truth-table.md)。
+

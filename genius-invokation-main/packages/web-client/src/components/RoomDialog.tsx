@@ -229,7 +229,7 @@ export function RoomDialog(props: RoomDialogProps) {
         } else if (type === "user") {
           payload.hostDeckId = selectedDeck();
         }
-        const { data } = await axios.post("rooms", payload);
+        const { data } = await axios.post("/api/rooms", payload);
         response = data;
         roomId = response.room.id as number;
       } else {

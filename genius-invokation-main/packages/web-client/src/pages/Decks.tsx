@@ -47,7 +47,7 @@ export function useDecks(): UseDecksResult {
   const EMPTY = { count: 0, data: [] };
   const [userDecks, { refetch }] = createResource(
     status,
-    () => axios.get<DecksResponse>("decks").then((res) => res.data),
+    () => axios.get<DecksResponse>("/api/decks").then((res) => res.data),
     {
       initialValue: EMPTY,
     },
@@ -87,7 +87,7 @@ export default function Decks() {
         await pinGuestDeck(deck.id);
       } else if (type === "user") {
         // trigger updatedAt
-        await axios.patch(`decks/${deck.id}`, { name: deck.name });
+        await axios.patch(`/api/decks/${deck.id}`, { name: deck.name });
       }
       refetch();
     } catch (e) {

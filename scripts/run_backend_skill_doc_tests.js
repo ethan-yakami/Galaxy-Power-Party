@@ -9,12 +9,12 @@ const tmpDir = path.join(__dirname, '..', 'tmp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 process.env.GPP_CUSTOM_CHARACTER_PATH = path.join(tmpDir, 'custom_characters_test.json');
 
-const createHandlers = require('../server/handlers');
-const roomsMod = require('../server/rooms');
-const dice = require('../server/dice');
-const skills = require('../server/skills');
-const weather = require('../server/weather');
-const registry = require('../server/registry');
+const createHandlers = require('../src/server/app/handlers');
+const roomsMod = require('../src/server/services/rooms');
+const dice = require('../src/server/services/dice');
+const skills = require('../src/server/services/skills');
+const weather = require('../src/server/services/weather');
+const registry = require('../src/server/services/registry');
 
 const { CharacterRegistry, AuroraRegistry, triggerCharacterHook, reloadRegistry } = registry;
 const { pushEffectEvent } = roomsMod;
@@ -701,7 +701,7 @@ run('TXT-MIS-003-OVERLOAD', 'TXT-MIS', () => {
 
 run('TXT-MIS-004-WEATHER-DOC-STATE', 'TXT-MIS', () => {
   const mechDoc = fs.readFileSync(path.join(__dirname, '..', 'MECHANISMS_AND_TESTS.md'), 'utf8');
-  const weatherCode = fs.readFileSync(path.join(__dirname, '..', 'server', 'weather.js'), 'utf8');
+  const weatherCode = fs.readFileSync(path.join(__dirname, '..', 'src', 'server', 'services', 'weather.js'), 'utf8');
   assert.ok(/未实现天气系统/.test(mechDoc));
   assert.ok(/function updateWeatherForNewRound/.test(weatherCode));
 });

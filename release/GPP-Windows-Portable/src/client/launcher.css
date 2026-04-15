@@ -1,0 +1,231 @@
+:root {
+  --bg0: #040726;
+  --bg1: #10277f;
+  --bg2: #5e2ab6;
+  --line: rgba(135, 190, 230, 0.5);
+  --text: #1a2f4c;
+  --text-soft: #b8c9f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  font-family: 'Rajdhani', 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  color: #1a2f4c;
+  background: radial-gradient(circle at 15% 10%, #c8e8ff 0%, transparent 50%),
+    radial-gradient(circle at 85% 10%, #c0f0e0 0%, transparent 50%),
+    linear-gradient(160deg, #eef7ff, #e2f2fb 50%, #d6f0ea);
+}
+
+.launcherBg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.launcherGlow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(68px);
+  opacity: 0.32;
+}
+
+.launcherGlowA {
+  width: 38vw;
+  height: 38vw;
+  top: -14vw;
+  left: -8vw;
+  background: #4db2ff;
+}
+
+.launcherGlowB {
+  width: 36vw;
+  height: 36vw;
+  right: -10vw;
+  top: -6vw;
+  background: #f35cff;
+}
+
+.launcherShell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.launcherCard {
+  width: min(560px, 100%);
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: linear-gradient(145deg, rgba(231, 243, 261, 0.88), rgba(231, 242, 257, 0.86));
+  box-shadow: 0 20px 48px rgba(230, 240, 250, 0.45);
+  backdrop-filter: blur(8px);
+  padding: 22px;
+  display: grid;
+  gap: 12px;
+}
+
+.launcherSub {
+  margin: 0;
+  letter-spacing: 0.18em;
+  font-size: 15px;
+  color: #1e3a5f;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(30px, 5.6vw, 46px);
+}
+
+.launcherDesc {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: #1a2f4c;
+}
+
+input {
+  width: 100%;
+  border: 1px solid rgba(153, 197, 255, 0.5);
+  border-radius: 10px;
+  background: rgba(230, 241, 255, 0.92);
+  color: #1a2f4c;
+  padding: 11px 12px;
+  font-size: 15px;
+  outline: none;
+}
+
+input:focus {
+  border-color: #2c4a6b;
+  box-shadow: 0 0 0 3px rgba(61, 232, 255, 0.15);
+}
+
+.launcherActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button {
+  border: 1px solid rgba(151, 189, 255, 0.58);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 15px;
+  color: #1a2f4c;
+  background: linear-gradient(140deg, rgba(30, 68, 183, 0.92), rgba(231, 244, 263, 0.95));
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+.primaryBtn {
+  color: #091640;
+  font-weight: 700;
+  border-color: #1a2f4c;
+  background: linear-gradient(90deg, #ffffff 0%, #a8d8f0 100%);
+}
+
+.launcherMessage {
+  margin: 0;
+  min-height: 20px;
+  color: #2c4a6b;
+  font-size: 16px;
+}
+
+.launcherMessage.error {
+  color: #1a2f4c;
+}
+
+.launcherPublicToggle {
+  display: flex;
+  align-items: center;
+}
+
+.launcherCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: #1a2f4c;
+}
+
+.launcherCheckbox input {
+  width: 18px;
+  height: 18px;
+}
+
+.launcherPublicCard {
+  border: 1px solid rgba(151, 189, 255, 0.4);
+  border-radius: 12px;
+  background: rgba(236, 245, 255, 0.82);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.launcherPublicHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.launcherPublicHead h3,
+.launcherPublicHint {
+  margin: 0;
+}
+
+.launcherPublicList {
+  display: grid;
+  gap: 8px;
+}
+
+.launcherPublicRoom {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.launcherPublicRoom.joinable {
+  border-color: #1a2f4c;
+  box-shadow: inset 0 0 0 1px rgba(111, 210, 255, 0.35);
+}
+
+@media (max-width: 640px) {
+  .launcherCard {
+    padding: 16px;
+  }
+
+  .launcherActions button {
+    width: 100%;
+  }
+}
+
+@keyframes pulseSelectedDie {
+  0% { transform: scale(1.12) translateY(-4px); box-shadow: 0 0 15px rgba(255, 214, 82, 0.4); }
+  50% { transform: scale(1.15) translateY(-6px); box-shadow: 0 0 25px rgba(255, 214, 82, 0.8); }
+  100% { transform: scale(1.12) translateY(-4px); box-shadow: 0 0 15px rgba(255, 214, 82, 0.4); }
+}
+.die.selected {
+  animation: pulseSelectedDie 1.5s infinite alternate ease-in-out;
+  border: 3px solid #ffcc00 !important;
+  background: white !important;
+  color: black !important;
+}
+.die.selected .dieLabel { color: #ffffff; text-shadow: 0 2px 4px rgba(0,0,0,0.4); }

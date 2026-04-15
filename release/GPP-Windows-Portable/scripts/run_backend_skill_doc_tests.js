@@ -9,12 +9,12 @@ const tmpDir = path.join(__dirname, '..', 'tmp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 process.env.GPP_CUSTOM_CHARACTER_PATH = path.join(tmpDir, 'custom_characters_test.json');
 
-const createHandlers = require('../server/handlers');
-const roomsMod = require('../server/rooms');
-const dice = require('../server/dice');
-const skills = require('../server/skills');
-const weather = require('../server/weather');
-const registry = require('../server/registry');
+const createHandlers = require('../src/server/app/handlers');
+const roomsMod = require('../src/server/services/rooms');
+const dice = require('../src/server/services/dice');
+const skills = require('../src/server/services/skills');
+const weather = require('../src/server/services/weather');
+const registry = require('../src/server/services/registry');
 
 const { CharacterRegistry, AuroraRegistry, triggerCharacterHook, reloadRegistry } = registry;
 const { pushEffectEvent } = roomsMod;
@@ -701,7 +701,7 @@ run('TXT-MIS-003-OVERLOAD', 'TXT-MIS', () => {
 
 run('TXT-MIS-004-WEATHER-DOC-STATE', 'TXT-MIS', () => {
   const mechDoc = fs.readFileSync(path.join(__dirname, '..', 'MECHANISMS_AND_TESTS.md'), 'utf8');
-  const weatherCode = fs.readFileSync(path.join(__dirname, '..', 'server', 'weather.js'), 'utf8');
+  const weatherCode = fs.readFileSync(path.join(__dirname, '..', 'src', 'server', 'services', 'weather.js'), 'utf8');
   assert.ok(/未实现天气系统/.test(mechDoc));
   assert.ok(/function updateWeatherForNewRound/.test(weatherCode));
 });
@@ -744,6 +744,475 @@ run('CUSTOM-003-VALID-CREATE', 'CUSTOM', () => {
   assert.equal(ok, true);
   reloadRegistry();
   assert.ok(CharacterRegistry[id]);
+});
+
+// WEATHER (remaining matrix)
+run('WEATHER-FLOW-003', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.round = 2;
+  withRandomSequence([0.01], () => weather.updateWeatherForNewRound(room, game));
+  const id = game.weather.weatherId;
+  game.round = 3;
+  withRandomSequence([0.99], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weather.weatherId, id);
+});
+
+run('WEATHER-FLOW-004', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.round = 4;
+  withRandomSequence([0.01], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weather.stageRound, 4);
+  assert.ok(weather.WEATHER_POOLS[4].includes(game.weather.weatherId));
+});
+
+run('WEATHER-FLOW-005', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.round = 6;
+  withRandomSequence([0.01], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weather.stageRound, 6);
+  assert.ok(weather.WEATHER_POOLS[6].includes(game.weather.weatherId));
+});
+
+run('WEATHER-FLOW-006', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.round = 8;
+  withRandomSequence([0.01], () => weather.updateWeatherForNewRound(room, game));
+  const id = game.weather.weatherId;
+  game.round = 9;
+  withRandomSequence([0.99], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weather.weatherId, id);
+  assert.equal(game.weather.stageRound, 8);
+});
+
+run('WEATHER-FLOW-007', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'frost';
+  const attacker = room.players[0];
+  const defender = room.players[1];
+  weather.onAttackSelect(room, game, attacker, defender, [{ value: 4 }, { value: 4 }]);
+  assert.equal(game.weatherState.pendingDefenseBonus.P1, 1);
+  game.round = 3;
+  weather.updateWeatherForNewRound(room, game);
+  assert.equal(game.weatherState.activeDefenseBonus.P1, 1);
+  assert.equal(game.defenseLevel.P1, 4);
+});
+
+run('WEATHER-FLOW-008', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weatherState.activeDefenseBonus.P1 = 2;
+  game.defenseLevel.P1 += 2;
+  game.weatherState.activeResilienceBonus.P1 = 3;
+  game.resilience.P1 += 3;
+  game.round = 3;
+  weather.updateWeatherForNewRound(room, game);
+  assert.equal(game.weatherState.activeDefenseBonus.P1, 0);
+  assert.equal(game.weatherState.activeResilienceBonus.P1, 0);
+  assert.equal(game.defenseLevel.P1, 3);
+  assert.equal(game.resilience.P1, 0);
+});
+
+run('WEATHER-FLOW-009', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.stageRound = 2;
+  game.weather.weatherId = 'heavy_rain';
+  game.weatherState.stageAttackLevelBonus.P1 = 2;
+  game.weatherState.stageDefenseLevelBonus.P1 = 1;
+  game.weatherState.stagePowerGranted.P1 = 4;
+  game.attackLevel.P1 += 2;
+  game.defenseLevel.P1 += 1;
+  game.power.P1 += 4;
+  game.round = 4;
+  withRandomSequence([0.3], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weatherState.stageAttackLevelBonus.P1 >= 0, true);
+  assert.equal(game.attackLevel.P1 >= 3, true);
+  assert.equal(game.defenseLevel.P1 >= 3, true);
+});
+
+run('WEATHER-CARD-FROST', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'frost';
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 2 }, { value: 2 }]);
+  assert.equal(game.weatherState.pendingDefenseBonus.P1, 1);
+});
+
+run('WEATHER-CARD-FROG_RAIN', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'frog_rain';
+  const die = { value: 1, label: '1', hasA: false, isAurora: false, sides: 6, maxValue: 6, slotId: 0 };
+  withRandomSequence([0.0, 0.4], () => {
+    const constrained = weather.applySingleDieConstraints(room, game, die, 'attack');
+    assert.notEqual(constrained.value, 1);
+  });
+});
+
+run('WEATHER-CARD-LIGHT_SNOW', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'light_snow';
+  game.weatherState.attackRerolledInRound.P1 = false;
+  weather.onEndCurrentRound(room, game, 'P1');
+  assert.equal(game.weatherState.pendingResilienceBonus.P1, 3);
+});
+
+run('WEATHER-CARD-FISH_RAIN', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'fish_rain';
+  assert.equal(weather.getAttackRerollBonus(game), 1);
+});
+
+run('WEATHER-CARD-GALE', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'gale';
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 2 }, { value: 3 }]);
+  assert.equal(game.extraAttackQueued, true);
+});
+
+run('WEATHER-CARD-SLEET', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'sleet';
+  game.hp.P1 = 20;
+  game.round = 3;
+  weather.updateWeatherForNewRound(room, game);
+  assert.equal(game.counterActive.P1, true);
+  assert.equal(game.defenseLevel.P1, 5);
+});
+
+run('WEATHER-CARD-ECLIPSE', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'eclipse';
+  game.attackValue = 8;
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 2 }, { value: 3 }]);
+  assert.equal(game.attackValue, 12);
+});
+
+run('WEATHER-CARD-BLIZZARD', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'blizzard';
+  game.defenseValue = 7;
+  weather.onDefenseSelect(room, game, room.players[1], [{ value: 3 }, { value: 4 }]);
+  assert.equal(game.forceField.P2, true);
+});
+
+run('WEATHER-CARD-ACID_RAIN', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'acid_rain';
+  game.hp.P1 = 25;
+  game.hp.P2 = 20;
+  game.round = 3;
+  weather.updateWeatherForNewRound(room, game);
+  assert.equal(game.poison.P1, 1);
+});
+
+run('WEATHER-CARD-HIGH_TEMP', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'high_temp';
+  game.hp.P1 = 10;
+  game.hp.P2 = 20;
+  game.round = 3;
+  weather.updateWeatherForNewRound(room, game);
+  assert.equal(game.power.P1, 2);
+});
+
+run('WEATHER-CARD-HEAVY_RAIN', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.round = 4;
+  withRandomSequence([0.56], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weather.weatherId, 'heavy_rain');
+  assert.equal(game.attackLevel.P1, 4);
+  assert.equal(game.defenseLevel.P1, 4);
+});
+
+run('WEATHER-CARD-MID_SNOW', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'mid_snow';
+  game.hp.P1 = 10;
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 3 }, { value: 3 }, { value: 3 }]);
+  assert.equal(game.hp.P1, 20);
+});
+
+run('WEATHER-CARD-BIG_SNOW', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'big_snow';
+  game.attackValue = 9;
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 7 }, { value: 2 }]);
+  assert.equal(game.attackValue, 13);
+});
+
+run('WEATHER-CARD-SANDSTORM', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'sandstorm';
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 1 }, { value: 3 }, { value: 5 }]);
+  assert.equal(game.power.P1, 3);
+});
+
+run('WEATHER-CARD-CLOUD_SEA', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.round = 6;
+  withRandomSequence([0.01], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weather.weatherId, 'cloud_sea');
+  assert.equal(game.auroraUsesRemaining.P1, 3);
+  assert.equal(game.auroraUsesRemaining.P2, 3);
+});
+
+run('WEATHER-CARD-RAINBOW', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'rainbow';
+  game.attackValue = 10;
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 5 }, { value: 5 }]);
+  assert.equal(game.attackPierce, true);
+});
+
+run('WEATHER-CARD-DROUGHT', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'drought';
+  game.attackValue = 5;
+  game.defenseLevel.P2 = 4;
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 2 }, { value: 3 }]);
+  assert.equal(game.attackValue, 17);
+});
+
+run('WEATHER-CARD-SUN_MOON', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'sun_moon';
+  game.hp.P1 = 3;
+  game.attackValue = 9;
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 4 }, { value: 5 }]);
+  assert.equal(game.attackValue, 18);
+});
+
+run('WEATHER-CARD-SUNBEAM', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'sunbeam';
+  game.hp.P1 = 10;
+  game.hp.P2 = 20;
+  weather.onAttackSelect(room, game, room.players[0], room.players[1], [{ value: 4 }, { value: 5 }]);
+  assert.equal(game.extraAttackQueued, true);
+});
+
+run('WEATHER-CARD-CLEAR', 'WEATHER', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.round = 8;
+  withRandomSequence([0.01], () => weather.updateWeatherForNewRound(room, game));
+  assert.equal(game.weather.weatherId, 'clear');
+  assert.equal(game.power.P1, 5);
+  assert.equal(game.power.P2, 5);
+});
+
+// CROSS (remaining matrix)
+run('CROSS-HACK-APPLY', 'CROSS', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.hackActive.P1 = true;
+  game.defenseSelection = [0, 1];
+  game.defenseDice = [
+    { value: 6, label: '6', isAurora: false },
+    { value: 4, label: '4', isAurora: false },
+  ];
+  game.defenseValue = 10;
+  skills.applyHackEffects(game, { id: 'P1', name: 'A' }, { id: 'P2', name: 'B' });
+  assert.equal(game.defenseDice[0].value, 2);
+  assert.equal(game.defenseValue, 6);
+});
+
+run('CROSS-UNYIELDING-CAP', 'CROSS', () => {
+  const ctx = setupRoom({ p1Char: 'huangquan', p2Char: 'xiadie', p1Aurora: 'prime', p2Aurora: 'prime' });
+  const g = ctx.room.game;
+  g.phase = 'defense_select';
+  g.attackerId = 'P1';
+  g.defenderId = 'P2';
+  g.attackValue = 20;
+  g.attackPierce = false;
+  g.extraAttackQueued = false;
+  g.attackSelection = [0, 1];
+  g.attackDice = [{ value: 10, isAurora: false }, { value: 10, isAurora: false }];
+  g.defenseLevel.P2 = 2;
+  g.defenseDice = [{ value: 1, isAurora: false }, { value: 1, isAurora: false }];
+  g.hp.P2 = 5;
+  g.unyielding.P2 = true;
+  ctx.handlers.handleConfirmDefense(ctx.ws2, { indices: [0, 1] });
+  assert.equal(g.hp.P2 >= 1, true);
+});
+
+run('CROSS-COUNTER-RESOLVE', 'CROSS', () => {
+  const ctx = setupRoom({ p1Char: 'huangquan', p2Char: 'xiadie', p1Aurora: 'prime', p2Aurora: 'prime' });
+  const g = ctx.room.game;
+  g.phase = 'defense_select';
+  g.attackerId = 'P1';
+  g.defenderId = 'P2';
+  g.attackValue = 5;
+  g.attackPierce = false;
+  g.extraAttackQueued = false;
+  g.attackSelection = [0, 1];
+  g.attackDice = [{ value: 3, isAurora: false }, { value: 2, isAurora: false }];
+  g.defenseLevel.P2 = 2;
+  g.defenseDice = [{ value: 4, isAurora: false }, { value: 4, isAurora: false }];
+  g.counterActive.P2 = true;
+  const before = g.hp.P1;
+  ctx.handlers.handleConfirmDefense(ctx.ws2, { indices: [0, 1] });
+  assert.equal(g.hp.P1 < before, true);
+});
+
+run('CROSS-SPACETIME-GAMEOVER-ORDER', 'CROSS', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.weather.weatherId = 'spacetime_storm';
+  game.attackSelection = [0, 1];
+  game.attackDice = [{ value: 6 }, { value: 6 }];
+  game.hp.P1 = 1;
+  game.hp.P2 = 25;
+  weather.onAfterDamageResolved(room, game, room.players[0], room.players[1], 5);
+  const ended = skills.checkGameOver(room, game);
+  assert.equal(ended, false);
+});
+
+run('CROSS-POISON-ROUNDEND', 'CROSS', () => {
+  const ctx = setupRoom({ p1Char: 'huangquan', p2Char: 'xiadie', p1Aurora: 'prime', p2Aurora: 'prime' });
+  const g = ctx.room.game;
+  g.phase = 'defense_select';
+  g.attackerId = 'P1';
+  g.defenderId = 'P2';
+  g.attackValue = 2;
+  g.attackPierce = false;
+  g.extraAttackQueued = false;
+  g.attackSelection = [0, 1];
+  g.attackDice = [{ value: 1, isAurora: false }, { value: 1, isAurora: false }];
+  g.defenseLevel.P2 = 2;
+  g.defenseDice = [{ value: 2, isAurora: false }, { value: 2, isAurora: false }];
+  g.poison.P1 = 2;
+  const hpBefore = g.hp.P1;
+  const roundBefore = g.round;
+  ctx.handlers.handleConfirmDefense(ctx.ws2, { indices: [0, 1] });
+  assert.equal(g.round, roundBefore + 1);
+  assert.equal(g.hp.P1, hpBefore - 2);
+  assert.equal(g.poison.P1, 1);
+});
+
+run('CROSS-STACKING-BOOL', 'CROSS', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  const attacker = room.players[0];
+  game.attackValue = 10;
+  triggerCharacterHook('onAttackConfirm', { characterId: 'liuying' }, game, attacker, [{ value: 2 }, { value: 2 }, { value: 3 }, { value: 3 }]);
+  AuroraRegistry.repeater.hooks.onAttack(game, attacker);
+  const hits = skills.calcHits(game);
+  assert.equal(Array.isArray(hits), true);
+  assert.equal(hits.length, 2);
+});
+
+// TXT-MIS (remaining matrix)
+run('TXT-MIS-005-REPEATER-DEFENSE-PATH', 'TXT-MIS', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  const check = AuroraRegistry.repeater.hooks.canUse(room.players[0], game, 'defense');
+  assert.ok(check && check.ok === false);
+  assert.equal(typeof AuroraRegistry.repeater.hooks.onDefense, 'function');
+});
+
+run('TXT-MIS-006-STARSHIELD-ATTACK-PATH', 'TXT-MIS', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  const check = AuroraRegistry.starshield.hooks.canUse(room.players[0], game, 'attack');
+  assert.ok(check && check.ok === false);
+  assert.equal(typeof AuroraRegistry.starshield.hooks.onAttack, 'function');
+});
+
+run('TXT-MIS-007-XILIAN-LOG-TEXT', 'TXT-MIS', () => {
+  const { room, game } = mkBasicRoomAndGame();
+  game.defenseValue = 25;
+  triggerCharacterHook('onMainDefenseConfirm', { characterId: 'xilian' }, game, room.players[0]);
+  assert.ok(game.log.some((x) => x.includes('攻击防等级变为5')));
+});
+
+run('TXT-MIS-008-WEATHER-SPEC-STATE', 'TXT-MIS', () => {
+  const specDoc = fs.readFileSync(path.join(__dirname, '..', 'WEATHER_SYSTEM_SPEC.md'), 'utf8');
+  const weatherCode = fs.readFileSync(path.join(__dirname, '..', 'server', 'weather.js'), 'utf8');
+  assert.ok(/文档先行版/.test(specDoc));
+  assert.ok(/onAttackSelect/.test(weatherCode));
+});
+
+// CUSTOM (remaining matrix)
+run('CUSTOM-004-INVALID-BASE', 'CUSTOM', () => {
+  const ctx = setupRoom({ p1Char: 'xiadie', p2Char: 'huangquan', p1Aurora: 'prime', p2Aurora: 'prime' });
+  resetSent(ctx.ws1);
+  const ok = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id: 'custom_invalid_base_1', baseCharacterId: 'not_exist', overrides: { hp: 20 } },
+  });
+  assert.equal(ok, false);
+  const err = lastError(ctx.ws1);
+  assert.ok(err && /母角色不存在/.test(err.message));
+});
+
+run('CUSTOM-005-BASE-IS-CUSTOM', 'CUSTOM', () => {
+  const ctx = setupRoom({ p1Char: 'xiadie', p2Char: 'huangquan', p1Aurora: 'prime', p2Aurora: 'prime' });
+  const id1 = `custom_base_${Date.now().toString().slice(-6)}`;
+  const id2 = `${id1}_child`;
+  const ok1 = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id: id1, baseCharacterId: 'xiadie', overrides: { hp: 28 } },
+  });
+  assert.equal(ok1, true);
+  resetSent(ctx.ws1);
+  const ok2 = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id: id2, baseCharacterId: id1, overrides: { hp: 27 } },
+  });
+  assert.equal(ok2, false);
+  const err = lastError(ctx.ws1);
+  assert.ok(err && /母角色必须是原版角色/.test(err.message));
+});
+
+run('CUSTOM-006-OVERRIDES-NONOBJ', 'CUSTOM', () => {
+  const ctx = setupRoom({ p1Char: 'xiadie', p2Char: 'huangquan', p1Aurora: 'prime', p2Aurora: 'prime' });
+  resetSent(ctx.ws1);
+  const ok = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id: 'custom_nonobj_1', baseCharacterId: 'xiadie', overrides: null },
+  });
+  assert.equal(ok, false);
+});
+
+run('CUSTOM-007-DICESIDES-INVALID', 'CUSTOM', () => {
+  const ctx = setupRoom({ p1Char: 'xiadie', p2Char: 'huangquan', p1Aurora: 'prime', p2Aurora: 'prime' });
+  resetSent(ctx.ws1);
+  const ok = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id: 'custom_dicesides_bad', baseCharacterId: 'xiadie', overrides: { diceSides: [8, 1, 6] } },
+  });
+  assert.equal(ok, false);
+  const err = lastError(ctx.ws1);
+  assert.ok(err && /非法面值/.test(err.message));
+});
+
+run('CUSTOM-008-POSITIVE-REQUIRED', 'CUSTOM', () => {
+  const ctx = setupRoom({ p1Char: 'xiadie', p2Char: 'huangquan', p1Aurora: 'prime', p2Aurora: 'prime' });
+  resetSent(ctx.ws1);
+  const ok = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id: 'custom_pos_req_bad', baseCharacterId: 'xiadie', overrides: { hp: 0 } },
+  });
+  assert.equal(ok, false);
+  const err = lastError(ctx.ws1);
+  assert.ok(err && /必须大于 0/.test(err.message));
+});
+
+run('CUSTOM-009-DUPLICATE-ID', 'CUSTOM', () => {
+  const ctx = setupRoom({ p1Char: 'xiadie', p2Char: 'huangquan', p1Aurora: 'prime', p2Aurora: 'prime' });
+  const id = `custom_dup_${Date.now().toString().slice(-6)}`;
+  const ok1 = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id, baseCharacterId: 'xiadie', overrides: { hp: 29 } },
+  });
+  assert.equal(ok1, true);
+  resetSent(ctx.ws1);
+  const ok2 = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: { id, baseCharacterId: 'xiadie', overrides: { hp: 30 } },
+  });
+  assert.equal(ok2, false);
+  const err = lastError(ctx.ws1);
+  assert.ok(err && /已存在/.test(err.message));
+});
+
+run('CUSTOM-010-PERSIST-RELOAD', 'CUSTOM', () => {
+  const ctx = setupRoom({ p1Char: 'xiadie', p2Char: 'huangquan', p1Aurora: 'prime', p2Aurora: 'prime' });
+  const id = `custom_reload_${Date.now().toString().slice(-6)}`;
+  const ok = ctx.handlers.handleCreateCustomCharacter(ctx.ws1, {
+    variant: {
+      id,
+      baseCharacterId: 'xiadie',
+      overrides: { hp: 31, attackLevel: 4, defenseLevel: 3, auroraUses: 2, maxAttackRerolls: 2, diceSides: [8, 8, 6, 6, 4] },
+    },
+  });
+  assert.equal(ok, true);
+  reloadRegistry();
+  assert.ok(CharacterRegistry[id] && CharacterRegistry[id].isCustomVariant === true);
 });
 
 const summary = {

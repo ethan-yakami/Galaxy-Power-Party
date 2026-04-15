@@ -214,7 +214,7 @@ export default function Room() {
     const onGiveUp = async () => {
       try {
         const { data } = await axios.post(
-          `rooms/${id}/players/${playerId}/giveUp`,
+          `/api/rooms/${id}/players/${playerId}/giveUp`,
         );
       } catch (e) {
         if (e instanceof AxiosError) {
@@ -313,11 +313,11 @@ export default function Room() {
   };
 
   const [roomInfo] = createResource(() =>
-    axios.get<{ status: string }>(`rooms/${id}`).then((res) => res.data),
+    axios.get<{ status: string }>(`/api/rooms/${id}`).then((res) => res.data),
   );
 
   const [fetchMyNotification, abortMyNotification] = createReconnectSse(
-    `rooms/${id}/players/${playerId}/notification`,
+    `/api/rooms/${id}/players/${playerId}/notification`,
     (payload: any) => {
       setLoading(false);
       switch (payload.type) {
@@ -370,7 +370,7 @@ export default function Room() {
   const allowWatchOpp = () => !action;
 
   const [fetchOppNotification, abortOppNotification] = createReconnectSse(
-    () => `rooms/${id}/players/${getOppPlayerId()}/notification`,
+    () => `/api/rooms/${id}/players/${getOppPlayerId()}/notification`,
     (payload: any) => {
       switch (payload.type) {
         case "initialized": {

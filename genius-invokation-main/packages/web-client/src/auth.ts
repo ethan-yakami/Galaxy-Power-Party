@@ -57,7 +57,7 @@ export interface Auth {
 
 const [user, { refetch: refetchUser }] = createResource<UserInfo | NotLogin>(
   () =>
-    axios.get<UserInfo>("users/me").then(({ data }) =>
+    axios.get<UserInfo>("/api/users/me").then(({ data }) =>
       data
         ? {
             ...data,
@@ -72,7 +72,7 @@ const [user, { refetch: refetchUser }] = createResource<UserInfo | NotLogin>(
 );
 
 const updateUserInfo = async (newInfo: Partial<UserInfo>) => {
-  await axios.patch("users/me", newInfo);
+  await axios.patch("/api/users/me", newInfo);
 };
 
 export const useAuth = (): Auth => {

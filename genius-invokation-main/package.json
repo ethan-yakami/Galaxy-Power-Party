@@ -6,9 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "bun scripts/build.ts",
-    "test": "bun run --filter '**' test",
-    "build:prod": "bun scripts/build.ts -n"
+    "start": "cd packages/server && npm start"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.16.4",

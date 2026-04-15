@@ -48,11 +48,11 @@ export default function Home() {
   const [joiningRoomInfo, setJoiningRoomInfo] = createSignal<any>();
 
   const [currentRoom] = createResource(() =>
-    axios.get("rooms/current").then((r) => r.data),
+    axios.get("/api/rooms/current").then((r) => r.data),
   );
   const [allRooms, { refetch: refreshAllRooms }] = createResource(() =>
     axios
-      .get("rooms")
+      .get("/api/rooms")
       .then((e) => e.data.filter((r: any) => r.id !== currentRoom()?.id)),
   );
 
@@ -80,7 +80,7 @@ export default function Home() {
     const roomCode = form.get("roomCode") as string;
     const roomId = roomCodeToId(roomCode);
     try {
-      const { data } = await axios.get(`rooms/${roomId}`);
+      const { data } = await axios.get(`/api/rooms/${roomId}`);
       setJoiningRoomInfo(data);
       joinRoomDialogEl.showModal();
     } catch (e) {

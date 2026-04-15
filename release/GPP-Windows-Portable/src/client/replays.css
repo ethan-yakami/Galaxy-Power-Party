@@ -1,0 +1,245 @@
+:root {
+  --line: rgba(135, 190, 230, 0.5);
+  --text: #1a2f4c;
+  --soft: #557199;
+  --bg-panel: rgba(231, 243, 261, 0.9);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: 'Rajdhani', 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at 15% 10%, #c8e8ff 0%, transparent 50%),
+    radial-gradient(circle at 85% 10%, #c0f0e0 0%, transparent 50%),
+    linear-gradient(160deg, #eef7ff, #e2f2fb 50%, #d6f0ea);
+}
+
+.replaysBg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.replaysGlow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(68px);
+  opacity: 0.3;
+}
+
+.replaysGlowA {
+  width: 38vw;
+  height: 38vw;
+  top: -14vw;
+  left: -8vw;
+  background: #4db2ff;
+}
+
+.replaysGlowB {
+  width: 36vw;
+  height: 36vw;
+  right: -10vw;
+  top: -6vw;
+  background: #f35cff;
+}
+
+.replaysShell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.replaysHeader {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.brandSub {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  color: #2f587d;
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: clamp(30px, 5vw, 44px);
+}
+
+h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+}
+
+.replaysLayout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 14px;
+}
+
+.panel {
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+  padding: 14px;
+}
+
+.historyPanel {
+  min-height: 520px;
+}
+
+.historyList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.historyItem {
+  border: 1px solid rgba(115, 164, 225, 0.5);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(243, 250, 255, 0.9);
+  display: grid;
+  gap: 6px;
+}
+
+.historyItem.active {
+  border-color: #2d6ac0;
+  box-shadow: 0 0 0 2px rgba(45, 106, 192, 0.2);
+}
+
+.historyLine {
+  font-size: 14px;
+  color: var(--soft);
+}
+
+.itemActions {
+  display: flex;
+  gap: 8px;
+}
+
+.detailPanel {
+  min-height: 520px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.hint {
+  margin: 0;
+  color: var(--soft);
+}
+
+.stepControls {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepLabel {
+  font-size: 13px;
+  color: var(--soft);
+  min-width: 84px;
+  text-align: right;
+}
+
+.actionSummary,
+.overview,
+.diceView,
+.logView {
+  border: 1px solid rgba(115, 164, 225, 0.45);
+  border-radius: 10px;
+  background: rgba(248, 253, 255, 0.9);
+  padding: 10px;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.playerCard {
+  border: 1px solid rgba(115, 164, 225, 0.45);
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.emptyState {
+  border: 1px dashed rgba(115, 164, 225, 0.6);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  color: var(--soft);
+}
+
+.hidden {
+  display: none !important;
+}
+
+button {
+  border: 1px solid rgba(151, 189, 255, 0.58);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1a2f4c;
+  background: linear-gradient(140deg, rgba(30, 68, 183, 0.92), rgba(231, 244, 263, 0.95));
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+.secondaryBtn {
+  color: #091640;
+  border-color: #4d78ab;
+  background: linear-gradient(90deg, #ffffff 0%, #dcefff 100%);
+}
+
+.dangerBtn {
+  color: #6d0d0d;
+  border-color: #c96f6f;
+  background: linear-gradient(90deg, #fff0f0 0%, #ffdede 100%);
+}
+
+@media (max-width: 980px) {
+  .replaysLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .historyPanel,
+  .detailPanel {
+    min-height: 0;
+  }
+}
+

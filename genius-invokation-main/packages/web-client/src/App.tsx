@@ -49,7 +49,7 @@ export const useMobile = () => useContext(MobileContext)!;
 
 function App() {
   const [versionInfo] = createResource(() =>
-    axios.get("version").then((res) => res.data),
+    axios.get("/api/version").then((res) => res.data),
   );
   const versionContextValue: VersionContextValue = {
     versionInfo,

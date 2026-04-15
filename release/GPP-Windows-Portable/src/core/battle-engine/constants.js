@@ -1,0 +1,62 @@
+const MAX_PLAYERS = 2;
+const MAX_NORMAL_DICE = 5;
+const MAX_ROLL_DICE = 6;
+
+const SOURCE_NORMAL = 0;
+const SOURCE_AURORA = 1;
+
+const ROLE_ATTACK = 0;
+const ROLE_DEFENSE = 1;
+
+const PHASE_ATTACK_ROLL = 0;
+const PHASE_ATTACK_REROLL_OR_SELECT = 1;
+const PHASE_DEFENSE_ROLL = 2;
+const PHASE_DEFENSE_SELECT = 3;
+const PHASE_ENDED = 4;
+
+const PHASE_NAMES = [
+  'attack_roll',
+  'attack_reroll_or_select',
+  'defense_roll',
+  'defense_select',
+  'ended',
+];
+
+const STATUS_IN_GAME = 0;
+const STATUS_ENDED = 1;
+
+const OPCODES = {
+  ROLL_ATTACK: 1,
+  USE_AURORA_ATTACK: 2,
+  REROLL_ATTACK: 3,
+  CONFIRM_ATTACK: 4,
+  ROLL_DEFENSE: 5,
+  USE_AURORA_DEFENSE: 6,
+  CONFIRM_DEFENSE: 7,
+};
+
+const WEATHER_NONE = -1;
+const PLAYER_NONE = -1;
+const VALUE_NONE = -1;
+
+module.exports = {
+  MAX_PLAYERS,
+  MAX_NORMAL_DICE,
+  MAX_ROLL_DICE,
+  SOURCE_NORMAL,
+  SOURCE_AURORA,
+  ROLE_ATTACK,
+  ROLE_DEFENSE,
+  PHASE_ATTACK_ROLL,
+  PHASE_ATTACK_REROLL_OR_SELECT,
+  PHASE_DEFENSE_ROLL,
+  PHASE_DEFENSE_SELECT,
+  PHASE_ENDED,
+  PHASE_NAMES,
+  STATUS_IN_GAME,
+  STATUS_ENDED,
+  OPCODES,
+  WEATHER_NONE,
+  PLAYER_NONE,
+  VALUE_NONE,
+};

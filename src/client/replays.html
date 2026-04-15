@@ -1,0 +1,72 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>银河战力党 - 对局回放</title>
+    <link rel="stylesheet" href="replays.css?v=v_replay_20260414_v4" />
+  </head>
+  <body>
+    <div class="replaysBg" aria-hidden="true">
+      <div class="replaysGlow replaysGlowA"></div>
+      <div class="replaysGlow replaysGlowB"></div>
+    </div>
+
+    <main class="replaysShell">
+      <header class="replaysHeader">
+        <div>
+          <p class="brandSub">GALAXY POWER PARTY</p>
+          <h1>对局回放</h1>
+        </div>
+        <div class="headerActions">
+          <label class="secondaryBtn" for="importReplayInput">导入 JSON</label>
+          <input id="importReplayInput" type="file" accept=".json,application/json" class="hidden" />
+          <button id="backHomeBtn" class="secondaryBtn" type="button">返回主页</button>
+          <button id="clearAllBtn" class="dangerBtn" type="button">清空历史</button>
+        </div>
+      </header>
+
+      <section class="replaysLayout">
+        <aside class="panel historyPanel">
+          <h2>最近对局</h2>
+          <p id="historyHint" class="hint"></p>
+          <ul id="historyList" class="historyList"></ul>
+        </aside>
+
+        <section class="panel detailPanel">
+          <h2 id="detailTitle">未选择回放</h2>
+          <p id="detailSubtitle" class="hint">从左侧选择一局回放，或导入一个 JSON 文件。</p>
+
+          <div id="detailActions" class="itemActions hidden">
+            <button id="openBattleReplayBtn" class="secondaryBtn" type="button">战斗页回看</button>
+            <button id="downloadReplayBtn" class="secondaryBtn" type="button">导出 JSON</button>
+            <button id="continueLocalBtn" class="secondaryBtn" type="button">从此步本地继续</button>
+            <button id="continueRoomBtn" class="secondaryBtn" type="button">从此步恢复房间</button>
+          </div>
+
+          <div id="stepControls" class="stepControls hidden">
+            <button id="prevStepBtn" class="secondaryBtn" type="button">上一步</button>
+            <input id="stepRange" type="range" min="0" max="0" value="0" />
+            <button id="nextStepBtn" class="secondaryBtn" type="button">下一步</button>
+            <span id="stepLabel" class="stepLabel"></span>
+          </div>
+
+          <div id="actionSummary" class="actionSummary hidden"></div>
+          <div id="stepDetailView" class="overview hidden"></div>
+          <div id="overview" class="overview hidden"></div>
+          <div id="diceView" class="diceView hidden"></div>
+          <div id="logView" class="logView hidden"></div>
+
+          <div id="detailEmpty" class="emptyState">
+            <p>暂无可展示的回放内容。</p>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/shared/replay-schema.js"></script>
+    <script src="js/replay-history.js?v=v_replay_20260414_v4"></script>
+    <script src="js/replays.js?v=v_replay_20260414_v4"></script>
+  </body>
+</html>
+

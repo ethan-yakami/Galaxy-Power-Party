@@ -69,7 +69,7 @@
 
 补充：
 
-- 自定义角色通过 `server/entities/custom_characters.json` 叠加，机制继承母角色（不允许覆写 hooks/skillText）。
+- 自定义角色通过 `src/content/entities/custom_characters.json` 叠加，机制继承母角色（不允许覆写 hooks/skillText）。
 - 当前示例自定义角色：`yaoguang_v2`、`xilian_v2`。
 
 ## 3. 曜彩骰机制表
