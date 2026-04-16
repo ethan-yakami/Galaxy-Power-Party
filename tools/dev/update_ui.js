@@ -107,5 +107,5 @@ function transformCSS(filePath) {
 }
 
 transformCSS(resolveFromRoot('src', 'client', 'styles.css'));
-try { transformCSS(resolveFromRoot('src', 'client', 'launcher.css')); } catch(e){}
-try { transformCSS(resolveFromRoot('src', 'client', 'workshop.css')); } catch(e){}
+try { transformCSS(resolveFromRoot('src', 'client', 'launcher.css')); } catch { /* optional file */ }
+try { transformCSS(resolveFromRoot('src', 'client', 'workshop.css')); } catch { /* optional file */ }

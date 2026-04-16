@@ -1,5 +1,7 @@
 (function() {
   const { state, send } = GPP;
+  const LIVE_SELECTION_SYNC_MS = 20;
+  const POINTER_CLICK_SUPPRESS_MS = 120;
 
   let liveSelectionTimeout = null;
   let dragSelection = null;
@@ -112,7 +114,7 @@
     clearTimeout(liveSelectionTimeout);
     liveSelectionTimeout = setTimeout(() => {
       send('update_live_selection', { indices: [...state.selectedDice] });
-    }, 80);
+    }, LIVE_SELECTION_SYNC_MS);
     GPP.render();
   }
 
@@ -130,7 +132,7 @@
     clearTimeout(liveSelectionTimeout);
     liveSelectionTimeout = setTimeout(() => {
       send('update_live_selection', { indices: [...state.selectedDice] });
-    }, 80);
+    }, LIVE_SELECTION_SYNC_MS);
   }
 
   function beginDragSelection(index, maxSelectable) {
@@ -204,7 +206,7 @@
           if (!dragSelection) return;
         };
         node.onclick = (event) => {
-          if (Date.now() - lastSelectionInputAt < 250) return;
+          if (Date.now() - lastSelectionInputAt < POINTER_CLICK_SUPPRESS_MS) return;
           event.preventDefault();
           toggleDie(index, maxSelectable);
         };

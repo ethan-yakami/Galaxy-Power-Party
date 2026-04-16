@@ -197,7 +197,7 @@
       button.tabIndex = 0;
     }
     if (tooltipText) {
-      button.title = tooltipText;
+      button.removeAttribute('title');
       button.setAttribute('aria-label', tooltipText);
     }
     button.addEventListener('mouseenter', (event) => showLobbyTooltip(event, button, title, lines));
@@ -483,6 +483,7 @@
       const label = character.isCustomVariant ? `${character.name} [变体]` : character.name;
       const button = buildLobbyButton(label, character.id === draftSelection.characterId, () => chooseCharacter(character.id));
       bindLobbyTooltip(button, character.name, [
+        `生命值：${character.hp}`,
         character.shortSpec || '',
         character.skillText || '',
       ]);
@@ -526,6 +527,24 @@
     renderSelectionSummary();
     renderCharacterButtons();
     renderAuroraButtons();
+    const players = (state.room && state.room.players) || [];
+    const hasAiOpponent = players.some((player) => player && player.id === 'AI');
+    if (hasAiOpponent && dom.lobbyHint && !state.ui.loadoutSubmitting) {
+      const me = getMe();
+      const draftSelection = getDraftSelection(me);
+      const completeDraft = hasCompleteDraft(draftSelection);
+      const serverSelection = me ? getServerSelection(me) : null;
+      const alreadyApplied = !!(me && serverSelection && loadoutsMatch(serverSelection, draftSelection) && serverSelection.auroraConfirmed);
+      if (!completeDraft) {
+        dom.lobbyHint.textContent = draftSelection.skipAurora
+          ? 'AI 已就绪，请先选择角色，然后点击“开始对战”。'
+          : 'AI 已就绪，请选择角色与曜彩骰，然后点击“开始对战”。';
+      } else if (alreadyApplied) {
+        dom.lobbyHint.textContent = '你的配置已提交，正在等待进入 AI 对局...';
+      } else {
+        dom.lobbyHint.textContent = 'AI 已就绪，点击“开始对战”后会直接进入对局。';
+      }
+    }
   }
 
   function getBattleView() {
@@ -553,6 +572,7 @@
       `  <h4>${escapeHtml(display.name)}</h4>`,
       `  <p class="weatherStatusMeta">${escapeHtml(display.type)} | 阶段 ${display.stageRound}</p>`,
       '</div>',
+      `  <p class="weatherStatusDesc">条件：${escapeHtml(display.condition || '见天气说明')}</p>`,
       `  <p class="weatherStatusDesc">${escapeHtml(display.effect)}</p>`,
     ].join('');
     setHidden(dom.weatherStatusCard, false);
@@ -600,6 +620,18 @@
     } else {
       tone = view.roomStatusTone || 'active';
       text = view.turnText;
+    }
+
+    if (!state.room.game) {
+      const players = state.room.players || [];
+      const hasAiOpponent = players.some((player) => player && player.id === 'AI');
+      const readyCount = players.filter((player) => player && player.auroraSelectionConfirmed).length;
+      if (hasAiOpponent) {
+        tone = readyCount >= 2 ? 'ready' : (readyCount > 0 ? 'progress' : 'waiting');
+        text = readyCount >= 2
+          ? 'AI 与你的配置已完成，正在准备开局...'
+          : 'AI 已就绪，请选择你的角色与曜彩骰后点击“开始对战”';
+      }
     }
 
     dom.roomStatusBar.className = `roomStatusBar roomStatusBar-${tone}`;
@@ -687,6 +719,7 @@
     characterLine.textContent = `角色：${characterName}`;
     if (character) {
       bindLobbyTooltip(characterLine, character.name, [
+        `生命值：${character.hp}`,
         character.shortSpec || '',
         character.skillText || '',
       ]);
@@ -827,6 +860,12 @@
           !!button.disabled,
           typeof button.onClick === 'function' ? button.onClick : null,
         );
+      }
+      if (model.note) {
+        const selfNote = document.createElement('p');
+        selfNote.className = 'railHint';
+        selfNote.textContent = model.note;
+        wrap.appendChild(selfNote);
       }
     } else if (view.kind === 'ended') {
       const endedNote = document.createElement('p');

@@ -30,6 +30,9 @@ function createSharedHandlers({ rooms, getHandlers }) {
   }
 
   function getBroadcastRoom(room) {
+    if (room) {
+      room.lastActiveAt = Date.now();
+    }
     const hasAI = room.players.some((p) => p.ws && p.ws.isAI);
     if (hasAI) {
       scheduleAIAction(room, rooms, getHandlers());
@@ -100,4 +103,3 @@ function createSharedHandlers({ rooms, getHandlers }) {
 }
 
 module.exports = createSharedHandlers;
-

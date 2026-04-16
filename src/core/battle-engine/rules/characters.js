@@ -101,17 +101,19 @@ const CHARACTER_RULES = {
         ? ctx.attackValue
         : state.attackValue;
       if (areAllValues(ctx.roll, ctx.mask, 6)) {
+        const beforePower = state.power[ctx.actor];
         state.power[ctx.actor] += resolvedAttackValue;
         const healed = runtime.heal(state, ctx.actor, 6);
         if (runtime.logEnabled) {
-          runtime.log(`${playerName(runtime, ctx.actor)}六六触发，力量累积${state.attackValue}（当前${state.power[ctx.actor]}层），治疗${healed}点。`);
+          runtime.log(`${playerName(runtime, ctx.actor)}六六触发，力量累积+${resolvedAttackValue}（${beforePower} -> ${state.power[ctx.actor]}层），治疗${healed}点。`);
         }
         return;
       }
       const add = Math.floor(resolvedAttackValue * 0.5);
+      const beforePower = state.power[ctx.actor];
       state.power[ctx.actor] += add;
       if (runtime.logEnabled) {
-        runtime.log(`${playerName(runtime, ctx.actor)}力量累积+${add}（当前${state.power[ctx.actor]}层）。`);
+        runtime.log(`${playerName(runtime, ctx.actor)}力量累积+${add}（${beforePower} -> ${state.power[ctx.actor]}层）。`);
       }
     },
   },

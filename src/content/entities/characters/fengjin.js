@@ -8,12 +8,13 @@ module.exports = {
   auroraUses:   2,
   attackLevel:  2,
   defenseLevel: 2,
-  skillText:    '攻击后累积攻击值50%为力量（全6则100%+治疗6）',
+  skillText:    '攻击后按当前攻击值累积力量：常规50%，若所选攻击骰全为6则按100%并治疗6。',
   hooks: {
     onAttackAfterDamageResolved(game, attacker) {
       const { pushEffectEvent } = require('../../rooms');
       const atkSelectedDice = game.attackSelection.map((idx) => game.attackDice[idx]);
       if (areAllValues(atkSelectedDice, 6)) {
+        const beforePower = game.power[attacker.id];
         game.power[attacker.id] += game.attackValue;
         const before  = game.hp[attacker.id];
         const healAmt = Math.min(6, game.maxHp[attacker.id] - before);
@@ -21,11 +22,12 @@ module.exports = {
           game.hp[attacker.id] += healAmt;
           pushEffectEvent(game, { type: 'heal', playerId: attacker.id, amount: healAmt, hpBefore: before, hpAfter: game.hp[attacker.id] });
         }
-        game.log.push(`${attacker.name}全6触发，力量累积100%（当前${game.power[attacker.id]}层），治疗${healAmt > 0 ? healAmt : 0}点。`);
+        game.log.push(`${attacker.name}全6触发，力量累积+${game.attackValue}（${beforePower} -> ${game.power[attacker.id]}层），治疗${healAmt > 0 ? healAmt : 0}点。`);
       } else {
         const add = Math.floor(game.attackValue * 0.5);
+        const beforePower = game.power[attacker.id];
         game.power[attacker.id] += add;
-        game.log.push(`${attacker.name}力量累积+${add}（当前${game.power[attacker.id]}层）。`);
+        game.log.push(`${attacker.name}力量累积+${add}（${beforePower} -> ${game.power[attacker.id]}层）。`);
       }
     },
     aiScoreAttackCombo(dice, indices) {

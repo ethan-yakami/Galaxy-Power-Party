@@ -56,6 +56,11 @@
       .replace(/'/g, '&#39;');
   }
 
+  function displayValue(value, fallback = '-') {
+    if (value === null || value === undefined || value === '') return fallback;
+    return String(value);
+  }
+
   function setResumePayload(entry, snapshotIndex) {
     try {
       sessionStorage.setItem(RESUME_PAYLOAD_KEY, JSON.stringify({
@@ -253,7 +258,9 @@
     dom.actionSummary.innerHTML = [
       `<div><strong>快照原因：</strong>${escapeHtml(snapshot.reason || 'snapshot')}</div>`,
       `<div><strong>时间：</strong>${escapeHtml(fmtTime(snapshot.timestamp))}</div>`,
-      `<div><strong>动作：</strong>${escapeHtml(action ? `${action.actionCode} (actor=${action.actor || '-'})` : '开局初始快照')}</div>`,
+      `<div><strong>动作：</strong>${escapeHtml(action
+        ? `${action.actionCode} (actor=${action.actor || '-'}, indices=${(action.indices || []).join(',') || '-'})`
+        : '开局初始快照')}</div>`,
     ].join('');
 
     dom.stepDetailView.classList.remove('hidden');
@@ -281,14 +288,14 @@
 
     const playersHtml = Array.isArray(view.players)
       ? view.players.map((player) => (
-        `<div class="playerCard"><strong>${escapeHtml(player.name || player.playerId || '-')}</strong><div>HP: ${escapeHtml(player.hp)} / ${escapeHtml(player.maxHp)}</div><div>${escapeHtml(player.characterId || '-')} | ${escapeHtml(player.auroraDiceId || '-')}</div></div>`
+        `<div class="playerCard"><strong>${escapeHtml(player.name || player.playerId || '-')}</strong><div>HP: ${escapeHtml(displayValue(player.hp))} / ${escapeHtml(displayValue(player.maxHp))}</div><div>${escapeHtml(player.characterId || '-')} | ${escapeHtml(player.auroraDiceId || '-')}</div></div>`
       )).join('')
       : '';
     dom.overview.classList.remove('hidden');
     dom.overview.innerHTML = [
       `<div>回合 ${escapeHtml(view.round)} | 阶段 ${escapeHtml(view.phase)} | 状态 ${escapeHtml(view.status)}</div>`,
       `<div>攻击方 ${escapeHtml(view.attackerId || '-')} | 防守方 ${escapeHtml(view.defenderId || '-')} | 胜者 ${escapeHtml(view.winnerId || '-')}</div>`,
-      `<div>攻击值 ${escapeHtml(view.attackValue)} | 防御值 ${escapeHtml(view.defenseValue)} | 上次伤害 ${escapeHtml(view.lastDamage)}</div>`,
+      `<div>攻击值 ${escapeHtml(displayValue(view.attackValue))} | 防御值 ${escapeHtml(displayValue(view.defenseValue))} | 上次伤害 ${escapeHtml(displayValue(view.lastDamage))}</div>`,
       `<div class="overviewGrid">${playersHtml}</div>`,
     ].join('');
 

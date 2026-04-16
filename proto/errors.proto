@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package gpp.protocol.v1;
+
+import "envelope.proto";
+
+// @gpp-message type=error direction=server_to_client
+message ErrorPayload {
+  string code = 1;
+  string message = 2;
+  string severity = 3;
+  string category = 4;
+  ProtocolMeta meta = 5; // @gpp-field required=false
+}

@@ -109,15 +109,7 @@
     }
 
     if (view.actionKind === 'defense_roll') {
-      const action = findAction(ticket, 'roll_defense');
-      model.buttons.push({
-        className: 'primaryBtn',
-        text: '掷防御骰',
-        disabled: !action,
-        onClick() {
-          submitBattleAction(send, ticket, action);
-        },
-      });
+      model.note = '系统自动掷防御骰中...';
       return model;
     }
 
@@ -156,4 +148,3 @@
     createBattleRailActionModel,
   };
 })();
-

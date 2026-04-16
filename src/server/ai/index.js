@@ -9,11 +9,15 @@ const {
 const { canUseAurora } = require('../services/skills');
 const { getEffectiveSelectionCount } = require('../services/dice');
 const { buildPendingActionSet } = require('../services/battle-actions');
+const { DEFAULT_DIFFICULTY, RESTRICTED_AI_LOADOUTS, getDifficultyConfig } = require('./config');
+const { scoreActionLocal, projectPureGame } = require('./evaluator');
+const { applyTacticalOverrides } = require('./tactical-overrides');
+const { pickCandidateActions, searchBestAction } = require('./search');
+const { choosePureActionForState } = require('./policy');
 const {
   cloneState,
   enumerateActions,
   applyActionInPlace,
-  projectStateToLegacyRoom,
   rolloutMany,
   getActionOpcode,
   getActionMask,
@@ -327,19 +331,29 @@ function choosePurePhaseAction({
 }
 
 function getAiCharacterPool() {
-  const baseOnly = Object.values(CharacterRegistry)
-    .filter((c) => !c.isCustomVariant)
-    .map((c) => c.id);
-  if (baseOnly.length > 0) return baseOnly;
-  return Object.keys(CharacterRegistry);
+  return RESTRICTED_AI_LOADOUTS
+    .filter((loadout) => CharacterRegistry[loadout.characterId])
+    .filter((loadout) => {
+      const character = CharacterRegistry[loadout.characterId];
+      if (allowsNoAurora(character)) return !loadout.auroraDiceId;
+      return !!(loadout.auroraDiceId && AuroraRegistry[loadout.auroraDiceId]);
+    });
 }
 
 function getRandomAiLoadout() {
-  const characterId = randomChoice(getAiCharacterPool());
-  const character = CharacterRegistry[characterId];
+  const pool = getAiCharacterPool();
+  const selected = pool.length > 0 ? randomChoice(pool) : null;
+  if (selected) {
+    return {
+      characterId: selected.characterId,
+      auroraDiceId: selected.auroraDiceId || null,
+    };
+  }
+
+  const fallbackCharacterId = 'zhigengniao';
   return {
-    characterId,
-    auroraDiceId: allowsNoAurora(character) ? null : randomChoice(Object.keys(AuroraRegistry)),
+    characterId: fallbackCharacterId,
+    auroraDiceId: null,
   };
 }
 
@@ -382,6 +396,7 @@ function createAIPlayer(roomCode) {
     graceTimer: null,
     autoActionTimer: null,
     auroraSelectionConfirmed: true,
+    aiDifficulty: 'elite',
   };
 }
 
@@ -390,6 +405,7 @@ function reRandomizeAIPlayer(player) {
   player.characterId = loadout.characterId;
   player.auroraDiceId = loadout.auroraDiceId;
   player.auroraSelectionConfirmed = true;
+  player.aiDifficulty = player.aiDifficulty || 'elite';
 }
 
 function scoreAttackCombo(dice, indices, characterId, game, playerId) {
@@ -491,17 +507,6 @@ function isPureRoom(room) {
   return !!(room && room.engineState && room.engineUi);
 }
 
-function createRolloutSessionUi() {
-  return {
-    indexToPlayerId: ['P1', 'P2'],
-    playerIdToIndex: { P1: 0, P2: 1 },
-    logs: [],
-    effectEvents: [],
-    attackPreviewMask: 0,
-    defensePreviewMask: 0,
-  };
-}
-
 function buildPureAiPlayerMeta(state, playerIndex) {
   const character = state.catalog.characters[state.characterIndex[playerIndex]];
   const aurora = state.catalog.auroras[state.auroraIndex[playerIndex]];
@@ -510,10 +515,6 @@ function buildPureAiPlayerMeta(state, playerIndex) {
     characterId: character ? character.id : null,
     auroraDiceId: aurora ? aurora.id : null,
   };
-}
-
-function projectPureGame(state) {
-  return projectStateToLegacyRoom(state, createRolloutSessionUi());
 }
 
 function scorePureAttackIndices(state, aiIndex, indices, gameOverride) {
@@ -714,6 +715,53 @@ function choosePureActionWithRollout(state, aiIndex, candidates, iterations, see
   return bestAction;
 }
 
+function getAiDifficultyConfig(aiPlayer) {
+  return getDifficultyConfig(aiPlayer && aiPlayer.aiDifficulty);
+}
+
+function chooseStrategicPureAction({
+  room,
+  state,
+  actionBuffer,
+  count,
+  aiIndex,
+  aiPlayer,
+  phaseLabel,
+  validOpcodes,
+}) {
+  const difficulty = getAiDifficultyConfig(aiPlayer);
+  const phase = state.phase;
+  const allowed = new Set(Array.isArray(validOpcodes) ? validOpcodes : []);
+  const heuristicAction = chooseHeuristicPureAction(state, actionBuffer, count);
+  const candidates = pickCandidateActions(state, actionBuffer, count, aiIndex, phase, difficulty.id)
+    .filter((candidate) => allowed.has(candidate.opcode));
+
+  if (difficulty.useTacticalOverrides) {
+    const override = applyTacticalOverrides(state, candidates, aiIndex, phaseLabel);
+    if (override && allowed.has(getActionOpcode(override))) {
+      return { action: override, selectedBy: 'tactical_override' };
+    }
+  }
+
+  if (candidates.length > 0) {
+    const samples = phase === 1 ? difficulty.searchSamplesAttack : difficulty.searchSamplesDefense;
+    const searched = searchBestAction(state, candidates, aiIndex, {
+      samples,
+      maxDecisionMs: difficulty.maxDecisionMs,
+    });
+    if (searched && allowed.has(getActionOpcode(searched))) {
+      return { action: searched, selectedBy: samples > 0 ? 'search' : 'local_eval' };
+    }
+  }
+
+  if (heuristicAction && allowed.has(getActionOpcode(heuristicAction))) {
+    return { action: heuristicAction, selectedBy: 'heuristic' };
+  }
+
+  const fallback = getFirstPureActionByOpcode(actionBuffer, count, Array.from(allowed));
+  return { action: fallback, selectedBy: 'fallback_first_legal' };
+}
+
 function chooseBestPureSelection(room, actionBuffer, count, opcode, scorer) {
   let bestMask = 0;
   let bestScore = -Infinity;
@@ -799,71 +847,12 @@ function schedulePureAttackSelect(context) {
   } = context;
   if (state.attacker !== aiIndex) return false;
   const delay = aiDelay();
-  let auroraAction = 0;
-  for (let i = 0; i < count; i += 1) {
-    if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_ATTACK) {
-      auroraAction = actionBuffer[i];
-      break;
-    }
-  }
-  if (auroraAction && aiShouldUseAurora(aiPlayer, game, 'attack')) {
-    schedulePureAiHandler(room, rooms, delay, 'attack_reroll_or_select', aiPlayer, 'handleUseAurora', () => {
-      submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'attack_reroll_or_select', auroraAction);
-    });
-    return true;
-  }
-
-  const candidates = [];
-  const rerollMask = chooseBestPureReroll(room, actionBuffer, count, game, aiPlayer);
-  if (rerollMask > 0) {
-    const rerollAction = findPureActionByMask(actionBuffer, count, OPCODES.REROLL_ATTACK, rerollMask);
-    if (rerollAction) {
-      candidates.push({
-        action: rerollAction,
-        mask: rerollMask,
-        score: scorePureRerollMask(state, rerollMask),
-      });
-    }
-  }
-  const confirmCandidates = getSortedPureActionCandidates(
-    state,
+  const chosen = choosePureActionForState(state, aiIndex, {
+    difficultyId: aiPlayer && aiPlayer.aiDifficulty,
     actionBuffer,
     count,
-    OPCODES.CONFIRM_ATTACK,
-    (mask) => scoreAttackCombo(game.attackDice, state.catalog.indicesByMask[mask], aiPlayer.characterId, game, aiPlayer.id),
-    PURE_AI_CANDIDATE_LIMIT,
-  );
-  for (let i = 0; i < confirmCandidates.length; i += 1) {
-    candidates.push(confirmCandidates[i]);
-  }
-
-  const heuristicAction = rerollMask > 0
-    ? findPureActionByMask(actionBuffer, count, OPCODES.REROLL_ATTACK, rerollMask)
-    : findPureActionByMask(
-      actionBuffer,
-      count,
-      OPCODES.CONFIRM_ATTACK,
-      chooseBestPureSelection(
-        room,
-        actionBuffer,
-        count,
-        OPCODES.CONFIRM_ATTACK,
-        (indices) => scoreAttackCombo(game.attackDice, indices, aiPlayer.characterId, game, aiPlayer.id),
-      ),
-    );
-  const chosen = choosePurePhaseAction({
-    room,
-    state,
-    actionBuffer,
-    count,
-    aiIndex,
-    aiPlayer,
     phaseLabel: 'attack_reroll_or_select',
-    rolloutCandidates: candidates,
-    rolloutIterations: PURE_AI_ATTACK_ROLLOUTS,
-    rolloutSeed: `${room.code}:r${state.round}:p${state.phase}:a${aiIndex}`,
-    heuristicAction,
-    validOpcodes: [OPCODES.REROLL_ATTACK, OPCODES.CONFIRM_ATTACK],
+    validOpcodes: [OPCODES.USE_AURORA_ATTACK, OPCODES.REROLL_ATTACK, OPCODES.CONFIRM_ATTACK],
   });
   if (!chosen.action) {
     clearAIActionTimer(room, aiPlayer);
@@ -919,53 +908,12 @@ function schedulePureDefenseSelect(context) {
   } = context;
   if (state.defender !== aiIndex) return false;
   const delay = aiDelay();
-  let auroraAction = 0;
-  for (let i = 0; i < count; i += 1) {
-    if (getActionOpcode(actionBuffer[i]) === OPCODES.USE_AURORA_DEFENSE) {
-      auroraAction = actionBuffer[i];
-      break;
-    }
-  }
-  if (auroraAction && aiShouldUseAurora(aiPlayer, game, 'defense')) {
-    schedulePureAiHandler(room, rooms, delay, 'defense_select', aiPlayer, 'handleUseAurora', () => {
-      submitEncodedActionWithTicket(room, handlers, aiWs, aiPlayer, 'defense_select', auroraAction);
-    });
-    return true;
-  }
-
-  const confirmCandidates = getSortedPureActionCandidates(
-    state,
+  const chosen = choosePureActionForState(state, aiIndex, {
+    difficultyId: aiPlayer && aiPlayer.aiDifficulty,
     actionBuffer,
     count,
-    OPCODES.CONFIRM_DEFENSE,
-    (mask) => scoreDefenseCombo(game.defenseDice, state.catalog.indicesByMask[mask], aiPlayer.characterId, game, aiPlayer.id),
-    PURE_AI_CANDIDATE_LIMIT,
-  );
-  const heuristicAction = findPureActionByMask(
-    actionBuffer,
-    count,
-    OPCODES.CONFIRM_DEFENSE,
-    chooseBestPureSelection(
-      room,
-      actionBuffer,
-      count,
-      OPCODES.CONFIRM_DEFENSE,
-      (indices) => scoreDefenseCombo(game.defenseDice, indices, aiPlayer.characterId, game, aiPlayer.id),
-    ),
-  );
-  const chosen = choosePurePhaseAction({
-    room,
-    state,
-    actionBuffer,
-    count,
-    aiIndex,
-    aiPlayer,
     phaseLabel: 'defense_select',
-    rolloutCandidates: confirmCandidates,
-    rolloutIterations: PURE_AI_DEFENSE_ROLLOUTS,
-    rolloutSeed: `${room.code}:r${state.round}:p${state.phase}:d${aiIndex}`,
-    heuristicAction,
-    validOpcodes: [OPCODES.CONFIRM_DEFENSE],
+    validOpcodes: [OPCODES.USE_AURORA_DEFENSE, OPCODES.CONFIRM_DEFENSE],
   });
   if (!chosen.action) {
     clearAIActionTimer(room, aiPlayer);
@@ -1149,6 +1097,7 @@ function scheduleAIAction(room, rooms, handlers) {
 module.exports = {
   createAIPlayer,
   reRandomizeAIPlayer,
+  choosePureActionForState,
   scheduleAIAction,
   clearAIActionTimer,
   getPendingActionKind,

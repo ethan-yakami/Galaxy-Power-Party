@@ -38,6 +38,14 @@ function createLobbyHandlers({ rooms, shared, startGameIfReady }) {
     if (!room) return;
     const player = getPlayerById(room, ws.playerId);
     if (!player) return;
+    const chosenCharacter = CharacterRegistry[player.characterId];
+    if (allowsNoAurora(chosenCharacter)) {
+      player.auroraDiceId = null;
+      player.auroraSelectionConfirmed = true;
+      shared.getBroadcastRoom(room);
+      startGameIfReady(room);
+      return;
+    }
 
     const { auroraDiceId } = payload || {};
     if (auroraDiceId && !AuroraRegistry[auroraDiceId]) return;
@@ -147,4 +155,3 @@ function createLobbyHandlers({ rooms, shared, startGameIfReady }) {
 }
 
 module.exports = createLobbyHandlers;
-

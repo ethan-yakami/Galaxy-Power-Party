@@ -219,6 +219,23 @@ function resetRoundFlags(state, a, b) {
   state.desperateBonus[b] = 0;
 }
 
+function resolveAuroraIndex(catalog, character, auroraDiceId) {
+  const normalizedAuroraId = typeof auroraDiceId === 'string' ? auroraDiceId.trim() : '';
+  if (normalizedAuroraId) {
+    const explicitIndex = catalog.auroraIndexById[normalizedAuroraId];
+    if (explicitIndex != null) return explicitIndex;
+    return null;
+  }
+
+  // Characters that cannot use aurora dice (auroraUses <= 0) still need
+  // a catalog aurora index placeholder for engine storage compatibility.
+  if ((character.auroraUses | 0) <= 0) {
+    if (catalog.auroraIndexById.prime != null) return catalog.auroraIndexById.prime;
+    if (Array.isArray(catalog.auroras) && catalog.auroras.length > 0) return 0;
+  }
+  return null;
+}
+
 function createBattle(config, seed, options = {}) {
   const catalog = options.catalog || compileCatalog();
   const hasStartingAttacker = Number.isInteger(options.startingAttacker) && options.startingAttacker >= 0 && options.startingAttacker < 2;
@@ -238,11 +255,11 @@ function createBattle(config, seed, options = {}) {
   for (let i = 0; i < 2; i += 1) {
     const player = config.players[i];
     const characterIdx = catalog.characterIndexById[player.characterId];
-    const auroraIdx = catalog.auroraIndexById[player.auroraDiceId];
     if (characterIdx == null) throw new Error(`Unknown character: ${player.characterId}`);
+    const character = catalog.characters[characterIdx];
+    const auroraIdx = resolveAuroraIndex(catalog, character, player.auroraDiceId);
     if (auroraIdx == null) throw new Error(`Unknown aurora: ${player.auroraDiceId}`);
 
-    const character = catalog.characters[characterIdx];
     state.characterIndex[i] = characterIdx;
     state.auroraIndex[i] = auroraIdx;
     state.maxAttackRerolls[i] = character.maxAttackRerolls;

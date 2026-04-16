@@ -9,10 +9,15 @@ const WebSocket = require('ws');
 const { getCharacterSummary, getAuroraDiceSummary } = require('../services/registry');
 const { getWeatherCatalogSummary } = require('../services/weather');
 const { send, buildPublicRoomSummary } = require('../services/rooms');
+const { createLogger } = require('../observability/logger');
 const createHandlers = require('./handlers');
 const createMessageRouter = require('../transport/message-router');
 const { normalizeIncomingMessage, PROTOCOL_VERSION } = require('../transport/protocol/messages');
 const { sendError, ERROR_CODES } = require('../transport/protocol/errors');
+const replaySchema = require('../../core/shared/replay-schema');
+const protocolVersioning = require('../../core/shared/protocol/versioning');
+const { createPlatform } = require('../platform/create-platform');
+const { registerPlatformHttpRoutes } = require('../platform/http');
 
 const packageMeta = require(path.resolve(__dirname, '../../../package.json'));
 
@@ -59,17 +64,27 @@ function getLocalOpenHost(host) {
   return host;
 }
 
-function startServer() {
+function startServer(options = {}) {
+  const logger = createLogger('server.bootstrap');
   process.on('uncaughtException', (err) => {
-    console.error('[Global Error] Uncaught Exception:', err);
+    logger.error('uncaught_exception', {
+      message: err && err.message ? err.message : String(err),
+    });
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    console.error('[Global Error] Unhandled Rejection at:', promise, 'reason:', reason);
+    logger.error('unhandled_rejection', {
+      promise: String(promise),
+      reason: reason && reason.message ? reason.message : String(reason),
+    });
   });
 
-  const PORT = Number(process.env.PORT) || 3000;
-  const HOST = process.env.HOST || '0.0.0.0';
+  const envPort = process.env.PORT;
+  const parsedEnvPort = envPort === undefined ? NaN : Number(envPort);
+  const PORT = Number.isInteger(options.port)
+    ? options.port
+    : (Number.isInteger(parsedEnvPort) ? parsedEnvPort : 3000);
+  const HOST = options.host || process.env.HOST || '0.0.0.0';
   const ROOT_DIR = path.resolve(__dirname, '../../..');
   const CLIENT_DIR = path.join(ROOT_DIR, 'src', 'client');
   const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
@@ -79,6 +94,12 @@ function startServer() {
 
   const app = express();
   app.use(compression());
+  app.use(express.json({ limit: '1mb' }));
+  app.use((req, res, next) => {
+    req.requestId = randomBytes(8).toString('hex');
+    res.setHeader('X-Request-Id', req.requestId);
+    next();
+  });
   const staticOptions = {
     maxAge: '1h',
     etag: true,
@@ -133,6 +154,32 @@ function startServer() {
 
   const rooms = new Map();
   let nextPlayerId = 1;
+  const platform = createPlatform({
+    rooms,
+    logger: createLogger('server.platform'),
+    packageMeta,
+    protocolVersion: PROTOCOL_VERSION,
+    replayVersion: replaySchema.REPLAY_VERSION,
+  });
+
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      platform.metrics.inc('gpp_http_requests_total', {
+        method: req.method,
+        route: req.path,
+        status: String(res.statusCode),
+      });
+      logger.info('http_request_completed', {
+        requestId: req.requestId,
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
+    });
+    next();
+  });
 
   app.get('/api/public-rooms', (_req, res) => {
     const roomsList = [];
@@ -152,14 +199,28 @@ function startServer() {
     res.json({
       ok: true,
       generatedAt: Date.now(),
-      name: packageMeta.name || 'galaxy-power-party',
-      version: packageMeta.version || '0.0.0',
-      protocolVersion: PROTOCOL_VERSION,
+      app: {
+        name: packageMeta.name || 'galaxy-power-party',
+        version: packageMeta.version || '0.0.0',
+      },
+      protocol: {
+        current: PROTOCOL_VERSION,
+        supported: protocolVersioning.SUPPORTED_PROTOCOL_VERSIONS,
+        deprecated: protocolVersioning.DEPRECATED_PROTOCOL_VERSIONS,
+      },
+      replay: {
+        current: replaySchema.REPLAY_VERSION,
+        supported: replaySchema.SUPPORTED_REPLAY_VERSIONS,
+      },
     });
   });
 
   app.get('/api/debug/room-metrics', (_req, res) => {
     res.json({ ok: true, generatedAt: Date.now(), metrics: collectRoomMetrics(rooms) });
+  });
+  registerPlatformHttpRoutes(app, {
+    platform,
+    logger,
   });
 
   function broadcastCharacterCatalog() {
@@ -170,15 +231,37 @@ function startServer() {
     wss.clients.forEach((client) => send(client, payload));
   }
 
-  const handlers = createHandlers(rooms);
+  const handlers = createHandlers(rooms, { platform });
   const messageRouter = createMessageRouter({
     handlers,
     broadcastCharacterCatalog,
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', async (ws, req) => {
     ws.awaitingPong = false;
     ws.heartbeatMisses = 0;
+    platform.metrics.inc('gpp_socket_connections_total');
+    try {
+      const requestUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
+      const accessToken = requestUrl.searchParams.get('accessToken')
+        || requestUrl.searchParams.get('token')
+        || '';
+      if (accessToken) {
+        const auth = await platform.authenticateAccessToken(accessToken);
+        if (auth.ok) {
+          ws.authUser = auth.profile;
+          ws.authSessionId = auth.session.id;
+        } else {
+          platform.metrics.inc('gpp_auth_failures_total', { reason: auth.reason || 'ws_auth_failed' });
+        }
+      }
+    } catch {
+      // Ignore query parsing/auth errors for anonymous ws sessions.
+    }
+    logger.info('socket_connected', {
+      playerId: ws.playerId || null,
+      userId: ws.authUser ? ws.authUser.id : null,
+    });
     ws.on('pong', () => {
       ws.awaitingPong = false;
       ws.heartbeatMisses = 0;
@@ -199,39 +282,66 @@ function startServer() {
         protocolVersion: PROTOCOL_VERSION,
       },
     });
+    logger.info('welcome_sent', {
+      playerId: ws.playerId,
+      protocolVersion: PROTOCOL_VERSION,
+    });
 
     ws.on('message', (raw) => {
       const normalized = normalizeIncomingMessage(raw.toString());
       if (!normalized.ok) {
+        platform.metrics.inc('gpp_protocol_rejected_total', {
+          code: normalized.errorCode || ERROR_CODES.INVALID_JSON,
+        });
+        logger.warn('socket_message_rejected', {
+          playerId: ws.playerId,
+          errorCode: normalized.errorCode || ERROR_CODES.INVALID_JSON,
+          errorMessage: normalized.errorMessage,
+        });
         sendError(ws, normalized.errorCode || ERROR_CODES.INVALID_JSON, normalized.errorMessage, {
           meta: normalized.meta,
         });
         return;
       }
+      logger.debug('socket_message_accepted', {
+        playerId: ws.playerId,
+        type: normalized.envelope.type,
+        requestId: normalized.envelope.meta && normalized.envelope.meta.requestId,
+      });
       messageRouter.dispatch(ws, normalized.envelope, normalized.legacyMessage);
     });
 
     ws.on('close', () => {
+      logger.info('socket_closed', {
+        playerId: ws.playerId,
+        roomCode: ws.playerRoomCode,
+        userId: ws.authUser ? ws.authUser.id : null,
+      });
       handlers.handleSocketClosed(ws);
     });
   });
 
   server.listen(PORT, HOST, () => {
-    const localUrl = `http://${getLocalOpenHost(HOST)}:${PORT}`;
+    const address = server.address();
+    const actualPort = address && typeof address === 'object' ? address.port : PORT;
+    const localUrl = `http://${getLocalOpenHost(HOST)}:${actualPort}`;
     const lanIp = getLanIPv4();
-    console.log('Galaxy Power Party server running');
-    console.log(`Bind: ${HOST}:${PORT}`);
-    console.log(`Local: ${localUrl}`);
+    logger.info('server_started', {
+      bind: `${HOST}:${actualPort}`,
+      localUrl,
+    });
     if (HOST === '0.0.0.0' || HOST === '::' || HOST === '::0') {
       if (lanIp) {
-        console.log(`LAN: http://${lanIp}:${PORT}`);
+        logger.info('lan_url_detected', {
+          lanUrl: `http://${lanIp}:${actualPort}`,
+        });
       } else {
-        console.log('LAN: IPv4 address not detected');
+        logger.warn('lan_ip_not_detected');
       }
     }
   });
 
-  return { app, server, wss, rooms, handlers };
+  return { app, server, wss, rooms, handlers, platform };
 }
 
 module.exports = {

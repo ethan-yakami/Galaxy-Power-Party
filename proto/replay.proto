@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package gpp.protocol.v1;
+
+import "google/protobuf/struct.proto";
+import "envelope.proto";
+
+// @gpp-message type=export_replay direction=client_to_server
+message ExportReplayPayload {
+  string request_source = 1; // @gpp-field required=false
+}
+
+// @gpp-message type=create_resume_room direction=client_to_server
+message CreateResumeRoomPayload {
+  int32 snapshot_index = 1; // @gpp-field required=false
+  google.protobuf.Struct replay = 2; // @gpp-field type=object required=false
+  string mode = 3; // @gpp-field required=false
+}
+
+// @gpp-message type=replay_export direction=server_to_client
+message ReplayExportPayload {
+  google.protobuf.Struct content = 1; // @gpp-field type=object
+  ProtocolMeta meta = 2; // @gpp-field required=false
+}

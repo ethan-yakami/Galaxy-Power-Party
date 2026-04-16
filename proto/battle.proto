@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package gpp.protocol.v1;
+
+import "google/protobuf/struct.proto";
+
+// @gpp-message type=choose_character direction=client_to_server
+message ChooseCharacterPayload {
+  string character_id = 1;
+}
+
+// @gpp-message type=choose_aurora_die direction=client_to_server
+message ChooseAuroraDiePayload {
+  string aurora_dice_id = 1;
+}
+
+// @gpp-message type=create_custom_character direction=client_to_server
+message CreateCustomCharacterPayload {
+  google.protobuf.Struct variant = 1; // @gpp-field type=object transitional=custom_content
+}
+
+// @gpp-message type=list_custom_characters direction=client_to_server
+message ListCustomCharactersPayload {}
+
+// @gpp-message type=update_custom_character direction=client_to_server
+message UpdateCustomCharacterPayload {
+  google.protobuf.Struct variant = 1; // @gpp-field type=object transitional=custom_content
+}
+
+// @gpp-message type=delete_custom_character direction=client_to_server
+message DeleteCustomCharacterPayload {
+  string character_id = 1;
+}
+
+// @gpp-message type=toggle_custom_character direction=client_to_server
+message ToggleCustomCharacterPayload {
+  string character_id = 1;
+  bool enabled = 2;
+}
+
+// @gpp-message type=roll_attack direction=client_to_server
+message RollAttackPayload {}
+
+// @gpp-message type=use_aurora_die direction=client_to_server
+message UseAuroraDiePayload {}
+
+// @gpp-message type=reroll_attack direction=client_to_server
+message RerollAttackPayload {
+  repeated int32 indices = 1;
+}
+
+// @gpp-message type=update_live_selection direction=client_to_server
+message UpdateLiveSelectionPayload {
+  repeated int32 indices = 1;
+}
+
+// @gpp-message type=confirm_attack_selection direction=client_to_server
+message ConfirmAttackSelectionPayload {
+  repeated int32 indices = 1;
+}
+
+// @gpp-message type=roll_defense direction=client_to_server
+message RollDefensePayload {}
+
+// @gpp-message type=confirm_defense_selection direction=client_to_server
+message ConfirmDefenseSelectionPayload {
+  repeated int32 indices = 1;
+}
+
+// @gpp-message type=submit_battle_action direction=client_to_server
+message SubmitBattleActionPayload {
+  int32 turn_id = 1;
+  string action_id = 2;
+}
+
+// @gpp-message type=apply_preset direction=client_to_server
+message ApplyPresetPayload {
+  google.protobuf.Struct preset = 1; // @gpp-field type=object required=false transitional=preset_object
+  string preset_code = 2; // @gpp-field required=false
+  bool use_suggested_preset = 3; // @gpp-field required=false
+}
+
+// @gpp-message type=preview_preset direction=client_to_server
+message PreviewPresetPayload {
+  google.protobuf.Struct preset = 1; // @gpp-field type=object required=false transitional=preset_object
+  string preset_code = 2; // @gpp-field required=false
+}
+
+// @gpp-message type=battle_actions direction=server_to_client
+message BattleActionsPayload {
+  int32 turn_id = 1;
+  string actor_id = 2;
+  repeated google.protobuf.Struct actions = 3; // @gpp-field type=object_array
+  string phase = 4;
+  int32 round = 5;
+}
+
+// @gpp-message type=weather_changed direction=server_to_client
+message WeatherChangedPayload {
+  google.protobuf.Struct weather = 1; // @gpp-field type=object required=false transitional=weather_projection
+  int32 round = 2; // @gpp-field required=false
+}

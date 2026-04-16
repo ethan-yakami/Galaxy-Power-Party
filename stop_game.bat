@@ -3,8 +3,9 @@ setlocal EnableExtensions EnableDelayedExpansion
 
 for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 if not defined PORT set "PORT=3000"
-set "PID_FILE=%ROOT%\.gpp-server.pid"
-set "TUNNEL_PID_FILE=%ROOT%\.gpp-cloudflared.pid"
+set "RUNTIME_DIR=%ROOT%\tmp\runtime"
+set "PID_FILE=%RUNTIME_DIR%\.gpp-server.pid"
+set "TUNNEL_PID_FILE=%RUNTIME_DIR%\.gpp-cloudflared.pid"
 set "KILLED=0"
 
 set "PORT_PIDS="

@@ -2,14 +2,11 @@ const {
   assert,
   createHandlers,
   engine,
-  PHASE_ATTACK_REROLL_OR_SELECT,
   STATUS_ENDED,
   createProjectionUi,
-  setRollBuffer,
   makeWs,
   highestIndices,
   drivePureGameToEnd,
-  withSeededRandom,
 } = require('./common');
 
 module.exports = [
@@ -67,12 +64,12 @@ module.exports = [
         pureState,
         engine.encodeAction(engine.OPCODES.CONFIRM_ATTACK, engine.indicesToMask(attackIndices, pureState.attackRoll.count)),
       );
+      if (room.game.phase === 'defense_select') {
+        engine.applyActionInPlace(pureState, engine.encodeAction(engine.OPCODES.ROLL_DEFENSE, 0));
+      }
       pureGame = engine.projectStateToLegacyRoom(pureState, ui);
       assert.strictEqual(room.game.attackValue, pureGame.attackValue);
       assert.strictEqual(room.game.phase, pureGame.phase);
-
-      handlers.handleRollDefense(defenderWs);
-      engine.applyActionInPlace(pureState, engine.encodeAction(engine.OPCODES.ROLL_DEFENSE, 0));
       pureGame = engine.projectStateToLegacyRoom(pureState, ui);
       assert.deepStrictEqual(room.game.defenseDice.map((die) => die.value), pureGame.defenseDice.map((die) => die.value));
 
@@ -206,9 +203,14 @@ module.exports = [
       assert(replayMessage, 'should receive replay export payload');
       assert.strictEqual(replayMessage.type, 'replay_export');
       assert.strictEqual(replayMessage.meta.requestId, 'test-replay-1');
-      assert.strictEqual(typeof replayMessage.content, 'string');
+      assert.ok(
+        typeof replayMessage.content === 'string' || typeof replayMessage.content === 'object',
+        'replay export content should be string or object',
+      );
 
-      const replay = JSON.parse(replayMessage.content);
+      const replay = typeof replayMessage.content === 'string'
+        ? JSON.parse(replayMessage.content)
+        : replayMessage.content;
       assert.strictEqual(typeof replay.replayId, 'string');
       assert(replay.replayId.length > 0, 'replayId should exist');
       assert.strictEqual(replay.version, 'ReplayV2');

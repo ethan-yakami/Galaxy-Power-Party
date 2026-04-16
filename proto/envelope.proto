@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package gpp.protocol.v1;
+
+import "google/protobuf/struct.proto";
+
+message ProtocolMeta {
+  string protocol_version = 1;
+  string request_id = 2;
+}
+
+message Envelope {
+  string type = 1;
+  google.protobuf.Struct payload = 2;
+  ProtocolMeta meta = 3;
+}
+
+message VersionView {
+  string app_name = 1;
+  string app_version = 2;
+  string protocol_current = 3;
+  repeated string protocol_supported = 4;
+  repeated string protocol_deprecated = 5;
+  string replay_current = 6;
+  repeated string replay_supported = 7;
+}

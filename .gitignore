@@ -9,3 +9,7 @@ pnpm-debug.log*
 chars
 auroras
 CLAUDE.md
+build/
+tmp/runtime/
+tmp/**/*.log
+*.pid

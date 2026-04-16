@@ -3,7 +3,7 @@ const createRoomLifecycleHandlers = require('./handlers/room-lifecycle');
 const createLobbyHandlers = require('./handlers/lobby');
 const createBattleHandlers = require('./handlers/battle');
 
-module.exports = function createHandlers(rooms) {
+module.exports = function createHandlers(rooms, options = {}) {
   let handlers = null;
   const shared = createSharedHandlers({
     rooms,
@@ -22,6 +22,7 @@ module.exports = function createHandlers(rooms) {
   const battle = createBattleHandlers({
     rooms,
     shared,
+    platform: options.platform || null,
   });
 
   handlers = {
@@ -32,4 +33,3 @@ module.exports = function createHandlers(rooms) {
 
   return handlers;
 };
-

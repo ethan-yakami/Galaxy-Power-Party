@@ -12,6 +12,7 @@ const {
   withImmediateTimers,
 } = require('./common');
 const { CharacterRegistry } = require('../../../src/server/services/registry');
+const { RESTRICTED_AI_LOADOUTS } = require('../../../src/server/ai/config');
 const { createAIPlayer, reRandomizeAIPlayer } = require('../../../src/server/ai');
 
 module.exports = [
@@ -166,9 +167,7 @@ module.exports = [
 
       const attackNeed = room.game.attackLevel[room.game.attackerId];
       handlers.handleConfirmAttack(attackerWs, { indices: highestIndices(room.game.attackDice, attackNeed) });
-      assert.strictEqual(room.game.phase, 'defense_roll');
-
-      handlers.handleRollDefense(defenderWs);
+      assert.strictEqual(room.game.phase, 'defense_select');
       const defenseNeed = room.game.defenseLevel[room.game.defenderId];
       handlers.handleConfirmDefense(defenderWs, { indices: highestIndices(room.game.defenseDice, defenseNeed) });
       assert.strictEqual(room.game.phase, 'attack_roll');
@@ -266,7 +265,7 @@ module.exports = [
         scheduleAIAction(room, rooms, handlers);
       });
 
-      assert.strictEqual(room.game.phase, 'defense_roll');
+      assert.strictEqual(room.game.phase, 'defense_select');
       assert(room.game.attackSelection && room.game.attackSelection.length > 0, 'AI should confirm an attack selection');
     },
   },
@@ -312,7 +311,10 @@ module.exports = [
         scheduleAIAction(room, rooms, handlers);
       });
 
-      assert.notStrictEqual(room.game.phase, 'defense_select');
+      assert(
+        room.game.phase !== 'defense_select' || room.game.round > 1,
+        'AI defense selection should advance state or enter next round',
+      );
       assert(room.game.round >= 1, 'room should still have a valid round after defense resolution');
     },
   },
@@ -474,14 +476,13 @@ module.exports = [
     act: 'Create and rerandomize AI player with deterministic random.',
     assert: 'auroraDiceId remains null for zhigengniao.',
     run() {
-      const characterPool = Object.values(CharacterRegistry)
-        .filter((character) => !character.isCustomVariant)
-        .map((character) => character.id);
-      const zhigengniaoIndex = characterPool.indexOf('zhigengniao');
+      const loadoutPool = RESTRICTED_AI_LOADOUTS
+        .filter((loadout) => CharacterRegistry[loadout.characterId]);
+      const zhigengniaoIndex = loadoutPool.findIndex((loadout) => loadout.characterId === 'zhigengniao');
       assert(zhigengniaoIndex >= 0, 'zhigengniao should exist in AI pool');
 
       const originalRandom = Math.random;
-      Math.random = () => ((zhigengniaoIndex + 0.01) / characterPool.length);
+      Math.random = () => ((zhigengniaoIndex + 0.01) / loadoutPool.length);
 
       try {
         const aiPlayer = createAIPlayer('9000');
@@ -496,6 +497,33 @@ module.exports = [
       } finally {
         Math.random = originalRandom;
       }
+    },
+  },
+  {
+    id: 'GEN-013',
+    title: 'zhigengniao preset starts AI room without aurora crash',
+    tags: ['group:general_rules', 'phase:setup', 'character:zhigengniao'],
+    arrange: 'Create an AI room and apply a zhigengniao preset without auroraDiceId.',
+    act: 'Start game via handleApplyPreset.',
+    assert: 'Room enters in_game and engine state is created without server error.',
+    run() {
+      const rooms = new Map();
+      const handlers = createHandlers(rooms);
+      const human = makeWs('P1');
+
+      handlers.handleCreateAIRoom(human, { name: 'Human' });
+      const room = rooms.get(human.playerRoomCode);
+      assert(room, 'room should exist');
+
+      handlers.handleApplyPreset(human, { characterId: 'zhigengniao' });
+
+      assert.strictEqual(room.status, 'in_game');
+      assert(room.engineState, 'engineState should be created');
+      assert(room.game && room.game.phase, 'projected game should exist');
+
+      const humanIndex = room.engineUi.indexToPlayerId.indexOf('P1');
+      assert(humanIndex >= 0, 'human index should exist in engine ui');
+      assert.strictEqual(room.engineState.auroraUsesRemaining[humanIndex], 0);
     },
   },
 ];

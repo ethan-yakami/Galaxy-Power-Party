@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package gpp.protocol.v1;
+
+import "google/protobuf/struct.proto";
+import "envelope.proto";
+
+// @gpp-message type=create_room direction=client_to_server
+message CreateRoomPayload {
+  string name = 1;
+}
+
+// @gpp-message type=create_ai_room direction=client_to_server
+message CreateAiRoomPayload {
+  string name = 1;
+}
+
+// @gpp-message type=join_room direction=client_to_server
+message JoinRoomPayload {
+  string name = 1;
+  string code = 2; // @gpp-field type=string_or_number
+}
+
+// @gpp-message type=leave_room direction=client_to_server
+message LeaveRoomPayload {}
+
+// @gpp-message type=resume_session direction=client_to_server
+message ResumeSessionPayload {
+  string room_code = 1;
+  string reconnect_token = 2;
+}
+
+// @gpp-message type=play_again direction=client_to_server
+message PlayAgainPayload {}
+
+// @gpp-message type=disband_room direction=client_to_server
+message DisbandRoomPayload {}
+
+// @gpp-message type=welcome direction=server_to_client
+message WelcomePayload {
+  string player_id = 1;
+  string reconnect_token = 2;
+  repeated google.protobuf.Struct characters = 3; // @gpp-field type=object_array transitional=shared_catalog
+  repeated google.protobuf.Struct aurora_dice = 4; // @gpp-field type=object_array transitional=shared_catalog
+  google.protobuf.Struct weather_catalog = 5; // @gpp-field type=object required=false transitional=shared_catalog
+  ProtocolMeta meta = 6;
+}
+
+// @gpp-message type=room_state direction=server_to_client
+message RoomStatePayload {
+  google.protobuf.Struct room = 1; // @gpp-field type=object transitional=legacy_room_projection
+}
+
+// @gpp-message type=session_resumed direction=server_to_client
+message SessionResumedPayload {
+  string player_id = 1; // @gpp-field required=false
+  string room_code = 2; // @gpp-field required=false
+}
+
+// @gpp-message type=session_resume_failed direction=server_to_client
+message SessionResumeFailedPayload {
+  string reason = 1; // @gpp-field required=false
+  string code = 2; // @gpp-field required=false
+  string message = 3; // @gpp-field required=false
+  ProtocolMeta meta = 4; // @gpp-field required=false
+}
+
+// @gpp-message type=left_room direction=server_to_client
+message LeftRoomPayload {
+  string reason = 1; // @gpp-field required=false
+}
+
+// @gpp-message type=player_presence_changed direction=server_to_client
+message PlayerPresenceChangedPayload {
+  string room_code = 1;
+  string player_id = 2;
+  bool is_online = 3;
+  int64 disconnected_at = 4; // @gpp-field type=integer required=false
+  int64 grace_deadline = 5; // @gpp-field type=integer required=false
+}
+
+// @gpp-message type=characters_updated direction=server_to_client
+message CharactersUpdatedPayload {
+  repeated google.protobuf.Struct characters = 1; // @gpp-field type=object_array transitional=shared_catalog
+}

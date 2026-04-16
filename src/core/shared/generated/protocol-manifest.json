@@ -1,0 +1,1278 @@
+{
+  "version": 2,
+  "source": {
+    "kind": "proto",
+    "directory": "proto",
+    "files": [
+      "proto/auth.proto",
+      "proto/battle.proto",
+      "proto/envelope.proto",
+      "proto/errors.proto",
+      "proto/replay.proto",
+      "proto/room.proto"
+    ]
+  },
+  "messages": [
+    {
+      "type": "apply_preset",
+      "direction": "client_to_server",
+      "protoMessage": "ApplyPresetPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 77
+      },
+      "fields": [
+        {
+          "name": "preset",
+          "protoName": "preset",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "preset_object",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 78,
+            "message": "ApplyPresetPayload"
+          }
+        },
+        {
+          "name": "presetCode",
+          "protoName": "preset_code",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 79,
+            "message": "ApplyPresetPayload"
+          }
+        },
+        {
+          "name": "useSuggestedPreset",
+          "protoName": "use_suggested_preset",
+          "protoType": "bool",
+          "fieldNumber": 3,
+          "type": "boolean",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 80,
+            "message": "ApplyPresetPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "battle_actions",
+      "direction": "server_to_client",
+      "protoMessage": "BattleActionsPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 90
+      },
+      "fields": [
+        {
+          "name": "turnId",
+          "protoName": "turn_id",
+          "protoType": "int32",
+          "fieldNumber": 1,
+          "type": "integer",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 91,
+            "message": "BattleActionsPayload"
+          }
+        },
+        {
+          "name": "actorId",
+          "protoName": "actor_id",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 92,
+            "message": "BattleActionsPayload"
+          }
+        },
+        {
+          "name": "actions",
+          "protoName": "actions",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 3,
+          "type": "object_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 93,
+            "message": "BattleActionsPayload"
+          }
+        },
+        {
+          "name": "phase",
+          "protoName": "phase",
+          "protoType": "string",
+          "fieldNumber": 4,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 94,
+            "message": "BattleActionsPayload"
+          }
+        },
+        {
+          "name": "round",
+          "protoName": "round",
+          "protoType": "int32",
+          "fieldNumber": 5,
+          "type": "integer",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 95,
+            "message": "BattleActionsPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "characters_updated",
+      "direction": "server_to_client",
+      "protoMessage": "CharactersUpdatedPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 83
+      },
+      "fields": [
+        {
+          "name": "characters",
+          "protoName": "characters",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "shared_catalog",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 84,
+            "message": "CharactersUpdatedPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "choose_aurora_die",
+      "direction": "client_to_server",
+      "protoMessage": "ChooseAuroraDiePayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 13
+      },
+      "fields": [
+        {
+          "name": "auroraDiceId",
+          "protoName": "aurora_dice_id",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 14,
+            "message": "ChooseAuroraDiePayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "choose_character",
+      "direction": "client_to_server",
+      "protoMessage": "ChooseCharacterPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 8
+      },
+      "fields": [
+        {
+          "name": "characterId",
+          "protoName": "character_id",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 9,
+            "message": "ChooseCharacterPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "confirm_attack_selection",
+      "direction": "client_to_server",
+      "protoMessage": "ConfirmAttackSelectionPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 58
+      },
+      "fields": [
+        {
+          "name": "indices",
+          "protoName": "indices",
+          "protoType": "int32",
+          "fieldNumber": 1,
+          "type": "integer_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 59,
+            "message": "ConfirmAttackSelectionPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "confirm_defense_selection",
+      "direction": "client_to_server",
+      "protoMessage": "ConfirmDefenseSelectionPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 66
+      },
+      "fields": [
+        {
+          "name": "indices",
+          "protoName": "indices",
+          "protoType": "int32",
+          "fieldNumber": 1,
+          "type": "integer_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 67,
+            "message": "ConfirmDefenseSelectionPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "create_ai_room",
+      "direction": "client_to_server",
+      "protoMessage": "CreateAiRoomPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 14
+      },
+      "fields": [
+        {
+          "name": "name",
+          "protoName": "name",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 15,
+            "message": "CreateAiRoomPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "create_custom_character",
+      "direction": "client_to_server",
+      "protoMessage": "CreateCustomCharacterPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 18
+      },
+      "fields": [
+        {
+          "name": "variant",
+          "protoName": "variant",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object",
+          "required": true,
+          "repeated": false,
+          "transitional": "custom_content",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 19,
+            "message": "CreateCustomCharacterPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "create_resume_room",
+      "direction": "client_to_server",
+      "protoMessage": "CreateResumeRoomPayload",
+      "source": {
+        "file": "proto/replay.proto",
+        "line": 14
+      },
+      "fields": [
+        {
+          "name": "snapshotIndex",
+          "protoName": "snapshot_index",
+          "protoType": "int32",
+          "fieldNumber": 1,
+          "type": "integer",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/replay.proto",
+            "line": 15,
+            "message": "CreateResumeRoomPayload"
+          }
+        },
+        {
+          "name": "replay",
+          "protoName": "replay",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 2,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/replay.proto",
+            "line": 16,
+            "message": "CreateResumeRoomPayload"
+          }
+        },
+        {
+          "name": "mode",
+          "protoName": "mode",
+          "protoType": "string",
+          "fieldNumber": 3,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/replay.proto",
+            "line": 17,
+            "message": "CreateResumeRoomPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "create_room",
+      "direction": "client_to_server",
+      "protoMessage": "CreateRoomPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 9
+      },
+      "fields": [
+        {
+          "name": "name",
+          "protoName": "name",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 10,
+            "message": "CreateRoomPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "delete_custom_character",
+      "direction": "client_to_server",
+      "protoMessage": "DeleteCustomCharacterPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 31
+      },
+      "fields": [
+        {
+          "name": "characterId",
+          "protoName": "character_id",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 32,
+            "message": "DeleteCustomCharacterPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "direction": "server_to_client",
+      "protoMessage": "ErrorPayload",
+      "source": {
+        "file": "proto/errors.proto",
+        "line": 8
+      },
+      "fields": [
+        {
+          "name": "code",
+          "protoName": "code",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/errors.proto",
+            "line": 9,
+            "message": "ErrorPayload"
+          }
+        },
+        {
+          "name": "message",
+          "protoName": "message",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/errors.proto",
+            "line": 10,
+            "message": "ErrorPayload"
+          }
+        },
+        {
+          "name": "severity",
+          "protoName": "severity",
+          "protoType": "string",
+          "fieldNumber": 3,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/errors.proto",
+            "line": 11,
+            "message": "ErrorPayload"
+          }
+        },
+        {
+          "name": "category",
+          "protoName": "category",
+          "protoType": "string",
+          "fieldNumber": 4,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/errors.proto",
+            "line": 12,
+            "message": "ErrorPayload"
+          }
+        },
+        {
+          "name": "meta",
+          "protoName": "meta",
+          "protoType": "ProtocolMeta",
+          "fieldNumber": 5,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/errors.proto",
+            "line": 13,
+            "message": "ErrorPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "export_replay",
+      "direction": "client_to_server",
+      "protoMessage": "ExportReplayPayload",
+      "source": {
+        "file": "proto/replay.proto",
+        "line": 9
+      },
+      "fields": [
+        {
+          "name": "requestSource",
+          "protoName": "request_source",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/replay.proto",
+            "line": 10,
+            "message": "ExportReplayPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "join_room",
+      "direction": "client_to_server",
+      "protoMessage": "JoinRoomPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 19
+      },
+      "fields": [
+        {
+          "name": "name",
+          "protoName": "name",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 20,
+            "message": "JoinRoomPayload"
+          }
+        },
+        {
+          "name": "code",
+          "protoName": "code",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string_or_number",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 21,
+            "message": "JoinRoomPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "left_room",
+      "direction": "server_to_client",
+      "protoMessage": "LeftRoomPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 69
+      },
+      "fields": [
+        {
+          "name": "reason",
+          "protoName": "reason",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 70,
+            "message": "LeftRoomPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "player_presence_changed",
+      "direction": "server_to_client",
+      "protoMessage": "PlayerPresenceChangedPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 74
+      },
+      "fields": [
+        {
+          "name": "roomCode",
+          "protoName": "room_code",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 75,
+            "message": "PlayerPresenceChangedPayload"
+          }
+        },
+        {
+          "name": "playerId",
+          "protoName": "player_id",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 76,
+            "message": "PlayerPresenceChangedPayload"
+          }
+        },
+        {
+          "name": "isOnline",
+          "protoName": "is_online",
+          "protoType": "bool",
+          "fieldNumber": 3,
+          "type": "boolean",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 77,
+            "message": "PlayerPresenceChangedPayload"
+          }
+        },
+        {
+          "name": "disconnectedAt",
+          "protoName": "disconnected_at",
+          "protoType": "int64",
+          "fieldNumber": 4,
+          "type": "integer",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 78,
+            "message": "PlayerPresenceChangedPayload"
+          }
+        },
+        {
+          "name": "graceDeadline",
+          "protoName": "grace_deadline",
+          "protoType": "int64",
+          "fieldNumber": 5,
+          "type": "integer",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 79,
+            "message": "PlayerPresenceChangedPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "preview_preset",
+      "direction": "client_to_server",
+      "protoMessage": "PreviewPresetPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 84
+      },
+      "fields": [
+        {
+          "name": "preset",
+          "protoName": "preset",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "preset_object",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 85,
+            "message": "PreviewPresetPayload"
+          }
+        },
+        {
+          "name": "presetCode",
+          "protoName": "preset_code",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 86,
+            "message": "PreviewPresetPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "replay_export",
+      "direction": "server_to_client",
+      "protoMessage": "ReplayExportPayload",
+      "source": {
+        "file": "proto/replay.proto",
+        "line": 21
+      },
+      "fields": [
+        {
+          "name": "content",
+          "protoName": "content",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/replay.proto",
+            "line": 22,
+            "message": "ReplayExportPayload"
+          }
+        },
+        {
+          "name": "meta",
+          "protoName": "meta",
+          "protoType": "ProtocolMeta",
+          "fieldNumber": 2,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/replay.proto",
+            "line": 23,
+            "message": "ReplayExportPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "reroll_attack",
+      "direction": "client_to_server",
+      "protoMessage": "RerollAttackPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 48
+      },
+      "fields": [
+        {
+          "name": "indices",
+          "protoName": "indices",
+          "protoType": "int32",
+          "fieldNumber": 1,
+          "type": "integer_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 49,
+            "message": "RerollAttackPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "resume_session",
+      "direction": "client_to_server",
+      "protoMessage": "ResumeSessionPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 28
+      },
+      "fields": [
+        {
+          "name": "roomCode",
+          "protoName": "room_code",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 29,
+            "message": "ResumeSessionPayload"
+          }
+        },
+        {
+          "name": "reconnectToken",
+          "protoName": "reconnect_token",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 30,
+            "message": "ResumeSessionPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "room_state",
+      "direction": "server_to_client",
+      "protoMessage": "RoomStatePayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 50
+      },
+      "fields": [
+        {
+          "name": "room",
+          "protoName": "room",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object",
+          "required": true,
+          "repeated": false,
+          "transitional": "legacy_room_projection",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 51,
+            "message": "RoomStatePayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "session_resume_failed",
+      "direction": "server_to_client",
+      "protoMessage": "SessionResumeFailedPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 61
+      },
+      "fields": [
+        {
+          "name": "reason",
+          "protoName": "reason",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 62,
+            "message": "SessionResumeFailedPayload"
+          }
+        },
+        {
+          "name": "code",
+          "protoName": "code",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 63,
+            "message": "SessionResumeFailedPayload"
+          }
+        },
+        {
+          "name": "message",
+          "protoName": "message",
+          "protoType": "string",
+          "fieldNumber": 3,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 64,
+            "message": "SessionResumeFailedPayload"
+          }
+        },
+        {
+          "name": "meta",
+          "protoName": "meta",
+          "protoType": "ProtocolMeta",
+          "fieldNumber": 4,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 65,
+            "message": "SessionResumeFailedPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "session_resumed",
+      "direction": "server_to_client",
+      "protoMessage": "SessionResumedPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 55
+      },
+      "fields": [
+        {
+          "name": "playerId",
+          "protoName": "player_id",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 56,
+            "message": "SessionResumedPayload"
+          }
+        },
+        {
+          "name": "roomCode",
+          "protoName": "room_code",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 57,
+            "message": "SessionResumedPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "submit_battle_action",
+      "direction": "client_to_server",
+      "protoMessage": "SubmitBattleActionPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 71
+      },
+      "fields": [
+        {
+          "name": "turnId",
+          "protoName": "turn_id",
+          "protoType": "int32",
+          "fieldNumber": 1,
+          "type": "integer",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 72,
+            "message": "SubmitBattleActionPayload"
+          }
+        },
+        {
+          "name": "actionId",
+          "protoName": "action_id",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 73,
+            "message": "SubmitBattleActionPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "toggle_custom_character",
+      "direction": "client_to_server",
+      "protoMessage": "ToggleCustomCharacterPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 36
+      },
+      "fields": [
+        {
+          "name": "characterId",
+          "protoName": "character_id",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 37,
+            "message": "ToggleCustomCharacterPayload"
+          }
+        },
+        {
+          "name": "enabled",
+          "protoName": "enabled",
+          "protoType": "bool",
+          "fieldNumber": 2,
+          "type": "boolean",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 38,
+            "message": "ToggleCustomCharacterPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "update_custom_character",
+      "direction": "client_to_server",
+      "protoMessage": "UpdateCustomCharacterPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 26
+      },
+      "fields": [
+        {
+          "name": "variant",
+          "protoName": "variant",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object",
+          "required": true,
+          "repeated": false,
+          "transitional": "custom_content",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 27,
+            "message": "UpdateCustomCharacterPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "update_live_selection",
+      "direction": "client_to_server",
+      "protoMessage": "UpdateLiveSelectionPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 53
+      },
+      "fields": [
+        {
+          "name": "indices",
+          "protoName": "indices",
+          "protoType": "int32",
+          "fieldNumber": 1,
+          "type": "integer_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 54,
+            "message": "UpdateLiveSelectionPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "weather_changed",
+      "direction": "server_to_client",
+      "protoMessage": "WeatherChangedPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 99
+      },
+      "fields": [
+        {
+          "name": "weather",
+          "protoName": "weather",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 1,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "weather_projection",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 100,
+            "message": "WeatherChangedPayload"
+          }
+        },
+        {
+          "name": "round",
+          "protoName": "round",
+          "protoType": "int32",
+          "fieldNumber": 2,
+          "type": "integer",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 101,
+            "message": "WeatherChangedPayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "welcome",
+      "direction": "server_to_client",
+      "protoMessage": "WelcomePayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 40
+      },
+      "fields": [
+        {
+          "name": "playerId",
+          "protoName": "player_id",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 41,
+            "message": "WelcomePayload"
+          }
+        },
+        {
+          "name": "reconnectToken",
+          "protoName": "reconnect_token",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 42,
+            "message": "WelcomePayload"
+          }
+        },
+        {
+          "name": "characters",
+          "protoName": "characters",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 3,
+          "type": "object_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "shared_catalog",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 43,
+            "message": "WelcomePayload"
+          }
+        },
+        {
+          "name": "auroraDice",
+          "protoName": "aurora_dice",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 4,
+          "type": "object_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "shared_catalog",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 44,
+            "message": "WelcomePayload"
+          }
+        },
+        {
+          "name": "weatherCatalog",
+          "protoName": "weather_catalog",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 5,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "shared_catalog",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 45,
+            "message": "WelcomePayload"
+          }
+        },
+        {
+          "name": "meta",
+          "protoName": "meta",
+          "protoType": "ProtocolMeta",
+          "fieldNumber": 6,
+          "type": "object",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 46,
+            "message": "WelcomePayload"
+          }
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

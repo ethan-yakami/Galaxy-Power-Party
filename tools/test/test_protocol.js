@@ -30,6 +30,18 @@ function testNewEnvelopeMessageNormalization() {
   assert.strictEqual(result.envelope.meta.protocolVersion, '2');
 }
 
+function testUnsupportedProtocolVersion() {
+  const input = JSON.stringify({
+    type: 'join_room',
+    payload: { name: 'Bob', code: '5678' },
+    meta: { requestId: 'req-unsupported', protocolVersion: '999' },
+  });
+  const result = normalizeIncomingMessage(input);
+  assert.strictEqual(result.ok, false);
+  assert.strictEqual(result.errorCode, ERROR_CODES.UNSUPPORTED_PROTOCOL_VERSION);
+  assert.strictEqual(result.meta.requestId, 'req-unsupported');
+}
+
 function testJoinRoomNumericCodeAndExtraFields() {
   const input = JSON.stringify({
     type: 'join_room',
@@ -110,6 +122,25 @@ function testSubmitBattleActionPayload() {
   assert.strictEqual(badResult.errorCode, ERROR_CODES.INVALID_PAYLOAD);
 }
 
+function testCreateResumeRoomPayload() {
+  const okResult = normalizeIncomingMessage(JSON.stringify({
+    type: 'create_resume_room',
+    payload: {
+      mode: 'resume_room',
+      snapshotIndex: 3,
+      replay: { replayId: 'r1', version: 'ReplayV2' },
+    },
+  }));
+  assert.strictEqual(okResult.ok, true);
+
+  const badResult = normalizeIncomingMessage(JSON.stringify({
+    type: 'create_resume_room',
+    payload: { snapshotIndex: '3' },
+  }));
+  assert.strictEqual(badResult.ok, false);
+  assert.strictEqual(badResult.errorCode, ERROR_CODES.INVALID_PAYLOAD);
+}
+
 function testErrorPayload() {
   const payload = buildErrorPayload(ERROR_CODES.INVALID_SELECTION, 'Invalid selection.', {
     meta: { requestId: 'req-2', protocolVersion: '2' },
@@ -117,6 +148,8 @@ function testErrorPayload() {
   assert.strictEqual(payload.type, 'error');
   assert.strictEqual(payload.code, ERROR_CODES.INVALID_SELECTION);
   assert.strictEqual(payload.message, 'Invalid selection.');
+  assert.strictEqual(payload.severity, 'warn');
+  assert.strictEqual(payload.category, 'user');
   assert.strictEqual(payload.meta.requestId, 'req-2');
 }
 
@@ -129,6 +162,7 @@ function testDefaultInvalidPayloadMessage() {
 function run() {
   testLegacyMessageNormalization();
   testNewEnvelopeMessageNormalization();
+  testUnsupportedProtocolVersion();
   testJoinRoomNumericCodeAndExtraFields();
   testInvalidJson();
   testUnknownType();
@@ -137,6 +171,7 @@ function run() {
   testInvalidPayloadIndices();
   testInvalidPayloadExportReplayRequestSource();
   testSubmitBattleActionPayload();
+  testCreateResumeRoomPayload();
   testErrorPayload();
   testDefaultInvalidPayloadMessage();
   console.log('test_protocol passed');

@@ -5,6 +5,7 @@ module.exports = {
   name:         '知更鸟',
   hp:           30,
   diceSides:    [6, 6, 4, 4, 4],
+  allowsNoAurora: true,
   auroraUses:   0,
   attackLevel:  4,
   defenseLevel: 3,

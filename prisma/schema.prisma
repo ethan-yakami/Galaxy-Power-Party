@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(uuid())
+  username       String        @unique
+  displayName    String
+  passwordDigest String
+  passwordSalt   String
+  passwordCost   Int
+  createdAt      DateTime      @default(now())
+  sessions       AuthSession[]
+  replayRecords  ReplayRecord[]
+  auditEvents    AuditEvent[]
+}
+
+model AuthSession {
+  id               String      @id
+  userId           String
+  refreshTokenHash String      @unique
+  userAgent        String?
+  ip               String?
+  createdAt        DateTime    @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  auditEvents      AuditEvent[]
+}
+
+model ReplayRecord {
+  replayId       String   @id
+  ownerUserId    String
+  version        String
+  sourceRoomMode String
+  roomCode       String?
+  payloadJson    String
+  createdAt      DateTime @default(now())
+  owner          User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+}
+
+model AuditEvent {
+  id         String       @id @default(uuid())
+  kind       String
+  userId     String?
+  sessionId  String?
+  roomCode   String?
+  payloadJson String
+  createdAt  DateTime     @default(now())
+  user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  session    AuthSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+}

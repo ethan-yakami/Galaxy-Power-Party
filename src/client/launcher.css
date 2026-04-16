@@ -109,6 +109,22 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(61, 232, 255, 0.15);
 }
 
+.launcherSelect {
+  width: 100%;
+  border: 1px solid rgba(153, 197, 255, 0.5);
+  border-radius: 10px;
+  background: rgba(230, 241, 255, 0.92);
+  color: #1a2f4c;
+  padding: 11px 12px;
+  font-size: 15px;
+  outline: none;
+}
+
+.launcherSelect:focus {
+  border-color: #2c4a6b;
+  box-shadow: 0 0 0 3px rgba(61, 232, 255, 0.15);
+}
+
 .launcherActions {
   display: flex;
   flex-wrap: wrap;
@@ -189,6 +205,11 @@ button:active {
 .launcherPublicHead h3,
 .launcherPublicHint {
   margin: 0;
+}
+
+.launcherPublicHint {
+  color: #2c4a6b;
+  font-size: 14px;
 }
 
 .launcherPublicList {

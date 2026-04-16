@@ -61,6 +61,8 @@ function sanitizeRoom(room, viewerPlayerId) {
   return {
     code: room.code,
     status: room.status,
+    roomMode: room.roomMode || 'standard',
+    isPublic: room.isPublic === true,
     waitingReason: room.waitingReason,
     players: room.players.map((p) => {
       const hideLoadout = room.status === 'lobby' && p.id !== viewerPlayerId;
@@ -153,17 +155,17 @@ function isAuroraEquipRequired(player) {
 }
 
 function readyToStart(room) {
-  if (room.players.length !== 2) return { ok: false, reason: '??????????' };
+  if (room.players.length !== 2) return { ok: false, reason: '房间人数不足两人' };
 
   for (const player of room.players) {
-    if (!player.characterId) return { ok: false, reason: `${player.name}???????` };
+    if (!player.characterId) return { ok: false, reason: `${player.name} 尚未选择角色` };
     const ch = CharacterRegistry[player.characterId];
-    if (!ch) return { ok: false, reason: `${player.name}?????` };
+    if (!ch) return { ok: false, reason: `${player.name} 的角色无效` };
     if (!player.auroraSelectionConfirmed) {
-      return { ok: false, reason: `${player.name}??????????` };
+      return { ok: false, reason: `${player.name} 尚未确认曜彩骰` };
     }
     if (isAuroraEquipRequired(player) && !player.auroraDiceId) {
-      return { ok: false, reason: `${player.name}????????` };
+      return { ok: false, reason: `${player.name} 尚未装备曜彩骰` };
     }
   }
 
@@ -175,6 +177,7 @@ function createNewRoomPlayer(ws, name) {
   return {
     id: ws.playerId,
     ws,
+    userId: ws && ws.authUser && ws.authUser.id ? ws.authUser.id : null,
     name,
     characterId: null,
     auroraDiceId: null,

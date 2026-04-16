@@ -165,6 +165,7 @@ function normalizeCharacterEntity(entity, sourceTag, options = {}) {
 
   const baseCharacterId = options.baseCharacterId || id;
   const isCustomVariant = !!options.isCustomVariant;
+  const allowsNoAuroraFlag = entity.allowsNoAurora === true;
 
   return Object.assign({}, entity, {
     id,
@@ -180,6 +181,7 @@ function normalizeCharacterEntity(entity, sourceTag, options = {}) {
     maxAttackRerolls,
     baseCharacterId,
     isCustomVariant,
+    allowsNoAurora: allowsNoAuroraFlag,
   });
 }
 
@@ -379,6 +381,7 @@ function countSides(sides) {
 
 function allowsNoAurora(character) {
   if (!character) return false;
+  if (character.allowsNoAurora === true) return true;
   const baseId = character.baseCharacterId || character.id;
   return baseId === 'zhigengniao';
 }
@@ -411,7 +414,7 @@ function getCharacterSummary() {
     auroraUses: c.auroraUses,
     attackLevel: c.attackLevel,
     defenseLevel: c.defenseLevel,
-    shortSpec: `${countSides(c.diceSides)} ${c.auroraUses}A ${c.attackLevel}+${c.defenseLevel}`,
+    shortSpec: `HP ${c.hp} | ${countSides(c.diceSides)} | ${c.auroraUses}A | ${c.attackLevel}+${c.defenseLevel}`,
     skillText: c.skillText,
     baseCharacterId: c.baseCharacterId,
     isCustomVariant: c.isCustomVariant,

@@ -137,7 +137,7 @@ async function main() {
         }
 
         if (
-          game.phase === 'defense_roll'
+          game.phase === 'defense_select'
           && game.defenderId === myId
           && sawAiAttackSelect
           && game.round >= 2
@@ -152,14 +152,16 @@ async function main() {
       });
     });
 
-    assert.strictEqual(resolved, true, 'AI attack phase should auto-resolve into defense_roll');
+    assert.strictEqual(resolved, true, 'AI attack phase should auto-resolve into defense_select');
     console.log('ai-battle-runtime test passed');
   } finally {
     if (ws) {
       try {
         ws.removeAllListeners();
         ws.terminate();
-      } catch {}
+      } catch {
+        // Ignore cleanup errors from already-closed test sockets.
+      }
     }
     await new Promise((resolve) => runtime.wss.close(() => runtime.server.close(resolve)));
   }

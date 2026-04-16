@@ -1,0 +1,25 @@
+name: Bug Report
+description: 报告一个可复现问题
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 简明描述实际表现和预期表现
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 按顺序写清楚如何复现
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图 / 额外信息
+      description: 可以附上 `tmp/runtime/` 下的日志片段或截图

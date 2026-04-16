@@ -1,6 +1,12 @@
 (function() {
-  const machine = window.GPPConnectionStateMachine;
   const { state, dom, send, setMessage } = GPP;
+  const logger = GPP.logger || {
+    debug() {},
+    info() {},
+    warn() {},
+    error() {},
+  };
+  const protocolErrors = window.GPPProtocolErrors || null;
   const isBattlePage = /\/battle\.html$/i.test(location.pathname);
   const replayHistory = window.GPPReplayHistory || null;
 
@@ -8,10 +14,7 @@
   const ROOM_ACK_TIMEOUT_MS = 8000;
   const RECONNECT_TOKEN_KEY = 'gpp_reconnect_token';
   const LAST_ROOM_CODE_KEY = 'gpp_last_room_code';
-
-  let connectWatchdogTimer = null;
-  let roomAckTimer = null;
-  let reconnectTimer = null;
+  const RESUME_PAYLOAD_KEY = 'gpp_resume_payload_v1';
 
   const STATUS_META = {
     idle: { text: '未连接', className: 'statusIdle' },
@@ -24,6 +27,10 @@
     retry_wait: { text: '重连中', className: 'statusRetrying' },
     failed: { text: '连接失败', className: 'statusFailed' },
   };
+
+  let connectWatchdogTimer = null;
+  let roomAckTimer = null;
+  let reconnectTimer = null;
 
   function clearTimer(handle) {
     if (handle) clearTimeout(handle);
@@ -48,7 +55,7 @@
   }
 
   function setLaunchHint(text) {
-    if (dom.launchHint) dom.launchHint.textContent = text;
+    if (dom.launchHint) dom.launchHint.textContent = text || '';
   }
 
   function buildWsUrl() {
@@ -56,6 +63,45 @@
       throw new Error('当前页面缺少 host，无法建立 WebSocket 连接。');
     }
     return `${GPP.wsProtocol}//${location.host}`;
+  }
+
+  function readResumePayload() {
+    try {
+      const raw = sessionStorage.getItem(RESUME_PAYLOAD_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const replay = parsed.replay && typeof parsed.replay === 'object' ? parsed.replay : null;
+      if (!replay) return null;
+      return {
+        replay,
+        snapshotIndex: Number.isInteger(parsed.snapshotIndex) ? parsed.snapshotIndex : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function readReplayFromHistoryById(replayId) {
+    if (!replayHistory || typeof replayHistory.loadHistory !== 'function') return null;
+    const entries = replayHistory.loadHistory();
+    const match = Array.isArray(entries)
+      ? entries.find((entry) => entry && entry.replayId === replayId)
+      : null;
+    if (!match || !match.replay || typeof match.replay !== 'object') return null;
+    return {
+      replay: match.replay,
+      snapshotIndex: undefined,
+    };
+  }
+
+  function resolveResumePayload(intent) {
+    const fromSession = readResumePayload();
+    if (fromSession && fromSession.replay) return fromSession;
+    if (intent && intent.mode === 'replay' && intent.replayId) {
+      return readReplayFromHistoryById(intent.replayId);
+    }
+    return null;
   }
 
   function parseLaunchIntent() {
@@ -66,7 +112,7 @@
     if (!mode) {
       return { intent: null, error: '未检测到启动参数，请从启动台打开战斗页。' };
     }
-    if (!['create', 'join', 'ai'].includes(mode)) {
+    if (!['create', 'join', 'ai', 'resume_room', 'resume_local', 'replay'].includes(mode)) {
       return { intent: null, error: `启动参数 mode 无效：${mode}` };
     }
 
@@ -75,9 +121,14 @@
     if (mode === 'join') {
       const code = String(params.get('code') || '').trim();
       if (!/^\d{4}$/.test(code)) {
-        return { intent: null, error: '加入房间参数无效：code 必须是 4 位数字。' };
+        return { intent: null, error: '加入房间参数无效，code 必须是 4 位数字。' };
       }
       return { intent: { mode, name, code }, error: '' };
+    }
+
+    if (mode === 'replay') {
+      const replayId = String(params.get('replayId') || '').trim();
+      return { intent: { mode, name, replayId }, error: '' };
     }
 
     return { intent: { mode, name }, error: '' };
@@ -132,15 +183,6 @@
     send('export_replay', {});
   }
 
-  function syncMachineFlags() {
-    const connectionMachine = state.ui.connectionMachine;
-    if (!connectionMachine) return;
-    state.ui.connection.status = connectionMachine.status;
-    state.ui.launchIntentConsumed = !!connectionMachine.launchIntentConsumed;
-    state.ui.resumePending = !!connectionMachine.resumePending;
-    state.ui.roomAckPending = !!connectionMachine.roomAckPending;
-  }
-
   function renderConnectionStateUI() {
     if (!isBattlePage) return;
 
@@ -188,76 +230,48 @@
     }
   }
 
-  function setConnectionUi(detail, errorText) {
+  function setConnectionUi(status, detail, errorText) {
+    if (status) state.ui.connection.status = status;
     if (detail !== undefined) state.ui.connection.detail = detail || '';
     if (errorText !== undefined) state.ui.connection.error = errorText || '';
-    syncMachineFlags();
     renderConnectionStateUI();
   }
 
-  function onWatchdogTimeout(kind) {
-    if (!machine) return;
-    applyMachineEvent(machine.EVENTS.WATCHDOG_TIMEOUT, { kind });
-    if (kind === 'welcome') {
-      const timeoutReason = '连接超时，未收到服务器欢迎消息。';
+  function clearRoomAckWatchdog() {
+    clearTimer(roomAckTimer);
+    roomAckTimer = null;
+    state.ui.roomAckPending = false;
+  }
+
+  function startRoomAckWatchdog() {
+    clearRoomAckWatchdog();
+    state.ui.roomAckPending = true;
+    roomAckTimer = setTimeout(() => {
+      if (!state.ui.roomAckPending) return;
+      state.ui.launchIntentConsumed = false;
+      setConnectionUi('failed', '房间回执超时。', '已连接但未收到房间状态，请点击重试。');
+      setMessage('房间回执超时，请重试自动入房。');
+      setLaunchHint('房间回执超时，请重试自动入房。');
+    }, ROOM_ACK_TIMEOUT_MS);
+  }
+
+  function clearWelcomeWatchdog() {
+    clearTimer(connectWatchdogTimer);
+    connectWatchdogTimer = null;
+  }
+
+  function startWelcomeWatchdog() {
+    clearWelcomeWatchdog();
+    connectWatchdogTimer = setTimeout(() => {
+      if (state.ui.welcomeReceived) return;
+      const timeoutReason = '连接超时，未收到服务端欢迎消息。';
       setMessage(timeoutReason);
       setLaunchHint(timeoutReason);
-      setConnectionUi('连接超时。', timeoutReason);
+      setConnectionUi('failed', '连接超时。', timeoutReason);
       try {
         if (GPP.ws) GPP.ws.close();
       } catch {}
-      return;
-    }
-
-    const timeoutText = '已连接但房间回执超时，请重试自动入房。';
-    setLaunchHint(timeoutText);
-    setMessage(timeoutText);
-    setConnectionUi('房间回执超时。', timeoutText);
-  }
-
-  function applyEffects(effects) {
-    (effects || []).forEach((effect) => {
-      switch (effect.type) {
-        case machine.EFFECTS.START_WELCOME_WATCHDOG:
-          clearTimer(connectWatchdogTimer);
-          connectWatchdogTimer = setTimeout(() => onWatchdogTimeout('welcome'), effect.timeoutMs);
-          break;
-        case machine.EFFECTS.STOP_WELCOME_WATCHDOG:
-          clearTimer(connectWatchdogTimer);
-          connectWatchdogTimer = null;
-          break;
-        case machine.EFFECTS.START_ROOM_ACK_WATCHDOG:
-          clearTimer(roomAckTimer);
-          roomAckTimer = setTimeout(() => onWatchdogTimeout('room_ack'), effect.timeoutMs);
-          break;
-        case machine.EFFECTS.STOP_ROOM_ACK_WATCHDOG:
-          clearTimer(roomAckTimer);
-          roomAckTimer = null;
-          break;
-        case machine.EFFECTS.SCHEDULE_RECONNECT:
-          clearTimer(reconnectTimer);
-          reconnectTimer = setTimeout(() => {
-            connect(machine.EVENTS.APP_START, 'retrying');
-          }, effect.waitMs);
-          break;
-        case machine.EFFECTS.CANCEL_RECONNECT:
-          clearTimer(reconnectTimer);
-          reconnectTimer = null;
-          break;
-        default:
-          break;
-      }
-    });
-  }
-
-  function applyMachineEvent(event, payload) {
-    if (!machine) return { state: null, effects: [] };
-    const result = machine.transition(state.ui.connectionMachine, event, payload || {});
-    state.ui.connectionMachine = result.state;
-    applyEffects(result.effects);
-    syncMachineFlags();
-    renderConnectionStateUI();
-    return result;
+    }, CONNECT_WELCOME_TIMEOUT_MS);
   }
 
   function triggerLaunchIntent(force) {
@@ -267,16 +281,16 @@
     if (state.ui.launchIntentConsumed && !force) return;
 
     if (!GPP.ws || GPP.ws.readyState !== WebSocket.OPEN || !state.ui.welcomeReceived) {
-      setConnectionUi('连接尚未就绪，暂时无法自动入房。', '请先点击“重新连接”后再重试。');
+      setConnectionUi('failed', '连接尚未就绪。', '请先点击“重新连接”后重试自动入房。');
       return;
     }
-
-    applyMachineEvent(machine.EVENTS.INTENT_RETRY, { roomAckTimeoutMs: ROOM_ACK_TIMEOUT_MS });
 
     if (intent.mode === 'create') {
       setLaunchHint('已连接，正在创建房间...');
       setMessage('已连接，正在创建房间...');
-      setConnectionUi('正在创建房间...', '');
+      setConnectionUi('joining_room', '正在创建房间...', '');
+      state.ui.launchIntentConsumed = true;
+      startRoomAckWatchdog();
       send('create_room', { name: intent.name });
       return;
     }
@@ -284,14 +298,48 @@
     if (intent.mode === 'ai') {
       setLaunchHint('已连接，正在创建 AI 对战房间...');
       setMessage('已连接，正在创建 AI 对战房间...');
-      setConnectionUi('正在创建 AI 对战房间...', '');
+      setConnectionUi('joining_room', '正在创建 AI 对战房间...', '');
+      state.ui.launchIntentConsumed = true;
+      startRoomAckWatchdog();
       send('create_ai_room', { name: intent.name });
+      return;
+    }
+
+    if (intent.mode === 'resume_room' || intent.mode === 'resume_local' || intent.mode === 'replay') {
+      const payload = resolveResumePayload(intent);
+      if (!payload || !payload.replay) {
+        const hint = '未找到可恢复的回放快照，请先在回放页选择一条记录。';
+        setLaunchHint(hint);
+        setMessage(hint);
+        setConnectionUi('failed', '恢复数据缺失。', hint);
+        return;
+      }
+      const resumeMode = intent.mode === 'replay' ? 'resume_local' : intent.mode;
+      const launchText = resumeMode === 'resume_local'
+        ? '正在根据快照恢复本地续战...'
+        : '正在根据快照恢复房间...';
+      setLaunchHint(launchText);
+      setMessage(launchText);
+      setConnectionUi('joining_room', launchText, '');
+      state.ui.launchIntentConsumed = true;
+      startRoomAckWatchdog();
+      send('create_resume_room', {
+        name: intent.name,
+        mode: resumeMode,
+        replay: payload.replay,
+        snapshotIndex: Number.isInteger(payload.snapshotIndex) ? payload.snapshotIndex : undefined,
+      });
+      try {
+        sessionStorage.removeItem(RESUME_PAYLOAD_KEY);
+      } catch {}
       return;
     }
 
     setLaunchHint(`已连接，正在加入房间 ${intent.code}...`);
     setMessage(`已连接，正在加入房间 ${intent.code}...`);
-    setConnectionUi(`正在加入房间 ${intent.code}...`, '');
+    setConnectionUi('joining_room', `正在加入房间 ${intent.code}...`, '');
+    state.ui.launchIntentConsumed = true;
+    startRoomAckWatchdog();
     send('join_room', { name: intent.name, code: intent.code });
   }
 
@@ -302,10 +350,20 @@
       ? storedToken
       : (state.ui.reconnectToken || storedToken);
     if (!roomCode || !reconnectToken) return false;
+    state.ui.resumePending = true;
     setLaunchHint(`检测到历史房间 ${roomCode}，正在尝试恢复会话...`);
     setMessage(`检测到历史房间 ${roomCode}，正在尝试恢复会话...`);
+    setConnectionUi('resuming', '正在恢复会话...', '');
     send('resume_session', { roomCode, reconnectToken });
+    startRoomAckWatchdog();
     return true;
+  }
+
+  function scheduleReconnect(waitMs) {
+    clearTimer(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+      connect('retrying');
+    }, waitMs);
   }
 
   function openSocket(url) {
@@ -315,39 +373,60 @@
       const reason = `WebSocket 构造失败：${error && error.message ? error.message : String(error)}`;
       setMessage(reason);
       setLaunchHint(reason);
-      applyMachineEvent(machine.EVENTS.CONNECT_ERROR, { error: reason });
-      setConnectionUi('连接地址无效或被浏览器阻止。', reason);
+      setConnectionUi('failed', '连接地址无效或被浏览器阻止。', reason);
       return null;
     }
   }
 
-  function attachSocketHandlers(ws, token) {
+  function connect(mode) {
+    const wsUrl = buildWsUrl();
+    clearTimer(reconnectTimer);
+    logger.info('socket_connect_requested', { mode, wsUrl });
+    setConnectionUi('connecting', mode === 'retrying' ? '正在重新建立连接...' : '正在建立连接...', '');
+
+    state.ui.socketToken += 1;
+    const token = state.ui.socketToken;
+    state.ui.welcomeReceived = false;
+
+    const ws = openSocket(wsUrl);
+    if (!ws) return;
+    GPP.ws = ws;
+
     ws.onopen = () => {
       if (token !== state.ui.socketToken) return;
+      logger.info('socket_opened', { mode, token });
       state.ui.welcomeReceived = false;
-      applyMachineEvent(machine.EVENTS.SOCKET_OPEN, { welcomeTimeoutMs: CONNECT_WELCOME_TIMEOUT_MS });
-      setConnectionUi('连接已建立，正在等待服务器欢迎消息。', '');
+      setConnectionUi('awaiting_welcome', '连接已建立，正在等待服务端欢迎消息。', '');
       setMessage('已连接服务器。');
       setLaunchHint('连接已建立，等待欢迎消息...');
+      startWelcomeWatchdog();
     };
 
     ws.onerror = () => {
       if (token !== state.ui.socketToken) return;
-      setConnectionUi(state.ui.connection.detail, '网络异常或浏览器阻止了连接。');
+      logger.warn('socket_error', { mode, token });
+      setConnectionUi(state.ui.connection.status, state.ui.connection.detail, '网络异常或浏览器阻止了连接。');
     };
 
     ws.onclose = () => {
       if (token !== state.ui.socketToken) return;
+      logger.warn('socket_closed', {
+        token,
+        roomCode: state.room && state.room.code ? state.room.code : null,
+      });
+      clearWelcomeWatchdog();
+      clearRoomAckWatchdog();
       state.ui.welcomeReceived = false;
       if (state.ui.suppressNextClose) {
         state.ui.suppressNextClose = false;
         return;
       }
-      const result = applyMachineEvent(machine.EVENTS.SOCKET_CLOSE, { reason: 'closed' });
-      const reconnectEffect = (result.effects || []).find((effect) => effect.type === machine.EFFECTS.SCHEDULE_RECONNECT);
-      const waitSeconds = reconnectEffect ? Math.max(1, Math.round(reconnectEffect.waitMs / 1000)) : 1;
-      setMessage(`连接已断开，${waitSeconds} 秒后自动重连...`);
-      setConnectionUi(`连接已断开，${waitSeconds} 秒后自动重连...`, state.ui.connection.error);
+      const currentDelay = Math.max(1000, Math.min(state.ui.reconnectDelay || 1000, GPP.MAX_RECONNECT_DELAY || 15000));
+      const nextDelay = Math.max(1000, Math.min(Math.floor(currentDelay * 1.8), GPP.MAX_RECONNECT_DELAY || 15000));
+      state.ui.reconnectDelay = nextDelay;
+      setMessage(`连接已断开，${Math.max(1, Math.round(currentDelay / 1000))} 秒后自动重连...`);
+      setConnectionUi('retry_wait', `连接已断开，${Math.max(1, Math.round(currentDelay / 1000))} 秒后自动重连...`, state.ui.connection.error);
+      scheduleReconnect(currentDelay);
     };
 
     ws.onmessage = (event) => {
@@ -361,6 +440,11 @@
       }
 
       if (msg.type === 'welcome') {
+        logger.info('welcome_received', {
+          playerId: msg.playerId,
+          protocolVersion: msg.meta && msg.meta.protocolVersion ? msg.meta.protocolVersion : null,
+        });
+        clearWelcomeWatchdog();
         state.me = msg.playerId;
         state.battleActions = null;
         const freshReconnectToken = typeof msg.reconnectToken === 'string' ? msg.reconnectToken : '';
@@ -375,30 +459,18 @@
         }
 
         state.ui.welcomeReceived = true;
-        const shouldResume = !!(storageGet(LAST_ROOM_CODE_KEY) && (storageGet(RECONNECT_TOKEN_KEY) || state.ui.reconnectToken));
-        const shouldJoinIntent = !!state.ui.launchIntent;
-        applyMachineEvent(machine.EVENTS.WELCOME, {
-          shouldResume,
-          shouldJoinIntent,
-          roomAckTimeoutMs: ROOM_ACK_TIMEOUT_MS,
-        });
-
-        if (tryResumeSession()) {
-          setConnectionUi('检测到断线会话，正在自动恢复。', '');
-          return;
-        }
-
+        state.ui.reconnectDelay = 1000;
         if (freshReconnectToken) {
           storageSet(RECONNECT_TOKEN_KEY, freshReconnectToken);
         }
 
         if (state.ui.launchIntent) {
-          setConnectionUi('连接成功，准备自动进入房间。', '');
-          setMessage('连接成功，准备自动进入房间...');
+          setConnectionUi('ready', '连接成功，准备自动入房。', '');
+          setMessage('连接成功，准备自动入房...');
           triggerLaunchIntent(false);
-        } else {
+        } else if (!tryResumeSession()) {
           const notice = state.ui.launchIntentError || '连接成功。请从启动台打开战斗页。';
-          setConnectionUi('连接成功，等待手动操作。', state.ui.launchIntentError || '');
+          setConnectionUi('ready', '连接成功，等待手动操作。', state.ui.launchIntentError || '');
           setMessage(notice);
           setLaunchHint(notice);
         }
@@ -442,7 +514,10 @@
           }
         }
 
-        applyMachineEvent(machine.EVENTS.ROOM_STATE, { inRoom: !!state.room });
+        clearRoomAckWatchdog();
+        state.ui.resumePending = false;
+        state.ui.launchIntentConsumed = !!state.room;
+
         maybeRequestReplayExport(state.room);
 
         if (!state.room.game) {
@@ -458,11 +533,14 @@
           GPP.clearSelection();
         }
 
-        setConnectionUi('已进入房间，连接稳定。', '');
+        setConnectionUi('in_room', '已进入房间，连接稳定。', '');
         if (isBattlePage && dom.launchHint && state.room) {
-          setLaunchHint(state.room.game
+          const launchHint = state.room.game
             ? `已进入房间 ${state.room.code}，对战进行中。`
-            : `已进入房间 ${state.room.code}，请完成大厅配置。`);
+            : (state.room.roomMode === 'ai'
+              ? `已进入 AI 房间 ${state.room.code}，请选择角色与曜彩骰后点击“开始对战”。`
+              : `已进入房间 ${state.room.code}，请完成大厅配置。`);
+          setLaunchHint(launchHint);
         }
 
         try {
@@ -476,7 +554,9 @@
           }
         }
 
-        GPP.processEffectEvents(state.room.game || {}, prevRoomCode === state.room.code && prevHadGame);
+        if (typeof GPP.processEffectEvents === 'function') {
+          GPP.processEffectEvents(state.room.game || {}, prevRoomCode === state.room.code && prevHadGame);
+        }
         return;
       }
 
@@ -502,26 +582,28 @@
       }
 
       if (msg.type === 'session_resumed') {
+        clearRoomAckWatchdog();
+        state.ui.resumePending = false;
         if (msg.playerId) {
           state.me = msg.playerId;
           if (dom.myIdEl) dom.myIdEl.textContent = `玩家ID：${msg.playerId}`;
         }
-        applyMachineEvent(machine.EVENTS.RESUME_OK, {});
-        setConnectionUi('会话恢复成功。', '');
-        setMessage('已恢复到断线前房间。');
         if (msg.roomCode) storageSet(LAST_ROOM_CODE_KEY, msg.roomCode);
         const savedToken = storageGet(RECONNECT_TOKEN_KEY);
         if (savedToken) state.ui.reconnectToken = savedToken;
+        setConnectionUi('in_room', '会话恢复成功。', '');
+        setMessage('已恢复到断线前房间。');
         return;
       }
 
       if (msg.type === 'session_resume_failed') {
+        clearRoomAckWatchdog();
+        state.ui.resumePending = false;
         storageSet(LAST_ROOM_CODE_KEY, '');
         if (state.ui.reconnectToken) {
           storageSet(RECONNECT_TOKEN_KEY, state.ui.reconnectToken);
         }
-        applyMachineEvent(machine.EVENTS.RESUME_FAIL, { shouldJoinIntent: !!state.ui.launchIntent });
-        setConnectionUi('历史会话恢复失败，将尝试常规入房。', '');
+        setConnectionUi('ready', '历史会话恢复失败，将尝试常规入房。', '');
         setMessage(`会话恢复失败：${msg.reason || 'unknown'}`);
         if (state.ui.launchIntent) {
           triggerLaunchIntent(false);
@@ -544,11 +626,13 @@
 
       if (msg.type === 'weather_changed') {
         const weatherPayload = msg.weather || null;
-        const display = GPP.getWeatherDisplay({
-          round: Number.isInteger(msg.round) ? msg.round : (state.room && state.room.game ? state.room.game.round : 1),
-          weather: weatherPayload,
-        });
-        GPP.showWeatherBroadcast(display);
+        if (typeof GPP.getWeatherDisplay === 'function' && typeof GPP.showWeatherBroadcast === 'function') {
+          const display = GPP.getWeatherDisplay({
+            round: Number.isInteger(msg.round) ? msg.round : (state.room && state.room.game ? state.room.game.round : 1),
+            weather: weatherPayload,
+          });
+          GPP.showWeatherBroadcast(display);
+        }
         return;
       }
 
@@ -561,13 +645,14 @@
         state.ui.autoReplayExportRequested = false;
         resetLobbyDraft();
         storageSet(LAST_ROOM_CODE_KEY, '');
-        applyMachineEvent(machine.EVENTS.LEFT_ROOM, {});
+        clearRoomAckWatchdog();
+        state.ui.launchIntentConsumed = false;
         GPP.render();
 
         const reason = msg.reason || '你已退出房间。';
         setMessage(reason);
         setLaunchHint(reason);
-        setConnectionUi('已离开房间。', '');
+        setConnectionUi('ready', '已离开房间。', '');
         GPP.showErrorToast(reason);
         return;
       }
@@ -576,22 +661,24 @@
         state.pendingAction = null;
         state.ui.loadoutSubmitting = false;
         state.ui.submittedLoadout = null;
+        const descriptor = protocolErrors && typeof protocolErrors.getErrorDescriptor === 'function'
+          ? protocolErrors.getErrorDescriptor(msg.code)
+          : null;
+        logger[descriptor && descriptor.severity === 'error' ? 'error' : 'warn']('protocol_error_received', {
+          code: msg.code || 'INTERNAL_ERROR',
+          category: descriptor ? descriptor.category : (msg.category || 'internal'),
+          severity: descriptor ? descriptor.severity : (msg.severity || 'error'),
+          message: msg.message || '',
+        });
         const errorText = `错误：${msg.message}`;
         setMessage(errorText);
         if (state.ui.welcomeReceived && GPP.ws && GPP.ws.readyState === WebSocket.OPEN) {
-          setConnectionUi('连接稳定。', '');
+          setConnectionUi(state.room ? 'in_room' : 'ready', state.ui.connection.detail || '连接稳定。', '');
         } else {
-          applyMachineEvent(machine.EVENTS.CONNECT_ERROR, { error: msg.message || errorText });
-          setConnectionUi('服务器返回错误。', msg.message || errorText);
+          setConnectionUi('failed', '服务端返回错误。', msg.message || errorText);
         }
         GPP.showErrorToast(msg.message || '发生错误');
         GPP.render();
-        return;
-      }
-
-      if (msg.type === 'custom_character_created') {
-        const createdName = msg.name || msg.characterId || '自定义角色';
-        setMessage(`已创建角色：${createdName}`);
         return;
       }
 
@@ -605,45 +692,17 @@
     };
   }
 
-  function connect(eventType, mode) {
-    clearTimer(reconnectTimer);
-    reconnectTimer = null;
-
-    let wsUrl;
-    try {
-      wsUrl = buildWsUrl();
-    } catch (error) {
-      const reason = error && error.message ? error.message : String(error);
-      setMessage(reason);
-      setLaunchHint(reason);
-      applyMachineEvent(machine.EVENTS.CONNECT_ERROR, { error: reason });
-      setConnectionUi('无法构建连接地址。', reason);
-      return;
-    }
-
-    applyMachineEvent(eventType, { resetLaunchIntentConsumed: eventType === machine.EVENTS.USER_RECONNECT });
-    setConnectionUi(
-      mode === 'retrying' ? '正在重新建立连接...' : '正在建立连接...',
-      ''
-    );
-
-    state.ui.socketToken += 1;
-    const token = state.ui.socketToken;
-    state.ui.welcomeReceived = false;
-
-    const ws = openSocket(wsUrl);
-    if (!ws) return;
-    GPP.ws = ws;
-    attachSocketHandlers(ws, token);
-  }
-
-  state.ui.connectionMachine = machine
-    ? machine.createInitialState({ reconnectDelayMs: 1000, maxReconnectDelayMs: 15000 })
-    : null;
-  state.ui.connection.status = state.ui.connectionMachine ? state.ui.connectionMachine.status : 'failed';
+  state.ui.connectionMachine = null;
+  state.ui.connection.status = 'idle';
   state.ui.suppressNextClose = false;
+  state.ui.reconnectDelay = 1000;
 
-  const parsed = parseLaunchIntent();
+  const parsed = state.ui.launchIntentBootstrapped
+    ? {
+      intent: state.ui.launchIntent || null,
+      error: state.ui.launchIntentError || '',
+    }
+    : parseLaunchIntent();
   state.ui.launchIntent = parsed.intent;
   state.ui.launchIntentError = parsed.error;
 
@@ -684,13 +743,18 @@
       try {
         if (GPP.ws) GPP.ws.close();
       } catch {}
-      connect(machine.EVENTS.USER_RECONNECT, 'connecting');
+      state.ui.launchIntentConsumed = false;
+      connect('manual_reconnect');
     };
   }
 
   if (dom.retryIntentBtn) {
     dom.retryIntentBtn.onclick = () => {
-      triggerLaunchIntent(true);
+      if (GPP.ws && GPP.ws.readyState === WebSocket.OPEN && state.ui.welcomeReceived) {
+        triggerLaunchIntent(true);
+      } else {
+        connect('retrying');
+      }
     };
   }
 
@@ -700,13 +764,12 @@
     } else {
       const reason = state.ui.launchIntentError || '未检测到有效启动参数，请从启动台进入。';
       setLaunchHint(reason);
-      applyMachineEvent(machine.EVENTS.CONNECT_ERROR, { error: reason });
-      setConnectionUi('无法自动进入房间。', reason);
+      setConnectionUi('failed', '无法自动进入房间。', reason);
       setMessage(reason);
     }
   }
 
   renderConnectionStateUI();
-  connect(machine.EVENTS.APP_START, 'connecting');
+  connect('initial');
   GPP.render();
 })();
