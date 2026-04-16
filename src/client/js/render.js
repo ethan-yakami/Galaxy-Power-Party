@@ -1,5 +1,10 @@
 (function() {
   const { state, dom, send } = GPP;
+  const pathUtils = window.GPPUrls || {
+    toAsset(path) {
+      return `/${String(path || '').replace(/^\/+/, '')}`;
+    },
+  };
   const selectors = GPP.selectors || {};
   const battleActionMap = GPP.battleActionMap || {};
   const BattleViewModel = window.GPPBattleViewModel || {
@@ -94,6 +99,10 @@
     return PHASE_LABEL_MAP[phase] || String(phase || '-');
   }
 
+  function isReplayMode() {
+    return !!(state.ui && state.ui.replay && state.ui.replay.enabled);
+  }
+
 
   function getPortraitUrls(name, portraitUrl) {
     const urls = [];
@@ -101,8 +110,8 @@
     const sanitized = sanitizeDisplayName(name);
     if (!sanitized || sanitized === '未公开') return urls;
     const fileName = PORTRAIT_NAME_ALIAS[sanitized] || sanitized;
-    urls.push(`/portraits/${encodeURIComponent(fileName)}.png`);
-    urls.push(`/picture/${encodeURIComponent(fileName)}.png`);
+    urls.push(pathUtils.toAsset(`portraits/${encodeURIComponent(fileName)}.png`));
+    urls.push(pathUtils.toAsset(`picture/${encodeURIComponent(fileName)}.png`));
     return urls.filter((url, index, arr) => url && arr.indexOf(url) === index);
   }
 
@@ -769,7 +778,7 @@
     const displayed = GPP.getDisplayedDiceForPlayer(game, player.id);
     if (!displayed || !displayed.dice || !displayed.dice.length) return;
 
-    const isPickable = !isEnemy && (
+    const isPickable = !isReplayMode() && !isEnemy && (
       (game.phase === 'attack_reroll_or_select' && game.attackerId === player.id) ||
       (game.phase === 'defense_select' && game.defenderId === player.id)
     );
@@ -846,6 +855,15 @@
     hint.className = 'railHint';
     hint.textContent = view.railHint;
     dom.actionRail.appendChild(hint);
+
+    if (isReplayMode()) {
+      const replayNote = document.createElement('p');
+      replayNote.className = 'railHint';
+      replayNote.textContent = '当前是只读回放模式，下方时间轴可切换快照。';
+      wrap.appendChild(replayNote);
+      dom.actionRail.appendChild(wrap);
+      return;
+    }
 
     if (view.kind === 'self') {
       const model = battleActionMap.createBattleRailActionModel
@@ -926,6 +944,39 @@
     }
   }
 
+  function renderReplayControls() {
+    const replayState = state.ui && state.ui.replay ? state.ui.replay : null;
+    const enabled = !!(replayState && replayState.enabled && replayState.replay);
+    setHidden(dom.replayControls, !enabled);
+    if (!enabled) return;
+
+    const replay = replayState.replay || {};
+    const snapshots = Array.isArray(replay.snapshots) ? replay.snapshots : [];
+    const currentIndex = Math.max(0, Math.min(replayState.currentIndex || 0, Math.max(0, snapshots.length - 1)));
+    const snapshot = snapshots[currentIndex] || null;
+    const actions = Array.isArray(replay.actions) ? replay.actions : [];
+    const action = snapshot
+      ? actions.find((item) => item && item.step === snapshot.step) || null
+      : null;
+
+    if (dom.replayStepRange) {
+      dom.replayStepRange.min = '0';
+      dom.replayStepRange.max = String(Math.max(0, snapshots.length - 1));
+      dom.replayStepRange.value = String(currentIndex);
+      dom.replayStepRange.disabled = snapshots.length <= 1;
+    }
+    if (dom.replayPrevBtn) dom.replayPrevBtn.disabled = currentIndex <= 0;
+    if (dom.replayNextBtn) dom.replayNextBtn.disabled = currentIndex >= snapshots.length - 1;
+    if (dom.replayStepLabel) {
+      dom.replayStepLabel.textContent = `Step ${currentIndex}/${Math.max(0, snapshots.length - 1)} | reason: ${snapshot && snapshot.reason ? snapshot.reason : 'snapshot'}`;
+    }
+    if (dom.replayActionLabel) {
+      dom.replayActionLabel.textContent = action
+        ? `Action: ${action.actionCode || 'unknown'} | actor: ${action.actor || '-'}`
+        : 'Action: initial snapshot';
+    }
+  }
+
   function ensureStaticBindings() {
     if (dom.logToggleBtn && !dom.logToggleBtn.dataset.bound) {
       dom.logToggleBtn.dataset.bound = '1';
@@ -941,6 +992,7 @@
     renderBattlePlayerZone(getEnemy(), true);
     renderBattlePlayerZone(getMe(), false);
     renderActionRail(view);
+    renderReplayControls();
     renderLog();
     if (dom.logDrawer) {
       dom.logDrawer.classList.toggle('open', !!state.ui.logDrawerOpen);
@@ -967,6 +1019,9 @@
     setHidden(dom.gameArea, !inGame);
     if (dom.roomCodeEl) {
       dom.roomCodeEl.textContent = hasRoom ? state.room.code : '-';
+    }
+    if (!inGame) {
+      setHidden(dom.replayControls, true);
     }
     renderRoomStatusBar(view);
   }

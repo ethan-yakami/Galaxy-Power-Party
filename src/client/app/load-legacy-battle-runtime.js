@@ -1,22 +1,23 @@
 const LEGACY_RUNTIME_SCRIPTS = [
-  '/shared/replay-schema.js',
-  '/shared/preset-schema.js',
-  '/shared/protocol/error-registry.js',
-  '/shared/protocol/versioning.js',
-  '/js/auth.js',
-  '/js/replay-history.js',
-  '/js/connection-state-machine.js',
-  '/js/battle-view-model.js',
-  '/js/state-selectors.js',
-  '/js/battle-action-map.js',
-  '/js/guide-data.js',
-  '/js/ui-glossary.js',
-  '/js/ui-modal-controller.js',
-  '/js/ui.js',
-  '/js/effects.js',
-  '/js/dice-ui.js',
-  '/js/render.js',
-  '/js/connection.js',
+  'shared/replay-schema.js',
+  'shared/preset-schema.js',
+  'shared/protocol/error-registry.js',
+  'shared/protocol/versioning.js',
+  'js/url-utils.js',
+  'js/auth.js',
+  'js/replay-history.js',
+  'js/connection-state-machine.js',
+  'js/battle-view-model.js',
+  'js/state-selectors.js',
+  'js/battle-action-map.js',
+  'js/guide-data.js',
+  'js/ui-glossary.js',
+  'js/ui-modal-controller.js',
+  'js/ui.js',
+  'js/effects.js',
+  'js/dice-ui.js',
+  'js/render.js',
+  'js/connection.js',
 ];
 
 /**
@@ -35,7 +36,8 @@ export async function loadLegacyBattleRuntime(options) {
  */
 function loadScript(documentRef, src) {
   return new Promise((resolve, reject) => {
-    const existing = documentRef.querySelector(`script[data-legacy-src="${src}"]`);
+    const resolvedSrc = new URL(src, documentRef.baseURI).toString();
+    const existing = documentRef.querySelector(`script[data-legacy-src="${resolvedSrc}"]`);
     if (existing) {
       resolve();
       return;
@@ -43,10 +45,10 @@ function loadScript(documentRef, src) {
 
     const script = documentRef.createElement('script');
     script.async = false;
-    script.dataset.legacySrc = src;
-    script.src = src;
+    script.dataset.legacySrc = resolvedSrc;
+    script.src = resolvedSrc;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+    script.onerror = () => reject(new Error(`Failed to load ${resolvedSrc}`));
     documentRef.body.appendChild(script);
   });
 }

@@ -2,8 +2,15 @@ const path = require('path');
 const fs = require('fs');
 const SkillRegistry = require('./skillRegistry');
 
-const CHAR_DIR = path.join(__dirname, '../../content/entities/characters');
-const AURORA_DIR = path.join(__dirname, '../../content/entities/auroras');
+const ENTITIES_DIR = path.join(__dirname, '../../content/entities');
+const CHAR_DIR_CANDIDATES = [
+  path.join(ENTITIES_DIR, 'characters'),
+  path.join(ENTITIES_DIR, 'character'),
+];
+const AURORA_DIR_CANDIDATES = [
+  path.join(ENTITIES_DIR, 'auroras'),
+  path.join(ENTITIES_DIR, 'aurora'),
+];
 const CUSTOM_CHAR_PATH = process.env.GPP_CUSTOM_CHARACTER_PATH
   ? path.resolve(process.env.GPP_CUSTOM_CHARACTER_PATH)
   : path.join(__dirname, '../../content/entities/custom_characters.json');
@@ -185,6 +192,20 @@ function normalizeCharacterEntity(entity, sourceTag, options = {}) {
   });
 }
 
+function loadDirFromCandidates(candidates, label) {
+  for (const dir of candidates) {
+    if (!fs.existsSync(dir)) continue;
+    const loaded = loadDir(dir);
+    if (Object.keys(loaded).length > 0) {
+      return loaded;
+    }
+  }
+  if (Array.isArray(candidates) && candidates.length > 0) {
+    console.warn(`[Registry] ${label} directory not found or empty. Tried: ${candidates.join(', ')}`);
+  }
+  return {};
+}
+
 function normalizeAuroraEntity(entity, sourceTag) {
   if (!isPlainObject(entity)) return null;
   const id = typeof entity.id === 'string' ? entity.id.trim() : '';
@@ -339,7 +360,7 @@ function buildVariantCharacter(variant, characterRegistry) {
 
 function buildCharacterRegistry() {
   const registry = {};
-  const baseCharacters = loadDir(CHAR_DIR);
+  const baseCharacters = loadDirFromCandidates(CHAR_DIR_CANDIDATES, 'character');
   const baseIds = Object.keys(baseCharacters).sort();
 
   for (const id of baseIds) {
@@ -363,7 +384,7 @@ function buildCharacterRegistry() {
 
 function buildAuroraRegistry() {
   const registry = {};
-  const raw = loadDir(AURORA_DIR);
+  const raw = loadDirFromCandidates(AURORA_DIR_CANDIDATES, 'aurora');
   for (const id of Object.keys(raw)) {
     const normalized = normalizeAuroraEntity(raw[id], `aurora "${id}"`);
     if (!normalized) continue;

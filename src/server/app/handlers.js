@@ -13,6 +13,7 @@ module.exports = function createHandlers(rooms, options = {}) {
   const roomLifecycle = createRoomLifecycleHandlers({
     rooms,
     shared,
+    platform: options.platform || null,
   });
   const lobby = createLobbyHandlers({
     rooms,

@@ -65,10 +65,16 @@ function waitForMessage(ws, type) {
 }
 
 async function createAuthenticatedAiReplay(baseUrl, accessToken) {
-  const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/?accessToken=${encodeURIComponent(accessToken)}`;
+  const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/`;
   const ws = new WebSocket(wsUrl);
   await once(ws, 'open');
   await waitForMessage(ws, 'welcome');
+  ws.send(JSON.stringify({
+    type: 'authenticate',
+    payload: { accessToken },
+  }));
+  const authState = await waitForMessage(ws, 'auth_state');
+  assert.strictEqual(authState.ok, true);
 
   const character = Object.values(CharacterRegistry)[0];
   const aurora = Object.values(AuroraRegistry)[0];

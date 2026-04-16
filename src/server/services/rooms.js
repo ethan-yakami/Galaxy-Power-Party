@@ -104,6 +104,15 @@ function buildPublicRoomSummary(room) {
   if (!room || room.isPublic !== true) return null;
   const players = Array.isArray(room.players) ? room.players : [];
   const onlineCount = players.filter((player) => player && player.isOnline !== false).length;
+  let joinableReason = 'ok';
+  if (room.status === 'ended') {
+    joinableReason = 'ended';
+  } else if (room.status !== 'lobby') {
+    joinableReason = 'in_game';
+  } else if (players.length >= 2) {
+    joinableReason = onlineCount < players.length ? 'reserved_slot' : 'room_full';
+  }
+  const joinable = joinableReason === 'ok';
   return {
     code: room.code,
     status: room.status,
@@ -111,7 +120,8 @@ function buildPublicRoomSummary(room) {
     playerCount: players.length,
     onlineCount,
     capacity: 2,
-    joinable: room.status === 'lobby' && players.length < 2,
+    joinable,
+    joinableReason,
     hasAi: players.some((player) => player && player.ws && player.ws.isAI),
     lastActiveAt: room.lastActiveAt || null,
   };

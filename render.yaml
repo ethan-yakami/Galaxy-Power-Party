@@ -15,7 +15,7 @@
       - key: HOST
         value: 0.0.0.0
       - key: GPP_APP_VERSION
-        value: 1.1.0
+        value: 1.1.1
       - key: GPP_STORE_PROVIDER
         value: prisma
       - key: DATABASE_URL

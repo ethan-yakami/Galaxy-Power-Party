@@ -21,6 +21,11 @@ message JoinRoomPayload {
   string code = 2; // @gpp-field type=string_or_number
 }
 
+// @gpp-message type=authenticate direction=client_to_server
+message AuthenticatePayload {
+  string access_token = 1;
+}
+
 // @gpp-message type=leave_room direction=client_to_server
 message LeaveRoomPayload {}
 
@@ -63,6 +68,13 @@ message SessionResumeFailedPayload {
   string code = 2; // @gpp-field required=false
   string message = 3; // @gpp-field required=false
   ProtocolMeta meta = 4; // @gpp-field required=false
+}
+
+// @gpp-message type=auth_state direction=server_to_client
+message AuthStatePayload {
+  bool ok = 1;
+  google.protobuf.Struct user = 2; // @gpp-field type=object required=false
+  string reason = 3; // @gpp-field required=false
 }
 
 // @gpp-message type=left_room direction=server_to_client

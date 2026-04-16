@@ -1,5 +1,16 @@
 (function() {
   const { state, dom, send, setMessage } = GPP;
+  const urls = window.GPPUrls || {
+    getBasePath() {
+      return '/';
+    },
+    toPath(path) {
+      return `/${String(path || '').replace(/^\/+/, '')}`;
+    },
+    toWsUrl(_locationRef, wsProtocol) {
+      return `${wsProtocol}//${location.host}/`;
+    },
+  };
   const logger = GPP.logger || {
     debug() {},
     info() {},
@@ -12,9 +23,16 @@
 
   const CONNECT_WELCOME_TIMEOUT_MS = 6000;
   const ROOM_ACK_TIMEOUT_MS = 8000;
+  const WS_AUTH_TIMEOUT_MS = 3000;
   const RECONNECT_TOKEN_KEY = 'gpp_reconnect_token';
   const LAST_ROOM_CODE_KEY = 'gpp_last_room_code';
   const RESUME_PAYLOAD_KEY = 'gpp_resume_payload_v1';
+  const ROOM_JOIN_ERROR_HINTS = Object.freeze({
+    ROOM_NOT_FOUND: 'Room not found. Please verify the 4-digit room code.',
+    ROOM_FULL: 'This room is full.',
+    ROOM_IN_GAME: 'This room is already in game.',
+    ROOM_ENDED: 'This room has already ended.',
+  });
 
   const STATUS_META = {
     idle: { text: '未连接', className: 'statusIdle' },
@@ -31,6 +49,8 @@
   let connectWatchdogTimer = null;
   let roomAckTimer = null;
   let reconnectTimer = null;
+  let wsAuthTimer = null;
+  let catalogBackfillPromise = null;
 
   function clearTimer(handle) {
     if (handle) clearTimeout(handle);
@@ -58,18 +78,134 @@
     if (dom.launchHint) dom.launchHint.textContent = text || '';
   }
 
+  function getAccessToken() {
+    return window.GPPAuth && typeof window.GPPAuth.getAccessToken === 'function'
+      ? window.GPPAuth.getAccessToken()
+      : '';
+  }
+
+  function clearWsAuthWatchdog() {
+    clearTimer(wsAuthTimer);
+    wsAuthTimer = null;
+  }
+
+  function maybeStartWsAuthentication() {
+    clearWsAuthWatchdog();
+    state.ui.wsAuthPending = false;
+    state.ui.wsAuthAttempted = false;
+    state.ui.wsAuthOk = false;
+
+    const accessToken = getAccessToken();
+    if (!accessToken) return false;
+
+    state.ui.wsAuthPending = true;
+    state.ui.wsAuthAttempted = true;
+    send('authenticate', { accessToken });
+    wsAuthTimer = setTimeout(() => {
+      if (!state.ui.wsAuthPending) return;
+      state.ui.wsAuthPending = false;
+      state.ui.wsAuthOk = false;
+      logger.warn('ws_auth_timeout', {
+        hasLaunchIntent: !!state.ui.launchIntent,
+      });
+      if (state.ui.launchIntent && !state.ui.launchIntentConsumed && state.ui.welcomeReceived) {
+        setLaunchHint('Account auth timed out, continuing as guest.');
+        triggerLaunchIntent(false);
+      }
+    }, WS_AUTH_TIMEOUT_MS);
+    return true;
+  }
+
+  function syncAuthUserFromSocket(user) {
+    const authApi = window.GPPAuth;
+    if (!authApi || typeof authApi.getSession !== 'function' || typeof authApi.setSession !== 'function') {
+      return;
+    }
+    const session = authApi.getSession();
+    authApi.setSession({
+      accessToken: session && session.accessToken ? session.accessToken : '',
+      refreshToken: session && session.refreshToken ? session.refreshToken : '',
+      user: user && typeof user === 'object'
+        ? user
+        : (session && session.user && typeof session.user === 'object' ? session.user : null),
+    });
+  }
+
+  function isJoinFailureCode(code) {
+    return code === 'ROOM_NOT_FOUND'
+      || code === 'ROOM_FULL'
+      || code === 'ROOM_IN_GAME'
+      || code === 'ROOM_ENDED';
+  }
+
+  function getJoinFailureHint(code, fallback) {
+    return ROOM_JOIN_ERROR_HINTS[code] || fallback || 'Failed to join room.';
+  }
+
   function buildWsUrl() {
     if (!location.host) {
       throw new Error('当前页面缺少 host，无法建立 WebSocket 连接。');
     }
-    const url = new URL(`${GPP.wsProtocol}//${location.host}`);
-    const accessToken = window.GPPAuth && typeof window.GPPAuth.getAccessToken === 'function'
-      ? window.GPPAuth.getAccessToken()
-      : '';
-    if (accessToken) {
-      url.searchParams.set('accessToken', accessToken);
+    return new URL(urls.toWsUrl(location, GPP.wsProtocol)).toString();
+  }
+
+  function normalizeCatalogList(raw) {
+    if (Array.isArray(raw)) return raw.filter((item) => item && typeof item === 'object');
+    if (raw && typeof raw === 'object') return Object.values(raw).filter((item) => item && typeof item === 'object');
+    return [];
+  }
+
+  function applyCatalogPayload(payload) {
+    const nextCharacters = {};
+    const characters = normalizeCatalogList(payload && payload.characters);
+    for (let i = 0; i < characters.length; i += 1) {
+      const character = characters[i];
+      if (!character || !character.id) continue;
+      nextCharacters[character.id] = character;
     }
-    return url.toString();
+    if (Object.keys(nextCharacters).length > 0) {
+      state.characters = nextCharacters;
+    }
+
+    const auroraDice = normalizeCatalogList(payload && payload.auroraDice);
+    if (auroraDice.length > 0) {
+      state.auroraDice = auroraDice;
+    } else if (!Array.isArray(state.auroraDice)) {
+      state.auroraDice = [];
+    }
+  }
+
+  function ensureCatalogBackfill() {
+    if (Array.isArray(state.auroraDice) && state.auroraDice.length > 0) return;
+    if (catalogBackfillPromise) return;
+    if (typeof fetch !== 'function') return;
+
+    const endpoint = urls.toPath('api/catalog');
+    catalogBackfillPromise = fetch(endpoint, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'same-origin',
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`catalog_http_${response.status}`);
+        }
+        return response.json();
+      })
+      .then((payload) => {
+        applyCatalogPayload(payload);
+        if (state.room && !state.room.game) {
+          GPP.render();
+        }
+      })
+      .catch((error) => {
+        logger.warn('catalog_backfill_failed', {
+          message: error && error.message ? error.message : String(error),
+        });
+      })
+      .finally(() => {
+        catalogBackfillPromise = null;
+      });
   }
 
   function readResumePayload() {
@@ -109,6 +245,202 @@
       return readReplayFromHistoryById(intent.replayId);
     }
     return null;
+  }
+
+  function getReplayUiState() {
+    if (!state.ui.replay) {
+      state.ui.replay = {
+        enabled: false,
+        replayId: '',
+        replay: null,
+        currentIndex: 0,
+      };
+    }
+    return state.ui.replay;
+  }
+
+  function getReplayDetailByStep(replay, step) {
+    const details = replay && Array.isArray(replay.stepDetails) ? replay.stepDetails : [];
+    return details.find((item) => item && item.step === step) || null;
+  }
+
+  function buildReplayPlayers(replay) {
+    const loadouts = replay && Array.isArray(replay.playersLoadout) ? replay.playersLoadout : [];
+    return loadouts.slice(0, 2).map((loadout, index) => {
+      const playerId = loadout && loadout.playerId ? loadout.playerId : `P${index + 1}`;
+      const characterId = loadout && loadout.characterId ? loadout.characterId : '';
+      const auroraDiceId = loadout && loadout.auroraDiceId ? loadout.auroraDiceId : '';
+      const character = state.characters[characterId] || null;
+      const aurora = Array.isArray(state.auroraDice)
+        ? state.auroraDice.find((item) => item && item.id === auroraDiceId) || null
+        : null;
+      return {
+        id: playerId,
+        name: loadout && loadout.name ? loadout.name : `Player ${index + 1}`,
+        characterId,
+        auroraDiceId,
+        characterName: character ? character.name : characterId,
+        auroraDiceName: aurora ? aurora.name : auroraDiceId,
+        isOnline: true,
+      };
+    });
+  }
+
+  function buildReplayRoom(replay, snapshotIndex) {
+    const replayState = getReplayUiState();
+    const snapshots = replay && Array.isArray(replay.snapshots) ? replay.snapshots : [];
+    const safeIndex = Math.max(0, Math.min(snapshotIndex || 0, Math.max(0, snapshots.length - 1)));
+    const snapshot = snapshots[safeIndex] || null;
+    const view = snapshot && snapshot.view && typeof snapshot.view === 'object' ? snapshot.view : {};
+    const detail = snapshot ? getReplayDetailByStep(replay, snapshot.step) : null;
+    const players = buildReplayPlayers(replay);
+    const logs = detail && Array.isArray(detail.logsAdded) && detail.logsAdded.length
+      ? detail.logsAdded.slice()
+      : (Array.isArray(view.logTail) ? view.logTail.slice() : []);
+
+    replayState.currentIndex = safeIndex;
+    return {
+      code: replay && replay.roomMeta && replay.roomMeta.roomCode ? replay.roomMeta.roomCode : 'REPLAY',
+      roomMode: 'replay',
+      status: view && view.status === 'ended' ? 'ended' : 'in_game',
+      players,
+      game: Object.assign({
+        status: view.status || 'in_game',
+        round: Number.isFinite(view.round) ? view.round : 0,
+        phase: typeof view.phase === 'string' && view.phase ? view.phase : 'ended',
+        attackerId: view.attackerId || null,
+        defenderId: view.defenderId || null,
+        winnerId: view.winnerId || null,
+        attackValue: Number.isFinite(view.attackValue) ? view.attackValue : null,
+        defenseValue: Number.isFinite(view.defenseValue) ? view.defenseValue : null,
+        lastDamage: Number.isFinite(view.lastDamage) ? view.lastDamage : null,
+        attackDice: Array.isArray(view.attackDice) ? view.attackDice : [],
+        defenseDice: Array.isArray(view.defenseDice) ? view.defenseDice : [],
+        attackSelection: Array.isArray(view.attackSelection) ? view.attackSelection : [],
+        defenseSelection: Array.isArray(view.defenseSelection) ? view.defenseSelection : [],
+        attackPreviewSelection: [],
+        defensePreviewSelection: [],
+        attackLevel: view.attackLevel && typeof view.attackLevel === 'object' ? view.attackLevel : {},
+        defenseLevel: view.defenseLevel && typeof view.defenseLevel === 'object' ? view.defenseLevel : {},
+        hp: view.hp && typeof view.hp === 'object' ? view.hp : {},
+        maxHp: players.reduce((acc, player) => {
+          const viewPlayer = Array.isArray(view.players)
+            ? view.players.find((item) => item && item.playerId === player.id)
+            : null;
+          acc[player.id] = viewPlayer && Number.isFinite(viewPlayer.maxHp) ? viewPlayer.maxHp : null;
+          return acc;
+        }, {}),
+        auroraUsesRemaining: view.auroraUsesRemaining && typeof view.auroraUsesRemaining === 'object' ? view.auroraUsesRemaining : {},
+        selectedFourCount: view.selectedFourCount && typeof view.selectedFourCount === 'object' ? view.selectedFourCount : {},
+        selectedOneCount: view.selectedOneCount && typeof view.selectedOneCount === 'object' ? view.selectedOneCount : {},
+        overload: view.overload && typeof view.overload === 'object' ? view.overload : {},
+        desperateBonus: view.desperateBonus && typeof view.desperateBonus === 'object' ? view.desperateBonus : {},
+        auroraAEffectCount: view.auroraAEffectCount && typeof view.auroraAEffectCount === 'object' ? view.auroraAEffectCount : {},
+        roundAuroraUsed: view.roundAuroraUsed && typeof view.roundAuroraUsed === 'object' ? view.roundAuroraUsed : {},
+        forceField: view.forceField && typeof view.forceField === 'object' ? view.forceField : {},
+        whiteeGuardUsed: view.whiteeGuardUsed && typeof view.whiteeGuardUsed === 'object' ? view.whiteeGuardUsed : {},
+        whiteeGuardActive: view.whiteeGuardActive && typeof view.whiteeGuardActive === 'object' ? view.whiteeGuardActive : {},
+        unyielding: view.unyielding && typeof view.unyielding === 'object' ? view.unyielding : {},
+        counterActive: view.counterActive && typeof view.counterActive === 'object' ? view.counterActive : {},
+        weather: view.weather && typeof view.weather === 'object' ? view.weather : null,
+        poison: view.poison && typeof view.poison === 'object' ? view.poison : {},
+        resilience: view.resilience && typeof view.resilience === 'object' ? view.resilience : {},
+        thorns: view.thorns && typeof view.thorns === 'object' ? view.thorns : {},
+        power: view.power && typeof view.power === 'object' ? view.power : {},
+        hackActive: view.hackActive && typeof view.hackActive === 'object' ? view.hackActive : {},
+        danhengCounterReady: view.danhengCounterReady && typeof view.danhengCounterReady === 'object' ? view.danhengCounterReady : {},
+        xilianCumulative: view.xilianCumulative && typeof view.xilianCumulative === 'object' ? view.xilianCumulative : {},
+        xilianAscensionActive: view.xilianAscensionActive && typeof view.xilianAscensionActive === 'object' ? view.xilianAscensionActive : {},
+        yaoguangRerollsUsed: view.yaoguangRerollsUsed && typeof view.yaoguangRerollsUsed === 'object' ? view.yaoguangRerollsUsed : {},
+        pendingActorId: null,
+        pendingActionKind: null,
+        pendingActionLabel: null,
+        isAiThinking: false,
+        rerollsLeft: 0,
+        effectEvents: [],
+        pendingWeatherChanged: null,
+        log: logs,
+      }, view),
+    };
+  }
+
+  function applyReplaySnapshot(nextIndex) {
+    const replayState = getReplayUiState();
+    const replay = replayState.replay;
+    if (!replay) return false;
+    const room = buildReplayRoom(replay, nextIndex);
+    state.room = room;
+    state.me = room.players[0] ? room.players[0].id : state.me;
+    state.pendingAction = null;
+    state.battleActions = null;
+    GPP.clearSelection();
+    GPP.render();
+    return true;
+  }
+
+  function bindReplayControls() {
+    if (dom.replayPrevBtn && !dom.replayPrevBtn.dataset.bound) {
+      dom.replayPrevBtn.dataset.bound = '1';
+      dom.replayPrevBtn.onclick = () => {
+        const replayState = getReplayUiState();
+        applyReplaySnapshot((replayState.currentIndex || 0) - 1);
+      };
+    }
+    if (dom.replayNextBtn && !dom.replayNextBtn.dataset.bound) {
+      dom.replayNextBtn.dataset.bound = '1';
+      dom.replayNextBtn.onclick = () => {
+        const replayState = getReplayUiState();
+        applyReplaySnapshot((replayState.currentIndex || 0) + 1);
+      };
+    }
+    if (dom.replayStepRange && !dom.replayStepRange.dataset.bound) {
+      dom.replayStepRange.dataset.bound = '1';
+      dom.replayStepRange.oninput = () => {
+        applyReplaySnapshot(Number(dom.replayStepRange.value || 0));
+      };
+    }
+  }
+
+  function initializeReplayViewer(intent) {
+    const payload = intent && intent.replayId
+      ? readReplayFromHistoryById(intent.replayId)
+      : readResumePayload();
+    if (!payload || !payload.replay) {
+      const hint = '未找到可回看的回放记录，请先从回放页选择一条记录。';
+      getReplayUiState().enabled = false;
+      setLaunchHint(hint);
+      setMessage(hint);
+      setConnectionUi('failed', '回放数据缺失。', hint);
+      return false;
+    }
+
+    const replay = payload.replay;
+    const snapshots = Array.isArray(replay.snapshots) ? replay.snapshots : [];
+    if (!snapshots.length) {
+      const hint = '这条回放没有可用快照，无法在战斗页查看。';
+      getReplayUiState().enabled = false;
+      setLaunchHint(hint);
+      setMessage(hint);
+      setConnectionUi('failed', '回放快照为空。', hint);
+      return false;
+    }
+
+    const replayState = getReplayUiState();
+    replayState.enabled = true;
+    replayState.replayId = replay.replayId || (intent && intent.replayId) || '';
+    replayState.replay = replay;
+    replayState.currentIndex = Number.isInteger(payload.snapshotIndex) ? payload.snapshotIndex : 0;
+    state.ui.launchIntentConsumed = true;
+    state.ui.connection.error = '';
+    bindReplayControls();
+    applyReplaySnapshot(replayState.currentIndex);
+    setLaunchHint('当前正在查看只读回放，可通过下方时间轴切换步骤。');
+    setMessage('已进入回放查看模式。');
+    setConnectionUi('ready', '回放已加载。', '');
+    try {
+      sessionStorage.removeItem(RESUME_PAYLOAD_KEY);
+    } catch {}
+    return true;
   }
 
   function parseLaunchIntent() {
@@ -394,6 +726,10 @@
     state.ui.socketToken += 1;
     const token = state.ui.socketToken;
     state.ui.welcomeReceived = false;
+    state.ui.wsAuthPending = false;
+    state.ui.wsAuthAttempted = false;
+    state.ui.wsAuthOk = false;
+    clearWsAuthWatchdog();
 
     const ws = openSocket(wsUrl);
     if (!ws) return;
@@ -423,7 +759,9 @@
       });
       clearWelcomeWatchdog();
       clearRoomAckWatchdog();
+      clearWsAuthWatchdog();
       state.ui.welcomeReceived = false;
+      state.ui.wsAuthPending = false;
       if (state.ui.suppressNextClose) {
         state.ui.suppressNextClose = false;
         return;
@@ -456,11 +794,8 @@
         state.battleActions = null;
         const freshReconnectToken = typeof msg.reconnectToken === 'string' ? msg.reconnectToken : '';
         state.ui.reconnectToken = freshReconnectToken || state.ui.reconnectToken || '';
-        state.characters = {};
-        (msg.characters || []).forEach((character) => {
-          state.characters[character.id] = character;
-        });
-        state.auroraDice = msg.auroraDice || [];
+        applyCatalogPayload(msg);
+        ensureCatalogBackfill();
         if (dom.myIdEl) {
           dom.myIdEl.textContent = `玩家ID：${msg.playerId}`;
         }
@@ -471,15 +806,46 @@
           storageSet(RECONNECT_TOKEN_KEY, freshReconnectToken);
         }
 
+        const authPending = maybeStartWsAuthentication();
         if (state.ui.launchIntent) {
-          setConnectionUi('ready', '连接成功，准备自动入房。', '');
-          setMessage('连接成功，准备自动入房...');
-          triggerLaunchIntent(false);
+          if (authPending) {
+            setConnectionUi('ready', '连接成功，正在验证账号状态。', '');
+            setMessage('连接成功，正在验证账号状态...');
+            setLaunchHint('验证账号后将自动执行入房。');
+          } else {
+            setConnectionUi('ready', '连接成功，准备自动入房。', '');
+            setMessage('连接成功，准备自动入房...');
+            triggerLaunchIntent(false);
+          }
         } else if (!tryResumeSession()) {
           const notice = state.ui.launchIntentError || '连接成功。请从启动台打开战斗页。';
           setConnectionUi('ready', '连接成功，等待手动操作。', state.ui.launchIntentError || '');
           setMessage(notice);
           setLaunchHint(notice);
+        }
+        return;
+      }
+
+      if (msg.type === 'auth_state') {
+        clearWsAuthWatchdog();
+        state.ui.wsAuthPending = false;
+        state.ui.wsAuthOk = msg.ok === true;
+        if (msg.ok === true) {
+          syncAuthUserFromSocket(msg.user);
+          logger.info('ws_auth_succeeded', {
+            hasUser: !!(msg.user && typeof msg.user === 'object'),
+          });
+        } else {
+          logger.warn('ws_auth_failed', {
+            reason: msg.reason || 'unknown',
+          });
+        }
+
+        if (state.ui.launchIntent && !state.ui.launchIntentConsumed && state.ui.welcomeReceived) {
+          if (msg.ok !== true) {
+            setLaunchHint(`账号鉴权失败（${msg.reason || 'unknown'}），将以游客模式继续。`);
+          }
+          triggerLaunchIntent(false);
         }
         return;
       }
@@ -679,7 +1045,15 @@
         });
         const errorText = `错误：${msg.message}`;
         setMessage(errorText);
-        if (state.ui.welcomeReceived && GPP.ws && GPP.ws.readyState === WebSocket.OPEN) {
+
+        const joinFailure = !state.room && isJoinFailureCode(msg.code);
+        if (joinFailure) {
+          clearRoomAckWatchdog();
+          state.ui.launchIntentConsumed = false;
+          const joinHint = getJoinFailureHint(msg.code, msg.message || errorText);
+          setLaunchHint(joinHint);
+          setConnectionUi('failed', '加入房间失败。', joinHint);
+        } else if (state.ui.welcomeReceived && GPP.ws && GPP.ws.readyState === WebSocket.OPEN) {
           setConnectionUi(state.room ? 'in_room' : 'ready', state.ui.connection.detail || '连接稳定。', '');
         } else {
           setConnectionUi('failed', '服务端返回错误。', msg.message || errorText);
@@ -690,10 +1064,7 @@
       }
 
       if (msg.type === 'characters_updated') {
-        state.characters = {};
-        (msg.characters || []).forEach((character) => {
-          state.characters[character.id] = character;
-        });
+        applyCatalogPayload(msg);
         GPP.render();
       }
     };
@@ -703,6 +1074,9 @@
   state.ui.connection.status = 'idle';
   state.ui.suppressNextClose = false;
   state.ui.reconnectDelay = 1000;
+  state.ui.wsAuthPending = false;
+  state.ui.wsAuthAttempted = false;
+  state.ui.wsAuthOk = false;
 
   const parsed = state.ui.launchIntentBootstrapped
     ? {
@@ -734,13 +1108,13 @@
 
   if (dom.backToLauncherBtn) {
     dom.backToLauncherBtn.onclick = () => {
-      location.href = '/';
+      location.href = urls.getBasePath(location);
     };
   }
 
   if (dom.backToLauncherInlineBtn) {
     dom.backToLauncherInlineBtn.onclick = () => {
-      location.href = '/';
+      location.href = urls.getBasePath(location);
     };
   }
 
@@ -777,6 +1151,11 @@
   }
 
   renderConnectionStateUI();
+  if (state.ui.launchIntent && state.ui.launchIntent.mode === 'replay') {
+    initializeReplayViewer(state.ui.launchIntent);
+    GPP.render();
+    return;
+  }
   connect('initial');
   GPP.render();
 })();

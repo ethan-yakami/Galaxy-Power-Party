@@ -1,4 +1,15 @@
 (function() {
+  const urls = window.GPPUrls || {
+    getBasePath() {
+      return '/';
+    },
+    toPath(path) {
+      return `/${String(path || '').replace(/^\/+/, '')}`;
+    },
+    toApi(path) {
+      return `/api/${String(path || '').replace(/^\/+/, '')}`;
+    },
+  };
   const nameInput = document.getElementById('nameInput');
   const roomCodeInput = document.getElementById('roomCodeInput');
   const createBtn = document.getElementById('createBtn');
@@ -17,6 +28,15 @@
   const authLoginBtn = document.getElementById('authLoginBtn');
   const authLogoutBtn = document.getElementById('authLogoutBtn');
   const authApi = window.GPPAuth || null;
+  const JOINABLE_REASON_TEXT = Object.freeze({
+    ok: '可加入',
+    room_full: '房间已满',
+    in_game: '对局进行中',
+    ended: '对局已结束',
+    private: '私有房间',
+    reserved_slot: '席位保留中（离线重连）',
+  });
+  let publicRoomMap = new Map();
 
   function setMessage(text, isError) {
     if (!messageEl) return;
@@ -40,49 +60,94 @@
     params.set('mode', mode);
     params.set('name', name);
     if (code) params.set('code', code);
-    navigate(`${location.origin}/battle.html?${params.toString()}`, '正在进入战斗房间...');
+    navigate(urls.toPath(`battle.html?${params.toString()}`), '正在进入战斗房间...');
   }
 
   function openStandalonePage(path, successText) {
-    navigate(`${location.origin}${path}`, successText);
+    navigate(urls.toPath(path), successText);
+  }
+
+  function normalizeJoinableReason(room) {
+    if (!room || typeof room !== 'object') return 'room_full';
+    if (typeof room.joinableReason === 'string' && room.joinableReason) {
+      return room.joinableReason;
+    }
+    return room.joinable ? 'ok' : 'room_full';
+  }
+
+  function getJoinableReasonText(reason) {
+    return JOINABLE_REASON_TEXT[reason] || reason || '不可加入';
+  }
+
+  function indexPublicRooms(rooms) {
+    publicRoomMap = new Map();
+    const list = Array.isArray(rooms) ? rooms : [];
+    for (const room of list) {
+      if (!room || !room.code) continue;
+      publicRoomMap.set(String(room.code), room);
+    }
+  }
+
+  function findPublicRoom(code) {
+    if (!code) return null;
+    return publicRoomMap.get(String(code).trim()) || null;
   }
 
   function renderPublicRooms(rooms) {
     if (!publicRoomSelect) return;
     const list = Array.isArray(rooms) ? rooms : [];
+    const previousCode = String(publicRoomSelect.value || '').trim();
+    indexPublicRooms(list);
     publicRoomSelect.innerHTML = '';
 
     const placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = list.length ? '选择可加入房间...' : '暂无可加入房间';
+    placeholder.textContent = list.length ? '选择公开房间...' : '暂无公开房间';
     publicRoomSelect.appendChild(placeholder);
 
+    let joinableCount = 0;
     for (const room of list) {
       const option = document.createElement('option');
       option.value = room.code;
       const status = room.status === 'lobby' ? '大厅' : (room.status || '未知');
-      option.textContent = `${room.code} | ${status} | ${room.playerCount || 0}/2`;
+      const reason = normalizeJoinableReason(room);
+      if (reason === 'ok') joinableCount += 1;
+      const reasonText = getJoinableReasonText(reason);
+      option.disabled = reason !== 'ok';
+      option.textContent = `${room.code} | ${status} | ${room.playerCount || 0}/${room.capacity || 2} | ${reasonText}`;
       publicRoomSelect.appendChild(option);
     }
 
+    if (previousCode) {
+      const previousRoom = findPublicRoom(previousCode);
+      if (previousRoom && normalizeJoinableReason(previousRoom) === 'ok') {
+        publicRoomSelect.value = previousCode;
+      } else {
+        publicRoomSelect.value = '';
+      }
+    }
+
     if (publicRoomsHint) {
+      const blockedCount = Math.max(0, list.length - joinableCount);
       publicRoomsHint.textContent = list.length
-        ? `当前可加入 ${list.length} 个房间，选择后会自动填入房号。`
-        : '暂无可加入房间，稍后刷新重试。';
+        ? `公开房间 ${list.length} 个，可加入 ${joinableCount} 个，不可加入 ${blockedCount} 个。`
+        : '暂无公开房间，稍后刷新重试。';
     }
   }
 
   async function refreshPublicRooms(showMessage) {
     if (refreshPublicRoomsBtn) refreshPublicRoomsBtn.disabled = true;
     try {
-      const response = await fetch(`/api/public-rooms?t=${Date.now()}`, { cache: 'no-store' });
+      const response = await fetch(urls.toApi(`public-rooms?t=${Date.now()}`), { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const payload = await response.json();
       const list = Array.isArray(payload && payload.rooms) ? payload.rooms : [];
-      const joinableRooms = list.filter((item) => item && item.joinable);
-      renderPublicRooms(joinableRooms);
+      const joinableCount = list.filter((item) => normalizeJoinableReason(item) === 'ok').length;
+      renderPublicRooms(list);
       if (showMessage) {
-        setMessage(joinableRooms.length ? '公开房间列表已刷新。' : '当前没有可加入的公开房间。', false);
+        setMessage(list.length
+          ? `公开房间列表已刷新（可加入 ${joinableCount} 个）。`
+          : '当前没有公开房间。', false);
       }
     } catch (error) {
       renderPublicRooms([]);
@@ -145,6 +210,7 @@
         setMessage('已退出登录。', false);
       }
       renderAuthStatus();
+      refreshPublicRooms(false);
     } catch (error) {
       setMessage(`账号操作失败：${error && error.message ? error.message : String(error)}`, true);
     }
@@ -169,6 +235,12 @@
       const code = typedCode || selectedCode;
       if (!/^\d{4}$/.test(code)) {
         setMessage('请输入有效的 4 位房间号。', true);
+        return;
+      }
+      const knownRoom = findPublicRoom(code);
+      if (knownRoom && normalizeJoinableReason(knownRoom) !== 'ok') {
+        const reasonText = getJoinableReasonText(normalizeJoinableReason(knownRoom));
+        setMessage(`房间 ${code} 当前不可加入：${reasonText}`, true);
         return;
       }
       openBattlePage('join', getPlayerName(), code);
@@ -224,7 +296,10 @@
   renderAuthStatus();
   if (authApi) {
     authApi.fetchMe().finally(renderAuthStatus);
-    window.addEventListener(authApi.AUTH_EVENT, renderAuthStatus);
+    window.addEventListener(authApi.AUTH_EVENT, () => {
+      renderAuthStatus();
+      refreshPublicRooms(false);
+    });
   }
   setInterval(() => {
     refreshPublicRooms(false);

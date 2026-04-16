@@ -1,4 +1,9 @@
 (function() {
+  const urls = window.GPPUrls || {
+    toApi(path) {
+      return `/api/${String(path || '').replace(/^\/+/, '')}`;
+    },
+  };
   const authApi = window.GPPAuth || null;
   const replayHistory = window.GPPReplayHistory || null;
   const dom = {
@@ -77,7 +82,7 @@
         importBtn.disabled = true;
         importBtn.textContent = '导入中...';
         try {
-          const response = await authApi.fetchWithAuth(`/api/replays/${encodeURIComponent(item.replayId || '')}`);
+          const response = await authApi.fetchWithAuth(urls.toApi(`replays/${encodeURIComponent(item.replayId || '')}`));
           if (!response.ok) {
             setCloudHint(`导入失败：HTTP ${response.status}`);
             return;
@@ -122,7 +127,7 @@
     if (dom.cloudRefreshBtn) dom.cloudRefreshBtn.disabled = true;
     setCloudHint('正在加载云端回放...');
     try {
-      const response = await authApi.fetchWithAuth('/api/replays');
+      const response = await authApi.fetchWithAuth(urls.toApi('replays'));
       if (response.status === 401) {
         renderCloudList([]);
         setCloudHint('登录已过期，请重新登录。');

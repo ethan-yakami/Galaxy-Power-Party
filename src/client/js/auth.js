@@ -1,4 +1,9 @@
 (function initAuth(root) {
+  const urls = root.GPPUrls || {
+    toApi(path) {
+      return `/api/${String(path || '').replace(/^\/+/, '')}`;
+    },
+  };
   const ACCESS_TOKEN_KEY = 'gpp_access_token_v1';
   const REFRESH_TOKEN_KEY = 'gpp_refresh_token_v1';
   const USER_KEY = 'gpp_auth_user_v1';
@@ -66,7 +71,7 @@
   async function refreshAccessToken() {
     const session = getSession();
     if (!session.refreshToken) return { ok: false, reason: 'missing_refresh_token' };
-    const response = await fetch('/api/auth/refresh', {
+    const response = await fetch(urls.toApi('auth/refresh'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -112,7 +117,7 @@
   }
 
   async function login(username, password) {
-    const response = await fetch('/api/auth/login', {
+    const response = await fetch(urls.toApi('auth/login'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -136,7 +141,7 @@
   }
 
   async function register(username, password) {
-    const response = await fetch('/api/auth/register', {
+    const response = await fetch(urls.toApi('auth/register'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -159,25 +164,8 @@
     return { ok: true, payload };
   }
 
-  async function logout() {
-    const session = getSession();
-    if (session.refreshToken || session.accessToken) {
-      try {
-        await fetchWithAuth('/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ refreshToken: session.refreshToken || '' }),
-        });
-      } catch {}
-    }
-    clearSession();
-    return { ok: true };
-  }
-
   async function fetchMe() {
-    const response = await fetchWithAuth('/api/me');
+    const response = await fetchWithAuth(urls.toApi('me'));
     if (!response.ok) {
       return { ok: false, status: response.status };
     }
@@ -191,6 +179,23 @@
       user: payload.user,
     });
     return { ok: true, user: payload.user };
+  }
+
+  async function logout() {
+    const session = getSession();
+    if (session.refreshToken || session.accessToken) {
+      try {
+        await fetchWithAuth(urls.toApi('auth/logout'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refreshToken: session.refreshToken || '' }),
+        });
+      } catch {}
+    }
+    clearSession();
+    return { ok: true };
   }
 
   root.GPPAuth = Object.freeze({

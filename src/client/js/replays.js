@@ -1,4 +1,12 @@
 (function() {
+  const urls = window.GPPUrls || {
+    getBasePath() {
+      return '/';
+    },
+    toPath(path) {
+      return `/${String(path || '').replace(/^\/+/, '')}`;
+    },
+  };
   const replayHistory = window.GPPReplayHistory;
   const schema = window.GPPReplaySchema || {};
   const REPLAY_ERROR_CODES = schema.REPLAY_ERROR_CODES || {};
@@ -142,7 +150,7 @@
       window.alert('浏览器无法写入继续对局数据，请稍后重试。');
       return;
     }
-    location.href = `/battle.html?mode=${encodeURIComponent(mode)}&name=${encodeURIComponent(`继续玩家${Math.floor(Math.random() * 1000)}`)}`;
+    location.href = urls.toPath(`battle.html?mode=${encodeURIComponent(mode)}&name=${encodeURIComponent(`继续玩家${Math.floor(Math.random() * 1000)}`)}`);
   }
 
   function renderHistoryList() {
@@ -177,7 +185,7 @@
       replayBtn.type = 'button';
       replayBtn.textContent = '战斗页回看';
       replayBtn.onclick = () => {
-        location.href = `/battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`;
+        location.href = urls.toPath(`battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`);
       };
 
       const deleteBtn = document.createElement('button');
@@ -324,7 +332,7 @@
   }
 
   function bindEvents() {
-    dom.backHomeBtn.onclick = () => { location.href = '/'; };
+    dom.backHomeBtn.onclick = () => { location.href = urls.getBasePath(location); };
     dom.clearAllBtn.onclick = () => {
       replayHistory.clearHistory();
       state.entries = [];
@@ -372,7 +380,7 @@
     dom.openBattleReplayBtn.onclick = () => {
       const entry = getSelectedEntry();
       if (!entry) return;
-      location.href = `/battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`;
+      location.href = urls.toPath(`battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`);
     };
     dom.continueLocalBtn.onclick = () => openResumeBattle('resume_local');
     dom.continueRoomBtn.onclick = () => openResumeBattle('resume_room');

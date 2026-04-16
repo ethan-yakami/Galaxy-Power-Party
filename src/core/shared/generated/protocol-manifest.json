@@ -70,6 +70,88 @@
       ]
     },
     {
+      "type": "auth_state",
+      "direction": "server_to_client",
+      "protoMessage": "AuthStatePayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 74
+      },
+      "fields": [
+        {
+          "name": "ok",
+          "protoName": "ok",
+          "protoType": "bool",
+          "fieldNumber": 1,
+          "type": "boolean",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 75,
+            "message": "AuthStatePayload"
+          }
+        },
+        {
+          "name": "user",
+          "protoName": "user",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 2,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 76,
+            "message": "AuthStatePayload"
+          }
+        },
+        {
+          "name": "reason",
+          "protoName": "reason",
+          "protoType": "string",
+          "fieldNumber": 3,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 77,
+            "message": "AuthStatePayload"
+          }
+        }
+      ]
+    },
+    {
+      "type": "authenticate",
+      "direction": "client_to_server",
+      "protoMessage": "AuthenticatePayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 25
+      },
+      "fields": [
+        {
+          "name": "accessToken",
+          "protoName": "access_token",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/room.proto",
+            "line": 26,
+            "message": "AuthenticatePayload"
+          }
+        }
+      ]
+    },
+    {
       "type": "battle_actions",
       "direction": "server_to_client",
       "protoMessage": "BattleActionsPayload",
@@ -161,7 +243,7 @@
       "protoMessage": "CharactersUpdatedPayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 83
+        "line": 95
       },
       "fields": [
         {
@@ -175,7 +257,7 @@
           "transitional": "shared_catalog",
           "source": {
             "file": "proto/room.proto",
-            "line": 84,
+            "line": 96,
             "message": "CharactersUpdatedPayload"
           }
         }
@@ -604,7 +686,7 @@
       "protoMessage": "LeftRoomPayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 69
+        "line": 81
       },
       "fields": [
         {
@@ -618,7 +700,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 70,
+            "line": 82,
             "message": "LeftRoomPayload"
           }
         }
@@ -630,7 +712,7 @@
       "protoMessage": "PlayerPresenceChangedPayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 74
+        "line": 86
       },
       "fields": [
         {
@@ -644,7 +726,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 75,
+            "line": 87,
             "message": "PlayerPresenceChangedPayload"
           }
         },
@@ -659,7 +741,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 76,
+            "line": 88,
             "message": "PlayerPresenceChangedPayload"
           }
         },
@@ -674,7 +756,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 77,
+            "line": 89,
             "message": "PlayerPresenceChangedPayload"
           }
         },
@@ -689,7 +771,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 78,
+            "line": 90,
             "message": "PlayerPresenceChangedPayload"
           }
         },
@@ -704,7 +786,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 79,
+            "line": 91,
             "message": "PlayerPresenceChangedPayload"
           }
         }
@@ -824,7 +906,7 @@
       "protoMessage": "ResumeSessionPayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 28
+        "line": 33
       },
       "fields": [
         {
@@ -838,7 +920,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 29,
+            "line": 34,
             "message": "ResumeSessionPayload"
           }
         },
@@ -853,7 +935,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 30,
+            "line": 35,
             "message": "ResumeSessionPayload"
           }
         }
@@ -865,7 +947,7 @@
       "protoMessage": "RoomStatePayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 50
+        "line": 55
       },
       "fields": [
         {
@@ -879,7 +961,7 @@
           "transitional": "legacy_room_projection",
           "source": {
             "file": "proto/room.proto",
-            "line": 51,
+            "line": 56,
             "message": "RoomStatePayload"
           }
         }
@@ -891,7 +973,7 @@
       "protoMessage": "SessionResumeFailedPayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 61
+        "line": 66
       },
       "fields": [
         {
@@ -905,7 +987,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 62,
+            "line": 67,
             "message": "SessionResumeFailedPayload"
           }
         },
@@ -920,7 +1002,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 63,
+            "line": 68,
             "message": "SessionResumeFailedPayload"
           }
         },
@@ -935,7 +1017,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 64,
+            "line": 69,
             "message": "SessionResumeFailedPayload"
           }
         },
@@ -950,7 +1032,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 65,
+            "line": 70,
             "message": "SessionResumeFailedPayload"
           }
         }
@@ -962,7 +1044,7 @@
       "protoMessage": "SessionResumedPayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 55
+        "line": 60
       },
       "fields": [
         {
@@ -976,7 +1058,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 56,
+            "line": 61,
             "message": "SessionResumedPayload"
           }
         },
@@ -991,7 +1073,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 57,
+            "line": 62,
             "message": "SessionResumedPayload"
           }
         }
@@ -1178,7 +1260,7 @@
       "protoMessage": "WelcomePayload",
       "source": {
         "file": "proto/room.proto",
-        "line": 40
+        "line": 45
       },
       "fields": [
         {
@@ -1192,7 +1274,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 41,
+            "line": 46,
             "message": "WelcomePayload"
           }
         },
@@ -1207,7 +1289,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 42,
+            "line": 47,
             "message": "WelcomePayload"
           }
         },
@@ -1222,7 +1304,7 @@
           "transitional": "shared_catalog",
           "source": {
             "file": "proto/room.proto",
-            "line": 43,
+            "line": 48,
             "message": "WelcomePayload"
           }
         },
@@ -1237,7 +1319,7 @@
           "transitional": "shared_catalog",
           "source": {
             "file": "proto/room.proto",
-            "line": 44,
+            "line": 49,
             "message": "WelcomePayload"
           }
         },
@@ -1252,7 +1334,7 @@
           "transitional": "shared_catalog",
           "source": {
             "file": "proto/room.proto",
-            "line": 45,
+            "line": 50,
             "message": "WelcomePayload"
           }
         },
@@ -1267,7 +1349,7 @@
           "transitional": "",
           "source": {
             "file": "proto/room.proto",
-            "line": 46,
+            "line": 51,
             "message": "WelcomePayload"
           }
         }

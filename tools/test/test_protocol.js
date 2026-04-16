@@ -141,6 +141,22 @@ function testCreateResumeRoomPayload() {
   assert.strictEqual(badResult.errorCode, ERROR_CODES.INVALID_PAYLOAD);
 }
 
+function testAuthenticatePayload() {
+  const okResult = normalizeIncomingMessage(JSON.stringify({
+    type: 'authenticate',
+    payload: { accessToken: 'access-token-1' },
+  }));
+  assert.strictEqual(okResult.ok, true);
+  assert.strictEqual(okResult.envelope.payload.accessToken, 'access-token-1');
+
+  const badResult = normalizeIncomingMessage(JSON.stringify({
+    type: 'authenticate',
+    payload: {},
+  }));
+  assert.strictEqual(badResult.ok, false);
+  assert.strictEqual(badResult.errorCode, ERROR_CODES.INVALID_PAYLOAD);
+}
+
 function testErrorPayload() {
   const payload = buildErrorPayload(ERROR_CODES.INVALID_SELECTION, 'Invalid selection.', {
     meta: { requestId: 'req-2', protocolVersion: '2' },
@@ -172,6 +188,7 @@ function run() {
   testInvalidPayloadExportReplayRequestSource();
   testSubmitBattleActionPayload();
   testCreateResumeRoomPayload();
+  testAuthenticatePayload();
   testErrorPayload();
   testDefaultInvalidPayloadMessage();
   console.log('test_protocol passed');

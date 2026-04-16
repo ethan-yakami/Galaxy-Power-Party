@@ -27,6 +27,7 @@ const {
   createReplayV1,
   appendReplaySnapshot,
 } = require('../../services/replay');
+const { sendError, ERROR_CODES } = require('../../transport/protocol/errors');
 
 function normalizeResumeMode(mode) {
   const value = typeof mode === 'string' ? mode.trim() : '';
@@ -120,10 +121,27 @@ function resolveResumeDraft(payload) {
   };
 }
 
-function createRoomLifecycleHandlers({ rooms, shared }) {
+function createRoomLifecycleHandlers({ rooms, shared, platform }) {
   const OFFLINE_GRACE_MS = Number.isInteger(Number(process.env.GPP_PLAYER_OFFLINE_GRACE_MS))
     ? Number(process.env.GPP_PLAYER_OFFLINE_GRACE_MS)
     : 2 * 60 * 1000;
+
+  function rejectJoinRoom(ws, reason) {
+    const normalized = String(reason || '').trim();
+    if (normalized === 'in_game') {
+      sendError(ws, ERROR_CODES.ROOM_IN_GAME, 'Room is already in game.');
+      return;
+    }
+    if (normalized === 'ended') {
+      sendError(ws, ERROR_CODES.ROOM_ENDED, 'Room has ended.');
+      return;
+    }
+    if (normalized === 'room_full') {
+      sendError(ws, ERROR_CODES.ROOM_FULL, 'Room is full.');
+      return;
+    }
+    sendError(ws, ERROR_CODES.ROOM_NOT_FOUND, 'Room not found.');
+  }
 
   function applyLoadoutToPlayer(player, loadout) {
     if (!player || !loadout) return;
@@ -267,11 +285,19 @@ function createRoomLifecycleHandlers({ rooms, shared }) {
     const { code, name } = payload || {};
     const room = rooms.get(String(code || '').trim());
     if (!room) {
-      send(ws, { type: 'error', message: '房间不存在。' });
+      rejectJoinRoom(ws, 'not_found');
+      return;
+    }
+    if (room.status === 'ended') {
+      rejectJoinRoom(ws, 'ended');
+      return;
+    }
+    if (room.status !== 'lobby') {
+      rejectJoinRoom(ws, 'in_game');
       return;
     }
     if (room.players.length >= 2) {
-      send(ws, { type: 'error', message: '房间已满。' });
+      rejectJoinRoom(ws, 'room_full');
       return;
     }
 
@@ -288,6 +314,60 @@ function createRoomLifecycleHandlers({ rooms, shared }) {
     if (room.resumeDraft) {
       startGameIfReady(room);
     }
+  }
+
+  function handleAuthenticate(ws, payload) {
+    const accessToken = payload && typeof payload.accessToken === 'string'
+      ? payload.accessToken.trim()
+      : '';
+    if (!accessToken) {
+      ws.authUser = null;
+      ws.authSessionId = null;
+      send(ws, {
+        type: 'auth_state',
+        ok: false,
+        reason: 'missing_access_token',
+      });
+      return;
+    }
+    if (!platform || typeof platform.authenticateAccessToken !== 'function') {
+      send(ws, {
+        type: 'auth_state',
+        ok: false,
+        reason: 'auth_unavailable',
+      });
+      return;
+    }
+
+    Promise.resolve(platform.authenticateAccessToken(accessToken))
+      .then((auth) => {
+        if (!auth || auth.ok !== true) {
+          ws.authUser = null;
+          ws.authSessionId = null;
+          send(ws, {
+            type: 'auth_state',
+            ok: false,
+            reason: auth && auth.reason ? auth.reason : 'invalid_access_token',
+          });
+          return;
+        }
+        ws.authUser = auth.profile;
+        ws.authSessionId = auth.session.id;
+        send(ws, {
+          type: 'auth_state',
+          ok: true,
+          user: auth.profile,
+        });
+      })
+      .catch(() => {
+        ws.authUser = null;
+        ws.authSessionId = null;
+        send(ws, {
+          type: 'auth_state',
+          ok: false,
+          reason: 'auth_internal_error',
+        });
+      });
   }
 
   function handleResumeSession(ws, payload) {
@@ -461,6 +541,7 @@ function createRoomLifecycleHandlers({ rooms, shared }) {
       handleCreateRoom,
       handleCreateAIRoom,
       handleJoinRoom,
+      handleAuthenticate,
       handleResumeSession,
       handleCreateResumeRoom,
       leaveRoom,

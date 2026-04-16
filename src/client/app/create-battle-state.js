@@ -41,6 +41,15 @@ export function createBattleState(options) {
       autoReplayExportRequested: false,
       suppressNextClose: false,
       reconnectDelay: 1000,
+      wsAuthPending: false,
+      wsAuthAttempted: false,
+      wsAuthOk: false,
+      replay: {
+        enabled: false,
+        replayId: '',
+        replay: null,
+        currentIndex: 0,
+      },
     },
   };
 }

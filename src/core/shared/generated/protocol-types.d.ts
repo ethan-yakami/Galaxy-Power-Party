@@ -2,7 +2,7 @@
 // Source of truth: proto/*.proto
 
 export type ProtocolMessageType =
-  'apply_preset' | 'battle_actions' | 'characters_updated' | 'choose_aurora_die' | 'choose_character' | 'confirm_attack_selection' | 'confirm_defense_selection' | 'create_ai_room' | 'create_custom_character' | 'create_resume_room' | 'create_room' | 'delete_custom_character' | 'error' | 'export_replay' | 'join_room' | 'left_room' | 'player_presence_changed' | 'preview_preset' | 'replay_export' | 'reroll_attack' | 'resume_session' | 'room_state' | 'session_resume_failed' | 'session_resumed' | 'submit_battle_action' | 'toggle_custom_character' | 'update_custom_character' | 'update_live_selection' | 'weather_changed' | 'welcome';
+  'apply_preset' | 'auth_state' | 'authenticate' | 'battle_actions' | 'characters_updated' | 'choose_aurora_die' | 'choose_character' | 'confirm_attack_selection' | 'confirm_defense_selection' | 'create_ai_room' | 'create_custom_character' | 'create_resume_room' | 'create_room' | 'delete_custom_character' | 'error' | 'export_replay' | 'join_room' | 'left_room' | 'player_presence_changed' | 'preview_preset' | 'replay_export' | 'reroll_attack' | 'resume_session' | 'room_state' | 'session_resume_failed' | 'session_resumed' | 'submit_battle_action' | 'toggle_custom_character' | 'update_custom_character' | 'update_live_selection' | 'weather_changed' | 'welcome';
 
 export type ProtocolDirection = 'client_to_server' | 'server_to_client';
 
@@ -39,6 +39,14 @@ export interface ProtocolPayloadByType {
     preset?: ProtocolObject;
     presetCode?: string;
     useSuggestedPreset?: boolean;
+  };
+  'auth_state': {
+    ok: boolean;
+    user?: ProtocolObject;
+    reason?: string;
+  };
+  'authenticate': {
+    accessToken: string;
   };
   'battle_actions': {
     turnId: number;
@@ -167,6 +175,8 @@ export type ProtocolEnvelope<T extends ProtocolMessageType = ProtocolMessageType
 
 export type ProtocolDirectionByType = {
   'apply_preset': 'client_to_server';
+  'auth_state': 'server_to_client';
+  'authenticate': 'client_to_server';
   'battle_actions': 'server_to_client';
   'characters_updated': 'server_to_client';
   'choose_aurora_die': 'client_to_server';

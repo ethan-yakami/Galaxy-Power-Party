@@ -48,6 +48,7 @@ function testGeneratedTypesContainMessageUnion() {
   const content = fs.readFileSync(dtsPath, 'utf8');
   assert.ok(content.includes("export type ProtocolMessageType ="));
   assert.ok(content.includes("'welcome'"));
+  assert.ok(content.includes("'authenticate'"));
   assert.ok(content.includes("'submit_battle_action'"));
 }
 

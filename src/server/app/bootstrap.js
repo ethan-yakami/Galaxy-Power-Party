@@ -118,11 +118,15 @@ function startServer(options = {}) {
     next();
   });
   const staticOptions = {
-    maxAge: '1h',
+    maxAge: 0,
     etag: true,
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('.html')) {
         res.setHeader('Cache-Control', 'no-store');
+        return;
+      }
+      if (/\.(?:js|mjs|css)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       }
     },
   };
@@ -258,6 +262,16 @@ function startServer(options = {}) {
     });
   });
 
+  app.get('/api/catalog', (_req, res) => {
+    res.json({
+      ok: true,
+      generatedAt: Date.now(),
+      characters: getCharacterSummary(),
+      auroraDice: getAuroraDiceSummary(),
+      weatherCatalog: getWeatherCatalogSummary(),
+    });
+  });
+
   app.get('/api/debug/room-metrics', (_req, res) => {
     if (!isAdminRequest(_req)) {
       const provided = !!(_req.headers && (_req.headers['x-admin-token'] || _req.headers.authorization));
@@ -381,23 +395,8 @@ function startServer(options = {}) {
     ws.heartbeatMisses = 0;
     ws.requestIp = requestIp;
     platform.metrics.inc('gpp_socket_connections_total');
-    try {
-      const requestUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-      const accessToken = requestUrl.searchParams.get('accessToken')
-        || requestUrl.searchParams.get('token')
-        || '';
-      if (accessToken) {
-        const auth = await platform.authenticateAccessToken(accessToken);
-        if (auth.ok) {
-          ws.authUser = auth.profile;
-          ws.authSessionId = auth.session.id;
-        } else {
-          platform.metrics.inc('gpp_auth_failures_total', { reason: auth.reason || 'ws_auth_failed' });
-        }
-      }
-    } catch {
-      // Ignore query parsing/auth errors for anonymous ws sessions.
-    }
+    ws.authUser = null;
+    ws.authSessionId = null;
     logger.info('socket_connected', {
       playerId: ws.playerId || null,
       userId: ws.authUser ? ws.authUser.id : null,
@@ -485,12 +484,21 @@ function startServer(options = {}) {
     const actualPort = address && typeof address === 'object' ? address.port : PORT;
     const localUrl = `http://${getLocalOpenHost(HOST)}:${actualPort}`;
     const lanIp = getLanIPv4();
+    const characterCount = getCharacterSummary().length;
+    const auroraCount = getAuroraDiceSummary().length;
     logger.info('server_started', {
       bind: `${HOST}:${actualPort}`,
       localUrl,
       nodeEnv: platform.config.nodeEnv,
       storeProvider: platform.config.database.provider,
+      characterCount,
+      auroraCount,
     });
+    if (auroraCount === 0) {
+      logger.error('aurora_catalog_empty', {
+        hint: 'Aurora registry is empty. Check content entities directory names and deployment artifact completeness.',
+      });
+    }
     if (HOST === '0.0.0.0' || HOST === '::' || HOST === '::0') {
       if (lanIp) {
         logger.info('lan_url_detected', {

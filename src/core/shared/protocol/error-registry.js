@@ -30,6 +30,24 @@
       severity: 'warn',
       defaultMessage: 'Room not found.',
     },
+    ROOM_FULL: {
+      code: 'ROOM_FULL',
+      category: 'user',
+      severity: 'warn',
+      defaultMessage: 'Room is full.',
+    },
+    ROOM_IN_GAME: {
+      code: 'ROOM_IN_GAME',
+      category: 'user',
+      severity: 'warn',
+      defaultMessage: 'Room is already in game.',
+    },
+    ROOM_ENDED: {
+      code: 'ROOM_ENDED',
+      category: 'user',
+      severity: 'warn',
+      defaultMessage: 'Room has ended.',
+    },
     NOT_IN_ROOM: {
       code: 'NOT_IN_ROOM',
       category: 'user',
