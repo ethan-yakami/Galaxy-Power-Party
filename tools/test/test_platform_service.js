@@ -1,5 +1,7 @@
 const assert = require('assert');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const { once } = require('events');
 const WebSocket = require('ws');
 
@@ -104,6 +106,17 @@ async function createAuthenticatedAiReplay(baseUrl, accessToken) {
 }
 
 async function run() {
+  const auroraDir = path.resolve(__dirname, '../../src/content/entities/auroras');
+  const requiredAuroraFiles = ['legacy.js', 'gambler.js', 'destiny.js'];
+  for (const fileName of requiredAuroraFiles) {
+    const fullPath = path.join(auroraDir, fileName);
+    assert.strictEqual(
+      fs.existsSync(fullPath),
+      true,
+      `missing required aurora asset: ${fullPath}`,
+    );
+  }
+
   process.env.GPP_ADMIN_TOKEN = 'test-admin-token';
   const runtime = startServer({ port: 0, host: '127.0.0.1' });
   await once(runtime.server, 'listening');
@@ -118,6 +131,12 @@ async function run() {
     const ready = await request(baseUrl, 'GET', '/api/readyz');
     assert.strictEqual(ready.status, 200);
     assert.strictEqual(ready.json.ok, true);
+
+    const catalog = await request(baseUrl, 'GET', '/api/catalog');
+    assert.strictEqual(catalog.status, 200);
+    assert.strictEqual(catalog.json.ok, true);
+    assert.ok(Array.isArray(catalog.json.auroraDice));
+    assert.ok(catalog.json.auroraDice.length > 0);
 
     const register = await request(baseUrl, 'POST', '/api/auth/register', {
       username: 'service_test_user',

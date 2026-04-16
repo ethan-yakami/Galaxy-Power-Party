@@ -7,7 +7,6 @@ yarn-error.log*
 pnpm-debug.log*
 .netlify/
 chars
-auroras
 CLAUDE.md
 build/
 tmp/runtime/
