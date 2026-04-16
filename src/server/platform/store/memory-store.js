@@ -109,6 +109,11 @@ function createMemoryStore() {
         .slice(0, limit)
         .map((record) => toReplaySummary(record));
     },
+    async getReplayRecordByIdForUser(ownerUserId, replayId) {
+      const record = replayRecords.get(String(replayId || ''));
+      if (!record || record.ownerUserId !== ownerUserId) return null;
+      return clone(record);
+    },
     async addAuditEvent(event) {
       auditEvents.push({
         id: randomUUID(),
@@ -116,6 +121,17 @@ function createMemoryStore() {
         ...clone(event),
       });
       return true;
+    },
+    async cleanupExpiredSessions(now = Date.now()) {
+      let removed = 0;
+      for (const [sessionId, session] of sessions.entries()) {
+        const expired = Number.isFinite(session.expiresAt) && session.expiresAt <= now;
+        const revoked = Number.isFinite(session.revokedAt) && session.revokedAt <= now;
+        if (!expired && !revoked) continue;
+        sessions.delete(sessionId);
+        removed += 1;
+      }
+      return removed;
     },
     async getAuditEvents(limit = 50) {
       return auditEvents.slice(-limit).map((event) => clone(event));

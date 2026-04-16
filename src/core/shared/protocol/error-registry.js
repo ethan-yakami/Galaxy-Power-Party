@@ -84,6 +84,12 @@
       severity: 'warn',
       defaultMessage: 'Session resume failed.',
     },
+    RATE_LIMITED: {
+      code: 'RATE_LIMITED',
+      category: 'security',
+      severity: 'warn',
+      defaultMessage: 'Too many requests. Please retry later.',
+    },
     UNSUPPORTED_PROTOCOL_VERSION: {
       code: 'UNSUPPORTED_PROTOCOL_VERSION',
       category: 'protocol',

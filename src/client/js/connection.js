@@ -62,7 +62,14 @@
     if (!location.host) {
       throw new Error('当前页面缺少 host，无法建立 WebSocket 连接。');
     }
-    return `${GPP.wsProtocol}//${location.host}`;
+    const url = new URL(`${GPP.wsProtocol}//${location.host}`);
+    const accessToken = window.GPPAuth && typeof window.GPPAuth.getAccessToken === 'function'
+      ? window.GPPAuth.getAccessToken()
+      : '';
+    if (accessToken) {
+      url.searchParams.set('accessToken', accessToken);
+    }
+    return url.toString();
   }
 
   function readResumePayload() {

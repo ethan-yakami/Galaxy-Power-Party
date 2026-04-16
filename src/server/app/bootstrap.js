@@ -9,6 +9,7 @@ const WebSocket = require('ws');
 const { getCharacterSummary, getAuroraDiceSummary } = require('../services/registry');
 const { getWeatherCatalogSummary } = require('../services/weather');
 const { send, buildPublicRoomSummary } = require('../services/rooms');
+const { clearAIActionTimer } = require('../ai');
 const { createLogger } = require('../observability/logger');
 const createHandlers = require('./handlers');
 const createMessageRouter = require('../transport/message-router');
@@ -17,7 +18,8 @@ const { sendError, ERROR_CODES } = require('../transport/protocol/errors');
 const replaySchema = require('../../core/shared/replay-schema');
 const protocolVersioning = require('../../core/shared/protocol/versioning');
 const { createPlatform } = require('../platform/create-platform');
-const { registerPlatformHttpRoutes } = require('../platform/http');
+const { registerPlatformHttpRoutes, sendJsonError, createAdminAccessGuard } = require('../platform/http');
+const { createWindowRateLimiter } = require('../platform/rate-limit');
 
 const packageMeta = require(path.resolve(__dirname, '../../../package.json'));
 
@@ -64,6 +66,20 @@ function getLocalOpenHost(host) {
   return host;
 }
 
+function getRequestIp(req) {
+  if (!req) return 'unknown';
+  const forwarded = req.headers && typeof req.headers['x-forwarded-for'] === 'string'
+    ? req.headers['x-forwarded-for'].split(',')[0].trim()
+    : '';
+  if (forwarded) return forwarded;
+  if (req.socket && req.socket.remoteAddress) return req.socket.remoteAddress;
+  return 'unknown';
+}
+
+function safeNow() {
+  return Date.now();
+}
+
 function startServer(options = {}) {
   const logger = createLogger('server.bootstrap');
   process.on('uncaughtException', (err) => {
@@ -93,6 +109,7 @@ function startServer(options = {}) {
   const PICTURE_DIR = path.join(ROOT_DIR, 'picture');
 
   const app = express();
+  app.set('trust proxy', 1);
   app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use((req, res, next) => {
@@ -150,7 +167,11 @@ function startServer(options = {}) {
       }
     });
   }, HEARTBEAT_INTERVAL);
-  wss.on('close', () => clearInterval(heartbeatTimer));
+  wss.on('close', () => {
+    clearInterval(heartbeatTimer);
+    clearInterval(roomCleanupTimer);
+    clearInterval(sessionCleanupTimer);
+  });
 
   const rooms = new Map();
   let nextPlayerId = 1;
@@ -161,6 +182,28 @@ function startServer(options = {}) {
     protocolVersion: PROTOCOL_VERSION,
     replayVersion: replaySchema.REPLAY_VERSION,
   });
+  const isAdminRequest = createAdminAccessGuard(platform);
+  const securityConfig = platform.config && platform.config.security ? platform.config.security : {};
+  const wsHandshakeLimiter = createWindowRateLimiter({
+    windowMs: Number.isInteger(securityConfig.wsHandshakeWindowMs) ? securityConfig.wsHandshakeWindowMs : 60 * 1000,
+    max: Number.isInteger(securityConfig.wsHandshakeMax) ? securityConfig.wsHandshakeMax : 30,
+    banMs: Number.isInteger(securityConfig.wsHandshakeBanMs) ? securityConfig.wsHandshakeBanMs : 2 * 60 * 1000,
+  });
+  const wsActionLimiter = createWindowRateLimiter({
+    windowMs: Number.isInteger(securityConfig.wsActionWindowMs) ? securityConfig.wsActionWindowMs : 10 * 1000,
+    max: Number.isInteger(securityConfig.wsActionMax) ? securityConfig.wsActionMax : 24,
+    banMs: Number.isInteger(securityConfig.wsActionBanMs) ? securityConfig.wsActionBanMs : 60 * 1000,
+  });
+  const rateLimitedWsTypes = new Set([
+    'create_room',
+    'create_ai_room',
+    'join_room',
+    'create_resume_room',
+    'submit_battle_action',
+    'create_custom_character',
+    'update_custom_character',
+    'delete_custom_character',
+  ]);
 
   app.use((req, res, next) => {
     const startedAt = Date.now();
@@ -201,7 +244,7 @@ function startServer(options = {}) {
       generatedAt: Date.now(),
       app: {
         name: packageMeta.name || 'galaxy-power-party',
-        version: packageMeta.version || '0.0.0',
+        version: platform.versionInfo.appVersion || packageMeta.version || '0.0.0',
       },
       protocol: {
         current: PROTOCOL_VERSION,
@@ -216,6 +259,16 @@ function startServer(options = {}) {
   });
 
   app.get('/api/debug/room-metrics', (_req, res) => {
+    if (!isAdminRequest(_req)) {
+      const provided = !!(_req.headers && (_req.headers['x-admin-token'] || _req.headers.authorization));
+      sendJsonError(
+        res,
+        provided ? 403 : 401,
+        provided ? 'admin_forbidden' : 'admin_auth_required',
+        'Admin token required.',
+      );
+      return;
+    }
     res.json({ ok: true, generatedAt: Date.now(), metrics: collectRoomMetrics(rooms) });
   });
   registerPlatformHttpRoutes(app, {
@@ -237,9 +290,96 @@ function startServer(options = {}) {
     broadcastCharacterCatalog,
   });
 
+  const roomCleanupIntervalMs = Number.isInteger(securityConfig.roomCleanupIntervalMs)
+    ? securityConfig.roomCleanupIntervalMs
+    : 30 * 1000;
+  const roomIdleTtlMs = Number.isInteger(securityConfig.roomIdleTtlMs)
+    ? securityConfig.roomIdleTtlMs
+    : 30 * 60 * 1000;
+  const playerOfflineGraceMs = Number.isInteger(securityConfig.playerOfflineGraceMs)
+    ? securityConfig.playerOfflineGraceMs
+    : 2 * 60 * 1000;
+  const sessionCleanupIntervalMs = Number.isInteger(securityConfig.sessionCleanupIntervalMs)
+    ? securityConfig.sessionCleanupIntervalMs
+    : 10 * 60 * 1000;
+
+  const roomCleanupTimer = setInterval(() => {
+    const now = safeNow();
+    let removedRooms = 0;
+    let removedPlayers = 0;
+    for (const [roomCode, room] of rooms.entries()) {
+      if (!room || !Array.isArray(room.players)) {
+        rooms.delete(roomCode);
+        removedRooms += 1;
+        continue;
+      }
+
+      room.players = room.players.filter((player) => {
+        if (!player) return false;
+        if (player.ws && player.ws.isAI) return true;
+        if (player.isOnline !== false && player.ws) return true;
+        const disconnectedAt = Number.isFinite(player.disconnectedAt) ? player.disconnectedAt : 0;
+        if (!disconnectedAt) return true;
+        if ((now - disconnectedAt) <= playerOfflineGraceMs) return true;
+        removedPlayers += 1;
+        return false;
+      });
+
+      const hasHumanOnline = room.players.some((player) => player && !(player.ws && player.ws.isAI) && player.ws && player.isOnline !== false);
+      const onlyAiOrEmpty = room.players.length === 0
+        || room.players.every((player) => player && player.ws && player.ws.isAI);
+      const lastActiveAt = Number.isFinite(room.lastActiveAt) ? room.lastActiveAt : 0;
+      const idleExpired = lastActiveAt > 0 && (now - lastActiveAt) > roomIdleTtlMs;
+      if (onlyAiOrEmpty || (idleExpired && !hasHumanOnline)) {
+        clearAIActionTimer(room);
+        rooms.delete(roomCode);
+        removedRooms += 1;
+      }
+    }
+
+    wsHandshakeLimiter.prune(now);
+    wsActionLimiter.prune(now);
+    if (removedRooms > 0 || removedPlayers > 0) {
+      logger.info('room_cleanup_applied', {
+        removedRooms,
+        removedPlayers,
+        activeRooms: rooms.size,
+      });
+    }
+  }, roomCleanupIntervalMs);
+
+  const sessionCleanupTimer = setInterval(async () => {
+    try {
+      const removed = await platform.cleanupExpiredSessions();
+      if (removed > 0) {
+        logger.info('session_cleanup_applied', { removed });
+      }
+    } catch (error) {
+      logger.warn('session_cleanup_failed', {
+        message: error && error.message ? error.message : String(error),
+      });
+    }
+  }, sessionCleanupIntervalMs);
+  server.on('close', () => {
+    clearInterval(roomCleanupTimer);
+    clearInterval(sessionCleanupTimer);
+  });
+
   wss.on('connection', async (ws, req) => {
+    const requestIp = getRequestIp(req);
+    const handshakeRate = wsHandshakeLimiter.consume(requestIp);
+    if (!handshakeRate.ok) {
+      platform.metrics.inc('gpp_rate_limited_total', { scope: 'ws_handshake' });
+      try {
+        ws.close(1013, 'rate_limited');
+      } catch {
+        ws.terminate();
+      }
+      return;
+    }
     ws.awaitingPong = false;
     ws.heartbeatMisses = 0;
+    ws.requestIp = requestIp;
     platform.metrics.inc('gpp_socket_connections_total');
     try {
       const requestUrl = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
@@ -303,6 +443,25 @@ function startServer(options = {}) {
         });
         return;
       }
+      if (rateLimitedWsTypes.has(normalized.envelope.type)) {
+        const rateKey = `${ws.requestIp || 'unknown'}:${normalized.envelope.type}`;
+        const actionRate = wsActionLimiter.consume(rateKey);
+        if (!actionRate.ok) {
+          platform.metrics.inc('gpp_rate_limited_total', {
+            scope: 'ws_action',
+            type: normalized.envelope.type,
+          });
+          logger.warn('socket_message_rate_limited', {
+            playerId: ws.playerId,
+            type: normalized.envelope.type,
+            requestIp: ws.requestIp || 'unknown',
+          });
+          sendError(ws, ERROR_CODES.RATE_LIMITED, 'Too many requests, please retry later.', {
+            meta: normalized.meta,
+          });
+          return;
+        }
+      }
       logger.debug('socket_message_accepted', {
         playerId: ws.playerId,
         type: normalized.envelope.type,
@@ -329,6 +488,8 @@ function startServer(options = {}) {
     logger.info('server_started', {
       bind: `${HOST}:${actualPort}`,
       localUrl,
+      nodeEnv: platform.config.nodeEnv,
+      storeProvider: platform.config.database.provider,
     });
     if (HOST === '0.0.0.0' || HOST === '::' || HOST === '::0') {
       if (lanIp) {

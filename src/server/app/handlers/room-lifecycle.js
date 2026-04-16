@@ -121,6 +121,10 @@ function resolveResumeDraft(payload) {
 }
 
 function createRoomLifecycleHandlers({ rooms, shared }) {
+  const OFFLINE_GRACE_MS = Number.isInteger(Number(process.env.GPP_PLAYER_OFFLINE_GRACE_MS))
+    ? Number(process.env.GPP_PLAYER_OFFLINE_GRACE_MS)
+    : 2 * 60 * 1000;
+
   function applyLoadoutToPlayer(player, loadout) {
     if (!player || !loadout) return;
     player.characterId = loadout.characterId || null;
@@ -441,6 +445,7 @@ function createRoomLifecycleHandlers({ rooms, shared }) {
     clearAIActionTimer(room);
     player.isOnline = false;
     player.disconnectedAt = Date.now();
+    player.graceDeadline = player.disconnectedAt + OFFLINE_GRACE_MS;
     player.ws = null;
 
     if (room.players.every((p) => !p.ws || p.ws.isAI)) {

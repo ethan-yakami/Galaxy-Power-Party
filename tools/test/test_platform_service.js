@@ -104,6 +104,7 @@ async function createAuthenticatedAiReplay(baseUrl, accessToken) {
 }
 
 async function run() {
+  process.env.GPP_ADMIN_TOKEN = 'test-admin-token';
   const runtime = startServer({ port: 0, host: '127.0.0.1' });
   await once(runtime.server, 'listening');
   const address = runtime.server.address();
@@ -154,8 +155,24 @@ async function run() {
     });
     assert.strictEqual(replayListAfter.status, 200);
     assert.strictEqual(replayListAfter.json.items.length, 1);
+    const replayId = replayListAfter.json.items[0].replayId;
 
-    const metrics = await request(baseUrl, 'GET', '/api/metrics');
+    const replayDetail = await request(baseUrl, 'GET', `/api/replays/${encodeURIComponent(replayId)}`, null, {
+      Authorization: `Bearer ${register.json.accessToken}`,
+    });
+    assert.strictEqual(replayDetail.status, 200);
+    assert.strictEqual(replayDetail.json.ok, true);
+    assert.ok(replayDetail.json.replay);
+
+    const metricsUnauthorized = await request(baseUrl, 'GET', '/api/metrics');
+    assert.strictEqual(metricsUnauthorized.status, 401);
+
+    const debugUnauthorized = await request(baseUrl, 'GET', '/api/debug/rooms');
+    assert.strictEqual(debugUnauthorized.status, 401);
+
+    const metrics = await request(baseUrl, 'GET', '/api/metrics', null, {
+      'x-admin-token': 'test-admin-token',
+    });
     assert.strictEqual(metrics.status, 200);
     assert.ok(metrics.text.includes('gpp_http_requests_total'));
     assert.ok(metrics.text.includes('gpp_replay_exports_total'));
@@ -175,6 +192,7 @@ async function run() {
   } finally {
     runtime.wss.close();
     runtime.server.close();
+    delete process.env.GPP_ADMIN_TOKEN;
   }
 }
 

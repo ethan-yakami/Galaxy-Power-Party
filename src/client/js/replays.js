@@ -376,6 +376,10 @@
     };
     dom.continueLocalBtn.onclick = () => openResumeBattle('resume_local');
     dom.continueRoomBtn.onclick = () => openResumeBattle('resume_room');
+    window.addEventListener('gpp_replays_local_updated', () => {
+      loadEntries();
+      render();
+    });
   }
 
   loadEntries();

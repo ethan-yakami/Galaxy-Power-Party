@@ -1,11 +1,38 @@
-services:
+﻿services:
   - type: web
     name: galaxy-power-party
     runtime: node
     plan: free
     region: singapore
-    branch: master
-    buildCommand: npm install
-    startCommand: npm start
-    healthCheckPath: /
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm run start:render
+    healthCheckPath: /api/readyz
     autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: GPP_APP_VERSION
+        value: 1.1.0
+      - key: GPP_STORE_PROVIDER
+        value: prisma
+      - key: DATABASE_URL
+        fromDatabase:
+          name: galaxy-power-party-db
+          property: connectionString
+      - key: GPP_ACCESS_TOKEN_SECRET
+        sync: false
+      - key: GPP_REFRESH_TOKEN_SECRET
+        sync: false
+      - key: GPP_ADMIN_TOKEN
+        sync: false
+
+
+databases:
+  - name: galaxy-power-party-db
+    databaseName: galaxy_power_party
+    user: gpp_user
+    plan: free
+    region: singapore

@@ -32,7 +32,9 @@ function createPrismaStore(config) {
       revokeSession: unavailable,
       saveReplayRecord: unavailable,
       listReplayRecordsByUser: unavailable,
+      getReplayRecordByIdForUser: unavailable,
       addAuditEvent: unavailable,
+      cleanupExpiredSessions: unavailable,
     };
   }
 
@@ -135,6 +137,14 @@ function createPrismaStore(config) {
         },
       });
     },
+    async getReplayRecordByIdForUser(ownerUserId, replayId) {
+      return prisma.replayRecord.findFirst({
+        where: {
+          ownerUserId,
+          replayId: String(replayId || ''),
+        },
+      });
+    },
     async addAuditEvent(event) {
       await prisma.auditEvent.create({
         data: {
@@ -146,6 +156,18 @@ function createPrismaStore(config) {
         },
       });
       return true;
+    },
+    async cleanupExpiredSessions(now = Date.now()) {
+      const cutoff = new Date(now);
+      const result = await prisma.authSession.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lte: cutoff } },
+            { revokedAt: { not: null } },
+          ],
+        },
+      });
+      return result && Number.isInteger(result.count) ? result.count : 0;
     },
   });
 }

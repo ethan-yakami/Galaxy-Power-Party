@@ -5,7 +5,10 @@
     "main":  "server.js",
     "scripts":  {
                     "start":  "node server.js",
+                    "start:render":  "npm run prisma:generate && npm run prisma:migrate && npm start",
                     "build:client":  "vite build",
+                    "prisma:generate":  "prisma generate --schema prisma/schema.prisma",
+                    "prisma:migrate":  "prisma migrate deploy --schema prisma/schema.prisma",
                     "build:portable":  "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build/build_portable.ps1",
                     "lint":  "eslint src/client/app src/server/app src/server/platform src/server/observability src/server/transport/protocol src/core/shared/protocol tools/dev tools/test vite.config.mjs vitest.config.mjs dependency-cruiser.cjs --max-warnings=0",
                     "typecheck":  "tsc -p tsconfig.json --noEmit",
@@ -46,8 +49,10 @@
                     "test:ai-strength":  "node tools/test/test_ai_strength.js"
                 },
     "dependencies":  {
+                         "@prisma/client":  "^5.22.0",
                          "compression":  "^1.7.5",
                          "express":  "^4.21.2",
+                         "prisma":  "^5.22.0",
                          "ws":  "^8.18.0"
                      },
     "devDependencies":  {

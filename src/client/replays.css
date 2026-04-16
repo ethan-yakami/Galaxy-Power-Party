@@ -89,6 +89,7 @@ h2 {
 
 .headerActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -242,4 +243,3 @@ button:hover {
     min-height: 0;
   }
 }
-

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>银河战力党 - 对局回放</title>
-    <link rel="stylesheet" href="replays.css?v=v_replay_20260414_v4" />
+    <link rel="stylesheet" href="replays.css?v=v_replay_20260416_v5" />
   </head>
   <body>
     <div class="replaysBg" aria-hidden="true">
@@ -17,8 +17,10 @@
         <div>
           <p class="brandSub">GALAXY POWER PARTY</p>
           <h1>对局回放</h1>
+          <p id="authReplayStatus" class="hint">账号：未登录（可浏览本地回放）</p>
         </div>
         <div class="headerActions">
+          <button id="cloudRefreshBtn" class="secondaryBtn" type="button">刷新我的回放</button>
           <label class="secondaryBtn" for="importReplayInput">导入 JSON</label>
           <input id="importReplayInput" type="file" accept=".json,application/json" class="hidden" />
           <button id="backHomeBtn" class="secondaryBtn" type="button">返回主页</button>
@@ -28,9 +30,13 @@
 
       <section class="replaysLayout">
         <aside class="panel historyPanel">
-          <h2>最近对局</h2>
+          <h2>本地回放</h2>
           <p id="historyHint" class="hint"></p>
           <ul id="historyList" class="historyList"></ul>
+
+          <h2 style="margin-top: 16px;">我的云端回放</h2>
+          <p id="cloudHint" class="hint">未加载</p>
+          <ul id="cloudReplayList" class="historyList"></ul>
         </aside>
 
         <section class="panel detailPanel">
@@ -65,8 +71,9 @@
     </main>
 
     <script src="/shared/replay-schema.js"></script>
+    <script src="js/auth.js?v=v_replay_auth_20260416_v1"></script>
     <script src="js/replay-history.js?v=v_replay_20260414_v4"></script>
-    <script src="js/replays.js?v=v_replay_20260414_v4"></script>
+    <script src="js/replays.js?v=v_replay_20260416_v5"></script>
+    <script src="js/replays-cloud.js?v=v_replay_cloud_20260416_v1"></script>
   </body>
 </html>
-

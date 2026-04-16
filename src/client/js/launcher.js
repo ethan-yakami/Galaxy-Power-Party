@@ -10,6 +10,13 @@
   const publicRoomSelect = document.getElementById('publicRoomSelect');
   const refreshPublicRoomsBtn = document.getElementById('refreshPublicRoomsBtn');
   const publicRoomsHint = document.getElementById('publicRoomsHint');
+  const authStatusText = document.getElementById('authStatusText');
+  const authUsernameInput = document.getElementById('authUsernameInput');
+  const authPasswordInput = document.getElementById('authPasswordInput');
+  const authRegisterBtn = document.getElementById('authRegisterBtn');
+  const authLoginBtn = document.getElementById('authLoginBtn');
+  const authLogoutBtn = document.getElementById('authLogoutBtn');
+  const authApi = window.GPPAuth || null;
 
   function setMessage(text, isError) {
     if (!messageEl) return;
@@ -87,6 +94,62 @@
     }
   }
 
+  function getAuthForm() {
+    const username = authUsernameInput ? String(authUsernameInput.value || '').trim() : '';
+    const password = authPasswordInput ? String(authPasswordInput.value || '') : '';
+    return { username, password };
+  }
+
+  function renderAuthStatus() {
+    if (!authApi || !authStatusText) return;
+    const session = authApi.getSession();
+    if (session && session.user && session.user.username) {
+      authStatusText.textContent = `已登录：${session.user.username}`;
+    } else if (session && session.isAuthenticated) {
+      authStatusText.textContent = '已登录';
+    } else {
+      authStatusText.textContent = '未登录';
+    }
+  }
+
+  async function runAuthAction(kind) {
+    if (!authApi) return;
+    const { username, password } = getAuthForm();
+    if (kind !== 'logout') {
+      if (username.length < 3) {
+        setMessage('用户名至少需要 3 位。', true);
+        return;
+      }
+      if (password.length < 6) {
+        setMessage('密码至少需要 6 位。', true);
+        return;
+      }
+    }
+    try {
+      if (kind === 'register') {
+        const result = await authApi.register(username, password);
+        if (!result.ok) {
+          setMessage(`注册失败：${result.code || result.status || 'unknown'}`, true);
+          return;
+        }
+        setMessage('注册成功，已自动登录。', false);
+      } else if (kind === 'login') {
+        const result = await authApi.login(username, password);
+        if (!result.ok) {
+          setMessage(`登录失败：${result.code || result.status || 'unknown'}`, true);
+          return;
+        }
+        setMessage('登录成功。', false);
+      } else {
+        await authApi.logout();
+        setMessage('已退出登录。', false);
+      }
+      renderAuthStatus();
+    } catch (error) {
+      setMessage(`账号操作失败：${error && error.message ? error.message : String(error)}`, true);
+    }
+  }
+
   if (createBtn) {
     createBtn.onclick = function() {
       openBattlePage('create', getPlayerName());
@@ -139,7 +202,30 @@
     };
   }
 
+  if (authRegisterBtn) {
+    authRegisterBtn.onclick = function() {
+      runAuthAction('register');
+    };
+  }
+
+  if (authLoginBtn) {
+    authLoginBtn.onclick = function() {
+      runAuthAction('login');
+    };
+  }
+
+  if (authLogoutBtn) {
+    authLogoutBtn.onclick = function() {
+      runAuthAction('logout');
+    };
+  }
+
   refreshPublicRooms(false);
+  renderAuthStatus();
+  if (authApi) {
+    authApi.fetchMe().finally(renderAuthStatus);
+    window.addEventListener(authApi.AUTH_EVENT, renderAuthStatus);
+  }
   setInterval(() => {
     refreshPublicRooms(false);
   }, 15000);

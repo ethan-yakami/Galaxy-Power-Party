@@ -3,6 +3,7 @@ const LEGACY_RUNTIME_SCRIPTS = [
   '/shared/preset-schema.js',
   '/shared/protocol/error-registry.js',
   '/shared/protocol/versioning.js',
+  '/js/auth.js',
   '/js/replay-history.js',
   '/js/connection-state-machine.js',
   '/js/battle-view-model.js',

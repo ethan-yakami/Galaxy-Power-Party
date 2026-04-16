@@ -1,3 +1,5 @@
+const { createWindowRateLimiter } = require('./rate-limit');
+
 function sendJsonError(res, status, code, message, extra = {}) {
   res.status(status).json({
     ok: false,
@@ -15,6 +17,72 @@ function getBearerToken(req) {
   return '';
 }
 
+function getAdminToken(req) {
+  const headerToken = req && req.headers && typeof req.headers['x-admin-token'] === 'string'
+    ? req.headers['x-admin-token'].trim()
+    : '';
+  if (headerToken) return headerToken;
+  return getBearerToken(req);
+}
+
+function createAdminAccessGuard(platform) {
+  const expectedToken = platform && platform.config && platform.config.admin
+    ? String(platform.config.admin.token || '').trim()
+    : '';
+  return function isAdminRequest(req) {
+    if (!expectedToken) return false;
+    const provided = getAdminToken(req);
+    return !!provided && provided === expectedToken;
+  };
+}
+
+function createRequireAdminMiddleware(platform) {
+  const isAdminRequest = createAdminAccessGuard(platform);
+  return function requireAdmin(req, res, next) {
+    if (isAdminRequest(req)) {
+      next();
+      return;
+    }
+    const provided = !!getAdminToken(req);
+    sendJsonError(
+      res,
+      provided ? 403 : 401,
+      provided ? 'admin_forbidden' : 'admin_auth_required',
+      'Admin token required.',
+    );
+  };
+}
+
+function createAuthRateLimitMiddleware(platform) {
+  const security = platform && platform.config ? platform.config.security : {};
+  const limiter = createWindowRateLimiter({
+    windowMs: security && Number.isInteger(security.authRateLimitWindowMs) ? security.authRateLimitWindowMs : 60 * 1000,
+    max: security && Number.isInteger(security.authRateLimitMax) ? security.authRateLimitMax : 20,
+    banMs: security && Number.isInteger(security.authRateLimitBanMs) ? security.authRateLimitBanMs : 5 * 60 * 1000,
+  });
+  return function authRateLimit(req, res, next) {
+    if (!req.path || !['/register', '/login', '/refresh'].includes(req.path)) {
+      next();
+      return;
+    }
+    const key = `${req.ip || 'unknown'}:${req.path}`;
+    const limited = limiter.consume(key);
+    if (limited.ok) {
+      next();
+      return;
+    }
+    if (platform && platform.metrics && typeof platform.metrics.inc === 'function') {
+      platform.metrics.inc('gpp_rate_limited_total', {
+        scope: 'http_auth',
+        path: req.path,
+      });
+    }
+    sendJsonError(res, 429, 'rate_limited', 'Too many requests, please retry later.', {
+      retryAfterMs: limited.retryAfterMs,
+    });
+  };
+}
+
 async function attachAuthUser(req, _res, next) {
   const token = getBearerToken(req);
   if (!token || !req.platform) {
@@ -28,10 +96,13 @@ async function attachAuthUser(req, _res, next) {
 }
 
 function registerPlatformHttpRoutes(app, { platform, logger }) {
+  const requireAdmin = createRequireAdminMiddleware(platform);
+  const authRateLimit = createAuthRateLimitMiddleware(platform);
   app.use((req, _res, next) => {
     req.platform = platform;
     next();
   });
+  app.use('/api/auth', authRateLimit);
   app.use(attachAuthUser);
 
   app.get('/api/healthz', async (_req, res) => {
@@ -53,7 +124,7 @@ function registerPlatformHttpRoutes(app, { platform, logger }) {
     });
   });
 
-  app.get('/api/metrics', (_req, res) => {
+  app.get('/api/metrics', requireAdmin, (_req, res) => {
     res.type('text/plain').send(platform.metrics.renderPrometheus());
   });
 
@@ -145,7 +216,29 @@ function registerPlatformHttpRoutes(app, { platform, logger }) {
     });
   });
 
-  app.get('/api/debug/rooms', async (_req, res) => {
+  app.get('/api/replays/:replayId', async (req, res) => {
+    if (!req.auth) {
+      sendJsonError(res, 401, 'auth_required', 'Authentication required.');
+      return;
+    }
+    const item = await platform.getUserReplay(req.auth.user.id, req.params.replayId);
+    if (!item || !item.replay) {
+      sendJsonError(res, 404, 'replay_not_found', 'Replay not found.');
+      return;
+    }
+    res.json({
+      ok: true,
+      replay: item.replay,
+      meta: {
+        replayId: item.replayId,
+        createdAt: item.createdAt,
+        sourceRoomMode: item.sourceRoomMode,
+        roomCode: item.roomCode,
+      },
+    });
+  });
+
+  app.get('/api/debug/rooms', requireAdmin, async (_req, res) => {
     const snapshot = await platform.buildRoomDiagnostics();
     res.json({
       ok: true,
@@ -154,7 +247,7 @@ function registerPlatformHttpRoutes(app, { platform, logger }) {
     });
   });
 
-  app.get('/api/debug/rooms/:roomCode', async (req, res) => {
+  app.get('/api/debug/rooms/:roomCode', requireAdmin, async (req, res) => {
     const snapshot = await platform.buildRoomDiagnostics(req.params.roomCode);
     res.status(snapshot.ok ? 200 : 404).json({
       ...snapshot,
@@ -180,4 +273,6 @@ function registerPlatformHttpRoutes(app, { platform, logger }) {
 module.exports = {
   registerPlatformHttpRoutes,
   getBearerToken,
+  sendJsonError,
+  createAdminAccessGuard,
 };

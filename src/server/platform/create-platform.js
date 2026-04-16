@@ -237,6 +237,33 @@ function createPlatform({ rooms, logger, packageMeta, protocolVersion, replayVer
     async listUserReplays(userId) {
       return store.listReplayRecordsByUser(userId, config.replays.listLimit);
     },
+    async getUserReplay(userId, replayId) {
+      const item = await store.getReplayRecordByIdForUser(userId, replayId);
+      if (!item) return null;
+      let replay = null;
+      if (item.payload && typeof item.payload === 'object') {
+        replay = item.payload;
+      } else if (typeof item.payloadJson === 'string' && item.payloadJson) {
+        try {
+          replay = JSON.parse(item.payloadJson);
+        } catch {
+          replay = null;
+        }
+      }
+      return {
+        replayId: item.replayId,
+        ownerUserId: item.ownerUserId,
+        version: item.version || '',
+        sourceRoomMode: item.sourceRoomMode || '',
+        roomCode: item.roomCode || '',
+        createdAt: item.createdAt,
+        replay,
+      };
+    },
+    async cleanupExpiredSessions() {
+      if (typeof store.cleanupExpiredSessions !== 'function') return 0;
+      return store.cleanupExpiredSessions(Date.now());
+    },
     async buildRoomDiagnostics(roomCode) {
       if (roomCode) {
         const room = rooms.get(String(roomCode));

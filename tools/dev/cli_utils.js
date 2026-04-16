@@ -40,10 +40,13 @@ function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-function fetchJson(url) {
+function fetchJson(url, options = {}) {
   const client = url.startsWith('https:') ? https : http;
   return new Promise((resolve, reject) => {
-    const req = client.get(url, (res) => {
+    const req = client.request(url, {
+      method: 'GET',
+      headers: options && options.headers ? options.headers : undefined,
+    }, (res) => {
       let body = '';
       res.setEncoding('utf8');
       res.on('data', (chunk) => {
@@ -60,6 +63,7 @@ function fetchJson(url) {
         }
       });
     });
+    req.end();
     req.on('error', reject);
   });
 }

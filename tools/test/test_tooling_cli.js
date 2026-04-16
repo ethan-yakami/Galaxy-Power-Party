@@ -34,6 +34,8 @@ async function run() {
   assert.strictEqual(replayInspect.exitCode, 0);
   assert.strictEqual(replayInspect.payload.ok, true);
 
+  const previousAdminToken = process.env.GPP_ADMIN_TOKEN;
+  process.env.GPP_ADMIN_TOKEN = 'tooling-cli-admin-token';
   const runtime = startServer({ port: 0, host: '127.0.0.1' });
   await once(runtime.server, 'listening');
   try {
@@ -41,12 +43,19 @@ async function run() {
     const debugRoom = await runDebugRoom([
       '--base-url',
       `http://127.0.0.1:${port}`,
+      '--admin-token',
+      process.env.GPP_ADMIN_TOKEN,
     ]);
     assert.strictEqual(debugRoom.exitCode, 0);
     assert.strictEqual(debugRoom.payload.ok, true);
   } finally {
     runtime.wss.close();
     runtime.server.close();
+    if (typeof previousAdminToken === 'string') {
+      process.env.GPP_ADMIN_TOKEN = previousAdminToken;
+    } else {
+      delete process.env.GPP_ADMIN_TOKEN;
+    }
   }
 
   console.log('test_tooling_cli passed');

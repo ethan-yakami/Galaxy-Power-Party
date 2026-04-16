@@ -4,10 +4,17 @@ async function runCli(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const baseUrl = typeof args['base-url'] === 'string' ? args['base-url'].replace(/\/+$/, '') : 'http://127.0.0.1:3000';
   const roomCode = typeof args.room === 'string' ? args.room.trim() : '';
+  const adminToken = typeof args['admin-token'] === 'string' && args['admin-token'].trim()
+    ? args['admin-token'].trim()
+    : (process.env.GPP_ADMIN_TOKEN || '').trim();
   const target = roomCode ? `${baseUrl}/api/debug/rooms/${encodeURIComponent(roomCode)}` : `${baseUrl}/api/debug/rooms`;
+  const headers = {};
+  if (adminToken) {
+    headers['x-admin-token'] = adminToken;
+  }
 
   try {
-    const response = await fetchJson(target);
+    const response = await fetchJson(target, { headers });
     if (response.status >= 400 || !response.body || response.body.ok === false) {
       return {
         exitCode: 3,

@@ -23,6 +23,26 @@
           <input id="nameInput" maxlength="20" placeholder="输入你的名字" />
         </label>
 
+        <div class="launcherPublicCard authCard">
+          <div class="launcherPublicHead">
+            <h3>账号</h3>
+            <span id="authStatusText" class="launcherPublicHint">未登录</span>
+          </div>
+          <label for="authUsernameInput">
+            用户名
+            <input id="authUsernameInput" maxlength="24" placeholder="输入用户名（至少3位）" />
+          </label>
+          <label for="authPasswordInput">
+            密码
+            <input id="authPasswordInput" type="password" maxlength="64" placeholder="输入密码（至少6位）" />
+          </label>
+          <div class="launcherActions">
+            <button id="authRegisterBtn" type="button" class="secondaryBtn">注册</button>
+            <button id="authLoginBtn" type="button" class="secondaryBtn">登录</button>
+            <button id="authLogoutBtn" type="button" class="secondaryBtn">登出</button>
+          </div>
+        </div>
+
         <div class="launcherActions">
           <button id="createBtn" class="primaryBtn" type="button">创建房间</button>
           <button id="aiBtn" type="button">与 AI 对战</button>
@@ -58,6 +78,7 @@
     </main>
 
     <script src="js/preset-schema.js?v=v_launcher_fix_20260416_v2"></script>
+    <script src="js/auth.js?v=v_launcher_auth_20260416_v1"></script>
     <script src="js/launcher.js?v=v_launcher_fix_20260416_v2"></script>
   </body>
 </html>
