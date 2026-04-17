@@ -1,12 +1,34 @@
 (function() {
   const { state, dom, send } = GPP;
-  const glossary = window.GPPGlossary || {};
-  const guideData = window.GPPGuideData || {};
-  const modalFactory = window.GPPModalController || {};
+  const fallbackModalController = {
+    showWinnerOverlay() {},
+    hideWinnerOverlay() {},
+    showErrorToast() {},
+    showDocModal() {},
+    showGuideModal() {},
+    getWeatherDisplay() { return null; },
+    showWeatherBroadcast() {},
+    showCustomCharacterModal() {},
+  };
+
+  let activeModalFactory = null;
+  let activeModalController = fallbackModalController;
+
+  function getGlossary() {
+    return window.GPPGlossary || {};
+  }
+
+  function getGuideData() {
+    return window.GPPGuideData || {};
+  }
+
+  function getModalFactory() {
+    return window.GPPModalController || {};
+  }
 
   function getMyName() {
     const name = dom.nameInput ? dom.nameInput.value.trim() : '';
-    return name || `玩家${Math.floor(Math.random() * 1000)}`;
+    return name || `鐜╁${Math.floor(Math.random() * 1000)}`;
   }
 
   function isMe(playerId) {
@@ -70,36 +92,99 @@
     return values;
   }
 
-  const modalController = modalFactory.createModalController
-    ? modalFactory.createModalController({
-      state,
-      send,
-      glossary,
-      guideData,
-      findPlayer,
-      getBaseCharacterList,
-      suggestVariantId,
-      parseDiceSidesInput,
-    })
-    : {
-      showWinnerOverlay() {},
-      hideWinnerOverlay() {},
-      showErrorToast() {},
-      showDocModal() {},
-      showGuideModal() {},
-      getWeatherDisplay() { return null; },
-      showWeatherBroadcast() {},
-      showCustomCharacterModal() {},
-    };
+  function resolveModalController() {
+    const modalFactory = getModalFactory();
+    if (modalFactory !== activeModalFactory) {
+      activeModalFactory = modalFactory;
+      activeModalController = modalFactory.createModalController
+        ? modalFactory.createModalController({
+          state,
+          send,
+          glossary: getGlossary(),
+          guideData: getGuideData(),
+          findPlayer,
+          getBaseCharacterList,
+          suggestVariantId,
+          parseDiceSidesInput,
+        })
+        : fallbackModalController;
+    }
+    return activeModalController || fallbackModalController;
+  }
 
-  const sanitizeDisplayName = glossary.sanitizeDisplayName || ((name) => String(name || '').trim());
-  const wrapGlossaryTerms = glossary.wrapGlossaryTerms || ((text) => String(text || ''));
-  const charTooltipHtml = glossary.charTooltipHtml
-    ? (characterId, characterName) => glossary.charTooltipHtml(state, characterId, characterName)
-    : ((characterId, characterName) => String(characterName || characterId || ''));
-  const auroraTooltipHtml = glossary.auroraTooltipHtml
-    ? (auroraDiceId, auroraDiceName) => glossary.auroraTooltipHtml(state, auroraDiceId, auroraDiceName)
-    : ((auroraDiceId, auroraDiceName) => String(auroraDiceName || auroraDiceId || ''));
+  async function ensureUiFeatures() {
+    if (typeof GPP.ensureBattleFeatureSet === 'function') {
+      await GPP.ensureBattleFeatureSet('ui');
+    }
+    return resolveModalController();
+  }
+
+  function sanitizeDisplayName(name) {
+    const glossary = getGlossary();
+    if (typeof glossary.sanitizeDisplayName === 'function') {
+      return glossary.sanitizeDisplayName(name);
+    }
+    return String(name || '').trim();
+  }
+
+  function wrapGlossaryTerms(text) {
+    const glossary = getGlossary();
+    if (typeof glossary.wrapGlossaryTerms === 'function') {
+      return glossary.wrapGlossaryTerms(text);
+    }
+    return String(text || '');
+  }
+
+  function charTooltipHtml(characterId, characterName) {
+    const glossary = getGlossary();
+    if (typeof glossary.charTooltipHtml === 'function') {
+      return glossary.charTooltipHtml(state, characterId, characterName);
+    }
+    return String(characterName || characterId || '');
+  }
+
+  function auroraTooltipHtml(auroraDiceId, auroraDiceName) {
+    const glossary = getGlossary();
+    if (typeof glossary.auroraTooltipHtml === 'function') {
+      return glossary.auroraTooltipHtml(state, auroraDiceId, auroraDiceName);
+    }
+    return String(auroraDiceName || auroraDiceId || '');
+  }
+
+  function showWinnerOverlay(text, detail, meta) {
+    return resolveModalController().showWinnerOverlay(text, detail, meta);
+  }
+
+  function hideWinnerOverlay() {
+    return resolveModalController().hideWinnerOverlay();
+  }
+
+  function showErrorToast(text) {
+    return resolveModalController().showErrorToast(text);
+  }
+
+  async function showDocModal() {
+    const modalController = await ensureUiFeatures();
+    return modalController.showDocModal();
+  }
+
+  async function showGuideModal(defaultTab) {
+    const modalController = await ensureUiFeatures();
+    return modalController.showGuideModal(defaultTab);
+  }
+
+  function getWeatherDisplay(game) {
+    return resolveModalController().getWeatherDisplay(game);
+  }
+
+  function showWeatherBroadcast(display) {
+    return resolveModalController().showWeatherBroadcast(display);
+  }
+
+  async function showCustomCharacterModal() {
+    const modalController = await ensureUiFeatures();
+    return modalController.showCustomCharacterModal();
+  }
 
   Object.assign(GPP, {
     getMyName,
@@ -109,18 +194,17 @@
     clearSelection,
     setSelection,
     sleep,
-    showWinnerOverlay: modalController.showWinnerOverlay,
-    hideWinnerOverlay: modalController.hideWinnerOverlay,
-    showErrorToast: modalController.showErrorToast,
-    showDocModal: modalController.showDocModal,
-    showGuideModal: modalController.showGuideModal,
-    getWeatherDisplay: modalController.getWeatherDisplay,
-    showWeatherBroadcast: modalController.showWeatherBroadcast,
-    showCustomCharacterModal: modalController.showCustomCharacterModal,
+    showWinnerOverlay,
+    hideWinnerOverlay,
+    showErrorToast,
+    showDocModal,
+    showGuideModal,
+    getWeatherDisplay,
+    showWeatherBroadcast,
+    showCustomCharacterModal,
     sanitizeDisplayName,
     wrapGlossaryTerms,
     charTooltipHtml,
     auroraTooltipHtml,
   });
 })();
-

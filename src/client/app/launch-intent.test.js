@@ -19,6 +19,16 @@ describe('parseLaunchIntent', () => {
     });
   });
 
+  it('accepts battle-next preview pages', () => {
+    const parsed = parseLaunchIntent(makeLocation('?mode=replay&replayId=demo', '/battle-next.html'));
+    expect(parsed.error).toBe('');
+    expect(parsed.intent).toEqual({
+      mode: 'replay',
+      name: expect.any(String),
+      replayId: 'demo',
+    });
+  });
+
   it('rejects join mode without a 4-digit code', () => {
     const parsed = parseLaunchIntent(makeLocation('?mode=join&name=test&code=12'));
     expect(parsed.intent).toBeNull();

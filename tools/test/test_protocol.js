@@ -1,6 +1,7 @@
 const assert = require('assert');
 const { normalizeIncomingMessage } = require('../../src/server/transport/protocol/messages');
 const { buildErrorPayload, ERROR_CODES } = require('../../src/server/transport/protocol/errors');
+const { getErrorDescriptor } = require('../../src/core/shared/protocol/error-registry');
 
 function testLegacyMessageNormalization() {
   const input = JSON.stringify({
@@ -172,7 +173,8 @@ function testErrorPayload() {
 function testDefaultInvalidPayloadMessage() {
   const payload = buildErrorPayload(ERROR_CODES.INVALID_PAYLOAD);
   assert.strictEqual(payload.code, ERROR_CODES.INVALID_PAYLOAD);
-  assert.strictEqual(payload.message, 'Invalid message payload.');
+  const descriptor = getErrorDescriptor(ERROR_CODES.INVALID_PAYLOAD);
+  assert.strictEqual(payload.message, descriptor.defaultMessage);
 }
 
 function run() {

@@ -7,6 +7,16 @@
   let dragSelection = null;
   let lastSelectionInputAt = 0;
 
+  function refreshSelectionUi() {
+    if (typeof GPP.refreshDiceSelectionUi === 'function') {
+      GPP.refreshDiceSelectionUi({
+        dragIndices: dragSelection ? [...dragSelection.visited] : [],
+      });
+      return;
+    }
+    GPP.render();
+  }
+
   function sumSelectedIndices(dice, indices) {
     let sum = 0;
     indices.forEach((idx) => {
@@ -115,7 +125,7 @@
     liveSelectionTimeout = setTimeout(() => {
       send('update_live_selection', { indices: [...state.selectedDice] });
     }, LIVE_SELECTION_SYNC_MS);
-    GPP.render();
+    refreshSelectionUi();
   }
 
   function applySelectionMode(index, maxSelectable, mode) {
@@ -146,7 +156,7 @@
     dragSelection.visited.add(index);
     applySelectionMode(index, maxSelectable, mode);
     syncLiveSelection();
-    GPP.render();
+    refreshSelectionUi();
   }
 
   function moveDragSelection(index) {
@@ -155,11 +165,13 @@
     dragSelection.visited.add(index);
     applySelectionMode(index, dragSelection.maxSelectable, dragSelection.mode);
     syncLiveSelection();
-    GPP.render();
+    refreshSelectionUi();
   }
 
   function endDragSelection() {
+    if (!dragSelection) return;
     dragSelection = null;
+    refreshSelectionUi();
   }
 
   function getDieShapeClass(die) {
@@ -171,13 +183,18 @@
     return 'shape-d6';
   }
 
-  function renderDice(dice, maxSelectable, clickable, selectedSet) {
+  function renderDice(dice, maxSelectable, clickable, selectedSet, options = {}) {
     const row = document.createElement('div');
     row.className = 'diceRow';
+    row.dataset.selectionRow = options.selectionRow ? 'true' : 'false';
+    row.dataset.playerId = options.playerId || '';
+    row.dataset.lane = options.lane || '';
+    row.dataset.clickable = clickable ? 'true' : 'false';
 
     dice.forEach((die, index) => {
       const node = document.createElement('div');
       node.className = `die ${getDieShapeClass(die)}`;
+      node.dataset.dieIndex = String(index);
       if (selectedSet && selectedSet.has(index)) node.classList.add('selected');
 
       const label = document.createElement('span');

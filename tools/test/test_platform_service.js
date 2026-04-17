@@ -64,49 +64,54 @@ function waitForMessage(ws, type) {
   });
 }
 
+async function sendAndWaitForMessage(ws, message, type) {
+  const responsePromise = waitForMessage(ws, type);
+  ws.send(JSON.stringify(message));
+  return responsePromise;
+}
+
 async function createAuthenticatedAiReplay(baseUrl, accessToken) {
   const wsUrl = `${baseUrl.replace(/^http/, 'ws')}/`;
   const ws = new WebSocket(wsUrl);
+  const welcomePromise = waitForMessage(ws, 'welcome');
   await once(ws, 'open');
-  await waitForMessage(ws, 'welcome');
-  ws.send(JSON.stringify({
+  await welcomePromise;
+  const authState = await sendAndWaitForMessage(ws, {
     type: 'authenticate',
     payload: { accessToken },
-  }));
-  const authState = await waitForMessage(ws, 'auth_state');
+  }, 'auth_state');
   assert.strictEqual(authState.ok, true);
 
-  const character = Object.values(CharacterRegistry)[0];
+  const character = Object.values(CharacterRegistry).find((item) => !allowsNoAurora(item))
+    || Object.values(CharacterRegistry)[0];
   const aurora = Object.values(AuroraRegistry)[0];
   assert.ok(character);
   assert.ok(aurora);
 
-  ws.send(JSON.stringify({
+  await sendAndWaitForMessage(ws, {
     type: 'create_ai_room',
     payload: { name: 'service-test' },
-  }));
-  await waitForMessage(ws, 'room_state');
+  }, 'room_state');
 
-  ws.send(JSON.stringify({
+  await sendAndWaitForMessage(ws, {
     type: 'choose_character',
     payload: { characterId: character.id },
-  }));
-  await waitForMessage(ws, 'room_state');
+  }, 'room_state');
 
   if (!allowsNoAurora(character)) {
-    ws.send(JSON.stringify({
+    await sendAndWaitForMessage(ws, {
       type: 'choose_aurora_die',
       payload: { auroraDiceId: aurora.id },
-    }));
+    }, 'battle_actions');
+  } else {
+    await waitForMessage(ws, 'battle_actions');
   }
-  await waitForMessage(ws, 'battle_actions');
 
-  ws.send(JSON.stringify({
+  const replayMessage = await sendAndWaitForMessage(ws, {
     type: 'export_replay',
     payload: { requestSource: 'service-test' },
     meta: { requestId: 'svc-export-1', protocolVersion: '2' },
-  }));
-  const replayMessage = await waitForMessage(ws, 'replay_export');
+  }, 'replay_export');
   ws.close();
   return replayMessage;
 }

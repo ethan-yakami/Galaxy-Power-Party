@@ -59,6 +59,16 @@ function waitForMessage(ws, matcher, timeoutMs = 10000) {
   });
 }
 
+async function waitFor(predicate, timeoutMs, intervalMs = 50) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt <= timeoutMs) {
+    const result = await predicate();
+    if (result) return result;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error(`waitFor timed out after ${timeoutMs}ms`);
+}
+
 function createStubRoom(code, status, players, overrides = {}) {
   return Object.assign({
     code,
@@ -71,23 +81,64 @@ function createStubRoom(code, status, players, overrides = {}) {
   }, overrides);
 }
 
-function createStubPlayer(id, isOnline, wsRef) {
+function createStubPlayer(id, options = {}) {
   return {
     id,
     name: id,
-    isOnline,
-    ws: wsRef || null,
+    isOnline: options.isOnline !== false,
+    ws: options.ws !== undefined ? options.ws : (options.isOnline === false ? null : {}),
+    disconnectedAt: options.disconnectedAt || null,
+    graceDeadline: options.graceDeadline || null,
+    reconnectToken: options.reconnectToken || `${id}_token`,
   };
 }
 
 async function connectClient(baseUrl) {
   const ws = new WebSocket(`${baseUrl.replace(/^http/, 'ws')}/`);
+  const welcomePromise = waitForMessage(ws, 'welcome');
   await once(ws, 'open');
-  const welcome = await waitForMessage(ws, 'welcome');
+  const welcome = await welcomePromise;
   return { ws, welcome };
 }
 
+async function createLobbyRoom(baseUrl, name) {
+  const host = await connectClient(baseUrl);
+  const roomStatePromise = waitForMessage(host.ws, 'room_state');
+  host.ws.send(JSON.stringify({
+    type: 'create_room',
+    payload: { name },
+  }));
+  const roomState = await roomStatePromise;
+  return {
+    ws: host.ws,
+    welcome: host.welcome,
+    roomCode: roomState && roomState.room ? roomState.room.code : '',
+  };
+}
+
+async function listPublicRooms(baseUrl) {
+  const response = await requestJson(baseUrl, '/api/public-rooms');
+  assert.strictEqual(response.status, 200);
+  return Array.isArray(response.json && response.json.rooms) ? response.json.rooms : [];
+}
+
+async function waitForPublicRoom(baseUrl, roomCode, matcher, timeoutMs = 5000) {
+  return waitFor(async () => {
+    const rooms = await listPublicRooms(baseUrl);
+    const room = rooms.find((item) => item && item.code === roomCode) || null;
+    if (typeof matcher === 'function') {
+      return matcher(room, rooms) ? room : null;
+    }
+    return room;
+  }, timeoutMs);
+}
+
 async function run() {
+  const previousGrace = process.env.GPP_PLAYER_OFFLINE_GRACE_MS;
+  const previousCleanup = process.env.GPP_ROOM_CLEANUP_INTERVAL_MS;
+  process.env.GPP_PLAYER_OFFLINE_GRACE_MS = '250';
+  process.env.GPP_ROOM_CLEANUP_INTERVAL_MS = '100';
+
   const runtime = startServer({ port: 0, host: '127.0.0.1' });
   await once(runtime.server, 'listening');
   const address = runtime.server.address();
@@ -97,22 +148,34 @@ async function run() {
   const sockets = [];
 
   try {
+    const reservedNow = Date.now() + 60 * 1000;
     runtime.rooms.set('1001', createStubRoom('1001', 'in_game', [
-      createStubPlayer('P1001A', true, {}),
+      createStubPlayer('P1001A'),
     ]));
     runtime.rooms.set('1002', createStubRoom('1002', 'ended', [
-      createStubPlayer('P1002A', true, {}),
+      createStubPlayer('P1002A'),
     ]));
     runtime.rooms.set('1003', createStubRoom('1003', 'lobby', [
-      createStubPlayer('P1003A', true, {}),
-      createStubPlayer('P1003B', false, null),
+      createStubPlayer('P1003A'),
+      createStubPlayer('P1003B', {
+        isOnline: false,
+        disconnectedAt: reservedNow,
+        graceDeadline: reservedNow + 60 * 1000,
+      }),
     ]));
     runtime.rooms.set('1004', createStubRoom('1004', 'lobby', [
-      createStubPlayer('P1004A', true, {}),
-      createStubPlayer('P1004B', true, {}),
+      createStubPlayer('P1004A'),
+      createStubPlayer('P1004B'),
     ]));
     runtime.rooms.set('1005', createStubRoom('1005', 'lobby', [
-      createStubPlayer('P1005A', true, {}),
+      createStubPlayer('P1005A'),
+    ]));
+    runtime.rooms.set('1006', createStubRoom('1006', 'lobby', [
+      createStubPlayer('P1006A', {
+        isOnline: false,
+        disconnectedAt: reservedNow,
+        graceDeadline: reservedNow + 60 * 1000,
+      }),
     ]));
 
     const listResponse = await requestJson(baseUrl, '/api/public-rooms');
@@ -124,53 +187,148 @@ async function run() {
     assert.strictEqual(byCode.get('1003').joinableReason, 'reserved_slot');
     assert.strictEqual(byCode.get('1004').joinableReason, 'room_full');
     assert.strictEqual(byCode.get('1005').joinableReason, 'ok');
+    assert.strictEqual(byCode.get('1006').joinableReason, 'reserved_slot');
 
     const joiner = await connectClient(baseUrl);
     sockets.push(joiner.ws);
 
+    const inGameErrorPromise = waitForMessage(joiner.ws, (msg) => msg.type === 'error' && msg.code === 'ROOM_IN_GAME');
     joiner.ws.send(JSON.stringify({
       type: 'join_room',
       payload: { name: 'joiner', code: '1001' },
     }));
-    const inGameError = await waitForMessage(joiner.ws, (msg) => msg.type === 'error' && msg.code === 'ROOM_IN_GAME');
+    const inGameError = await inGameErrorPromise;
     assert.strictEqual(inGameError.code, 'ROOM_IN_GAME');
 
+    const endedErrorPromise = waitForMessage(joiner.ws, (msg) => msg.type === 'error' && msg.code === 'ROOM_ENDED');
     joiner.ws.send(JSON.stringify({
       type: 'join_room',
       payload: { name: 'joiner', code: '1002' },
     }));
-    const endedError = await waitForMessage(joiner.ws, (msg) => msg.type === 'error' && msg.code === 'ROOM_ENDED');
+    const endedError = await endedErrorPromise;
     assert.strictEqual(endedError.code, 'ROOM_ENDED');
 
-    const host = await connectClient(baseUrl);
-    sockets.push(host.ws);
-    host.ws.send(JSON.stringify({
-      type: 'create_room',
-      payload: { name: 'resume-host' },
-    }));
-    const hostRoomState = await waitForMessage(host.ws, 'room_state');
-    const resumeRoomCode = hostRoomState.room && hostRoomState.room.code;
-    assert.ok(/^\d{4}$/.test(String(resumeRoomCode || '')));
-    const resumeRoom = runtime.rooms.get(String(resumeRoomCode));
-    assert.ok(resumeRoom);
-    resumeRoom.roomMode = 'resume_room';
-    resumeRoom.isPublic = true;
-    resumeRoom.status = 'lobby';
-
+    const reservedErrorPromise = waitForMessage(joiner.ws, (msg) => msg.type === 'error' && msg.code === 'ROOM_RESERVED');
     joiner.ws.send(JSON.stringify({
       type: 'join_room',
-      payload: { name: 'resume-joiner', code: resumeRoomCode },
+      payload: { name: 'joiner', code: '1003' },
     }));
-    const joinResumeRoomState = await waitForMessage(
-      joiner.ws,
-      (msg) => msg.type === 'room_state' && msg.room && msg.room.code === resumeRoomCode
+    const reservedError = await reservedErrorPromise;
+    assert.strictEqual(reservedError.code, 'ROOM_RESERVED');
+
+    const fullErrorPromise = waitForMessage(joiner.ws, (msg) => msg.type === 'error' && msg.code === 'ROOM_FULL');
+    joiner.ws.send(JSON.stringify({
+      type: 'join_room',
+      payload: { name: 'joiner', code: '1004' },
+    }));
+    const fullError = await fullErrorPromise;
+    assert.strictEqual(fullError.code, 'ROOM_FULL');
+
+    const reservedHost = await createLobbyRoom(baseUrl, 'resume-host');
+    sockets.push(reservedHost.ws);
+    const reservedRoomCode = reservedHost.roomCode;
+    const reservedReconnectToken = reservedHost.welcome.reconnectToken
+      || (runtime.rooms.get(String(reservedRoomCode)).players[0] && runtime.rooms.get(String(reservedRoomCode)).players[0].reconnectToken)
+      || '';
+    assert.ok(/^\d{4}$/.test(String(reservedRoomCode || '')));
+    assert.ok(typeof reservedReconnectToken === 'string' && reservedReconnectToken.length > 0);
+
+    reservedHost.ws.close();
+    await waitFor(() => {
+      const room = runtime.rooms.get(String(reservedRoomCode));
+      const player = room && room.players ? room.players[0] : null;
+      return player && player.isOnline === false && Number.isFinite(player.graceDeadline) && player.graceDeadline > Date.now();
+    }, 5000);
+
+    const reservedSummary = await waitForPublicRoom(
+      baseUrl,
+      reservedRoomCode,
+      (room) => !!room && room.joinableReason === 'reserved_slot' && room.joinable === false
     );
-    assert.strictEqual(joinResumeRoomState.room.status, 'lobby');
-    assert.strictEqual(joinResumeRoomState.room.roomMode, 'resume_room');
-    assert.strictEqual(joinResumeRoomState.room.players.length, 2);
+    assert.strictEqual(reservedSummary.joinableReason, 'reserved_slot');
+
+    const reconnectingErrorPromise = waitForMessage(
+      joiner.ws,
+      (msg) => msg.type === 'error' && msg.code === 'ROOM_RESERVED'
+    );
+    joiner.ws.send(JSON.stringify({
+      type: 'join_room',
+      payload: { name: 'blocked-joiner', code: reservedRoomCode },
+    }));
+    const reconnectingError = await reconnectingErrorPromise;
+    assert.strictEqual(reconnectingError.code, 'ROOM_RESERVED');
+
+    const resumeClient = await connectClient(baseUrl);
+    sockets.push(resumeClient.ws);
+    const resumedPromise = waitForMessage(
+      resumeClient.ws,
+      (msg) => msg.type === 'session_resumed' && msg.roomCode === reservedRoomCode
+    );
+    const resumedRoomStatePromise = waitForMessage(
+      resumeClient.ws,
+      (msg) => msg.type === 'room_state' && msg.room && msg.room.code === reservedRoomCode
+    );
+    resumeClient.ws.send(JSON.stringify({
+      type: 'resume_session',
+      payload: {
+        roomCode: reservedRoomCode,
+        reconnectToken: reservedReconnectToken,
+      },
+    }));
+    const resumed = await resumedPromise;
+    assert.strictEqual(resumed.roomCode, reservedRoomCode);
+    const resumedRoomState = await resumedRoomStatePromise;
+    assert.strictEqual(resumedRoomState.room.status, 'lobby');
+    assert.strictEqual(resumedRoomState.room.players.length, 1);
+
+    const resumeRoom = runtime.rooms.get(String(reservedRoomCode));
+    assert.ok(resumeRoom);
+    assert.strictEqual(resumeRoom.players[0].isOnline, true);
+    assert.strictEqual(resumeRoom.players[0].graceDeadline, null);
+
+    const restoredSummary = await waitForPublicRoom(
+      baseUrl,
+      reservedRoomCode,
+      (room) => !!room && room.joinableReason === 'ok' && room.joinable === true
+    );
+    assert.strictEqual(restoredSummary.joinableReason, 'ok');
+
+    const expiringHost = await createLobbyRoom(baseUrl, 'expiring-host');
+    sockets.push(expiringHost.ws);
+    const expiringRoomCode = expiringHost.roomCode;
+    assert.ok(/^\d{4}$/.test(String(expiringRoomCode || '')));
+    expiringHost.ws.close();
+
+    await waitFor(() => {
+      const room = runtime.rooms.get(String(expiringRoomCode));
+      const player = room && room.players ? room.players[0] : null;
+      return player && player.isOnline === false;
+    }, 5000);
+
+    await waitFor(() => !runtime.rooms.has(String(expiringRoomCode)), 5000);
+    const finalRooms = await listPublicRooms(baseUrl);
+    assert.strictEqual(finalRooms.some((room) => room && room.code === expiringRoomCode), false);
+
+    const lateJoiner = await connectClient(baseUrl);
+    sockets.push(lateJoiner.ws);
+    const notFoundErrorPromise = waitForMessage(
+      lateJoiner.ws,
+      (msg) => msg.type === 'error' && msg.code === 'ROOM_NOT_FOUND'
+    );
+    lateJoiner.ws.send(JSON.stringify({
+      type: 'join_room',
+      payload: { name: 'late-joiner', code: expiringRoomCode },
+    }));
+    const notFoundError = await notFoundErrorPromise;
+    assert.strictEqual(notFoundError.code, 'ROOM_NOT_FOUND');
 
     console.log('test_public_room_joinability passed');
   } finally {
+    if (previousGrace === undefined) delete process.env.GPP_PLAYER_OFFLINE_GRACE_MS;
+    else process.env.GPP_PLAYER_OFFLINE_GRACE_MS = previousGrace;
+    if (previousCleanup === undefined) delete process.env.GPP_ROOM_CLEANUP_INTERVAL_MS;
+    else process.env.GPP_ROOM_CLEANUP_INTERVAL_MS = previousCleanup;
+
     for (const ws of sockets) {
       try {
         ws.close();

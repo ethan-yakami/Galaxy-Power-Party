@@ -1,6 +1,7 @@
 const express = require('express');
 const compression = require('compression');
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { randomBytes } = require('crypto');
@@ -102,11 +103,16 @@ function startServer(options = {}) {
     : (Number.isInteger(parsedEnvPort) ? parsedEnvPort : 3000);
   const HOST = options.host || process.env.HOST || '0.0.0.0';
   const ROOT_DIR = path.resolve(__dirname, '../../..');
+  const NODE_ENV = process.env.NODE_ENV || 'development';
   const CLIENT_DIR = path.join(ROOT_DIR, 'src', 'client');
+  const BUILD_CLIENT_DIR = path.join(ROOT_DIR, 'build', 'client');
   const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
   const PUBLIC_PORTRAITS_DIR = path.join(PUBLIC_DIR, 'portraits');
   const SHARED_DIR = path.join(ROOT_DIR, 'src', 'core', 'shared');
   const PICTURE_DIR = path.join(ROOT_DIR, 'picture');
+  const isProductionStatic = NODE_ENV === 'production';
+  const hasBuiltClient = fs.existsSync(BUILD_CLIENT_DIR);
+  const staticClientDir = isProductionStatic && hasBuiltClient ? BUILD_CLIENT_DIR : CLIENT_DIR;
 
   const app = express();
   app.set('trust proxy', 1);
@@ -121,29 +127,52 @@ function startServer(options = {}) {
     maxAge: 0,
     etag: true,
     setHeaders: (res, filePath) => {
+      const normalized = String(filePath || '').replace(/\\/g, '/');
       if (filePath.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Cache-Control', 'no-cache');
+        return;
+      }
+      if (/(?:^|\/)(?:assets|chunks)\/.+\.[a-z0-9]{8,}\.(?:js|mjs|css)$/i.test(normalized)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         return;
       }
       if (/\.(?:js|mjs|css)$/i.test(filePath)) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Cache-Control', 'no-cache');
+        return;
+      }
+      if (/\.(?:png|jpg|jpeg|gif|webp|svg|ico)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
       }
     },
   };
-  // Frontend runtime source is `src/client`. The legacy `public` tree is kept
-  // only for asset folders that have not moved yet.
-  app.use(express.static(CLIENT_DIR, staticOptions));
-  app.use('/portraits', express.static(PUBLIC_PORTRAITS_DIR, { maxAge: '1h', etag: true }));
-  app.use('/shared', express.static(SHARED_DIR, { maxAge: '1h', etag: true }));
-  app.use('/picture', express.static(PICTURE_DIR));
+  if (isProductionStatic && !hasBuiltClient) {
+    logger.warn('built_client_missing_fallback', {
+      expectedDir: BUILD_CLIENT_DIR,
+      fallbackDir: CLIENT_DIR,
+    });
+  }
+  // Production serves built frontend assets. Development falls back to `src/client`.
+  app.use(express.static(staticClientDir, staticOptions));
+  app.use('/portraits', express.static(PUBLIC_PORTRAITS_DIR, { maxAge: '24h', etag: true }));
+  app.use('/shared', express.static(SHARED_DIR, {
+    maxAge: '24h',
+    etag: true,
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    },
+  }));
+  app.use('/picture', express.static(PICTURE_DIR, {
+    maxAge: '24h',
+    etag: true,
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    },
+  }));
 
   const server = http.createServer(app);
   const wss = new WebSocket.Server({
     server,
-    perMessageDeflate: {
-      zlibDeflateOptions: { level: 1 },
-      threshold: 128,
-    },
+    perMessageDeflate: false,
   });
 
   const HEARTBEAT_INTERVAL = 30000;
@@ -199,10 +228,6 @@ function startServer(options = {}) {
     banMs: Number.isInteger(securityConfig.wsActionBanMs) ? securityConfig.wsActionBanMs : 60 * 1000,
   });
   const rateLimitedWsTypes = new Set([
-    'create_room',
-    'create_ai_room',
-    'join_room',
-    'create_resume_room',
     'submit_battle_action',
     'create_custom_character',
     'update_custom_character',
@@ -242,6 +267,25 @@ function startServer(options = {}) {
     res.json({ ok: true, generatedAt: Date.now(), rooms: roomsList });
   });
 
+  let catalogSnapshot = null;
+  let catalogSnapshotAt = 0;
+
+  function buildCatalogSnapshot() {
+    return {
+      characters: getCharacterSummary(),
+      auroraDice: getAuroraDiceSummary(),
+      weatherCatalog: getWeatherCatalogSummary(),
+    };
+  }
+
+  function getCatalogSnapshot(forceRefresh = false) {
+    if (!catalogSnapshot || forceRefresh) {
+      catalogSnapshot = buildCatalogSnapshot();
+      catalogSnapshotAt = Date.now();
+    }
+    return catalogSnapshot;
+  }
+
   app.get('/api/version', (_req, res) => {
     res.json({
       ok: true,
@@ -263,12 +307,13 @@ function startServer(options = {}) {
   });
 
   app.get('/api/catalog', (_req, res) => {
+    const catalog = getCatalogSnapshot(false);
     res.json({
       ok: true,
-      generatedAt: Date.now(),
-      characters: getCharacterSummary(),
-      auroraDice: getAuroraDiceSummary(),
-      weatherCatalog: getWeatherCatalogSummary(),
+      generatedAt: catalogSnapshotAt || Date.now(),
+      characters: catalog.characters,
+      auroraDice: catalog.auroraDice,
+      weatherCatalog: catalog.weatherCatalog,
     });
   });
 
@@ -291,9 +336,10 @@ function startServer(options = {}) {
   });
 
   function broadcastCharacterCatalog() {
+    const catalog = getCatalogSnapshot(true);
     const payload = {
       type: 'characters_updated',
-      characters: getCharacterSummary(),
+      characters: catalog.characters,
     };
     wss.clients.forEach((client) => send(client, payload));
   }
@@ -321,10 +367,12 @@ function startServer(options = {}) {
     const now = safeNow();
     let removedRooms = 0;
     let removedPlayers = 0;
+    const removalDetails = [];
     for (const [roomCode, room] of rooms.entries()) {
       if (!room || !Array.isArray(room.players)) {
         rooms.delete(roomCode);
         removedRooms += 1;
+        removalDetails.push({ roomCode, reason: 'invalid_room_record' });
         continue;
       }
 
@@ -336,6 +384,11 @@ function startServer(options = {}) {
         if (!disconnectedAt) return true;
         if ((now - disconnectedAt) <= playerOfflineGraceMs) return true;
         removedPlayers += 1;
+        removalDetails.push({
+          roomCode,
+          reason: 'offline_player_expired',
+          playerId: player.id || null,
+        });
         return false;
       });
 
@@ -348,6 +401,11 @@ function startServer(options = {}) {
         clearAIActionTimer(room);
         rooms.delete(roomCode);
         removedRooms += 1;
+        removalDetails.push({
+          roomCode,
+          reason: onlyAiOrEmpty ? 'room_empty_or_ai_only' : 'room_idle_expired',
+          status: room.status || 'unknown',
+        });
       }
     }
 
@@ -358,6 +416,7 @@ function startServer(options = {}) {
         removedRooms,
         removedPlayers,
         activeRooms: rooms.size,
+        removalDetails: removalDetails.slice(0, 20),
       });
     }
   }, roomCleanupIntervalMs);
@@ -381,16 +440,6 @@ function startServer(options = {}) {
 
   wss.on('connection', async (ws, req) => {
     const requestIp = getRequestIp(req);
-    const handshakeRate = wsHandshakeLimiter.consume(requestIp);
-    if (!handshakeRate.ok) {
-      platform.metrics.inc('gpp_rate_limited_total', { scope: 'ws_handshake' });
-      try {
-        ws.close(1013, 'rate_limited');
-      } catch {
-        ws.terminate();
-      }
-      return;
-    }
     ws.awaitingPong = false;
     ws.heartbeatMisses = 0;
     ws.requestIp = requestIp;
@@ -410,13 +459,14 @@ function startServer(options = {}) {
     ws.playerRoomCode = null;
     ws.playerId = `P${nextPlayerId++}_${ws.reconnectToken.slice(0, 8)}`;
 
+    const catalog = getCatalogSnapshot(false);
     send(ws, {
       type: 'welcome',
       playerId: ws.playerId,
       reconnectToken: ws.reconnectToken,
-      characters: getCharacterSummary(),
-      auroraDice: getAuroraDiceSummary(),
-      weatherCatalog: getWeatherCatalogSummary(),
+      characters: catalog.characters,
+      auroraDice: catalog.auroraDice,
+      weatherCatalog: catalog.weatherCatalog,
       meta: {
         protocolVersion: PROTOCOL_VERSION,
       },
@@ -484,8 +534,9 @@ function startServer(options = {}) {
     const actualPort = address && typeof address === 'object' ? address.port : PORT;
     const localUrl = `http://${getLocalOpenHost(HOST)}:${actualPort}`;
     const lanIp = getLanIPv4();
-    const characterCount = getCharacterSummary().length;
-    const auroraCount = getAuroraDiceSummary().length;
+    const catalog = getCatalogSnapshot(false);
+    const characterCount = catalog.characters.length;
+    const auroraCount = catalog.auroraDice.length;
     logger.info('server_started', {
       bind: `${HOST}:${actualPort}`,
       localUrl,

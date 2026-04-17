@@ -2,7 +2,7 @@
  * @param {{ pathname: string, search: string }} locationRef
  */
 export function parseLaunchIntent(locationRef) {
-  const isBattlePage = /\/battle\.html$/i.test(locationRef.pathname);
+  const isBattlePage = /\/battle(?:-next)?\.html$/i.test(locationRef.pathname);
   if (!isBattlePage) {
     return { intent: null, error: '' };
   }
@@ -19,6 +19,7 @@ export function parseLaunchIntent(locationRef) {
 
   const rawName = String(params.get('name') || '').trim();
   const name = (rawName || `玩家${Math.floor(Math.random() * 1000)}`).slice(0, 20);
+
   if (mode === 'join') {
     const code = String(params.get('code') || '').trim();
     if (!/^\d{4}$/.test(code)) {

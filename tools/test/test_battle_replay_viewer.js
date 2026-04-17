@@ -3,6 +3,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const { JSDOM } = require('jsdom');
 
+const { loadBrowserBattleRuntime } = require('./battle_runtime_loader');
 const replayHistory = require('../../src/client/js/replay-history');
 const { startServer } = require('../../src/server/app/bootstrap');
 
@@ -185,6 +186,7 @@ async function main() {
     await createBattleApp({
       document: dom.window.document,
       location: dom.window.location,
+      runtimeLoader: loadBrowserBattleRuntime,
       windowRef: dom.window,
     });
 

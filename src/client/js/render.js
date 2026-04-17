@@ -78,6 +78,10 @@
     return (state.auroraDice || []).find((item) => item.id === auroraId) || null;
   }
 
+  function isOptimisticRoom() {
+    return !!(state.ui && state.ui.optimisticRoomActive);
+  }
+
   function allowsNoAurora(character) {
     return !!(character && character.allowsNoAurora);
   }
@@ -396,6 +400,17 @@
 
   function renderSelectionSummary() {
     if (!dom.selectionSummary) return;
+    if (isOptimisticRoom()) {
+      dom.selectionSummary.innerHTML = '<div class="summaryMain"><p><b>房间状态</b>：正在向服务器申请真实房间...</p><p><b>下一步</b>：收到房间状态后即可选择角色与曜彩骰。</p></div>';
+      if (dom.confirmHint) {
+        dom.confirmHint.textContent = '房间壳已打开，正在等待服务端回填。';
+      }
+      if (dom.lobbyHint) {
+        dom.lobbyHint.textContent = '正在分配房间，请稍候。';
+      }
+      updateConfirmButtons('分配房间中...', true, false);
+      return;
+    }
     const me = getMe();
     if (!me) {
       dom.selectionSummary.textContent = '等待房间信息...';
@@ -533,6 +548,16 @@
   }
 
   function renderLobby() {
+    if (isOptimisticRoom()) {
+      renderSelectionSummary();
+      if (dom.characterButtons) {
+        dom.characterButtons.innerHTML = '<p class="lobbyHint">角色列表即将就绪...</p>';
+      }
+      if (dom.auroraButtons) {
+        dom.auroraButtons.innerHTML = '<p class="lobbyHint">曜彩骰列表即将就绪...</p>';
+      }
+      return;
+    }
     renderSelectionSummary();
     renderCharacterButtons();
     renderAuroraButtons();
@@ -617,6 +642,17 @@
     let tone = 'waiting';
     let text = `房间 ${state.room.code}`;
 
+    if (isOptimisticRoom()) {
+      dom.roomStatusBar.className = 'roomStatusBar roomStatusBar-progress';
+      dom.roomStatusBar.textContent = state.room.roomMode === 'ai'
+        ? 'AI 房间壳已打开，正在分配真实房间...'
+        : (state.room.roomMode === 'standard' && /^-+$/.test(String(state.room.code || ''))
+          ? '正在创建房间并回填真实房间号...'
+          : `正在加入房间 ${state.room.code}...`);
+      setHidden(dom.roomStatusBar, false);
+      return;
+    }
+
     if (!state.room.game) {
       const readyCount = (state.room.players || []).filter((player) => player && player.auroraSelectionConfirmed).length;
       tone = readyCount >= 2 ? 'ready' : (readyCount > 0 ? 'progress' : 'waiting');
@@ -679,6 +715,74 @@
       };
     }
     return null;
+  }
+
+  function buildLocalSelectionHint(game, lane, playerId, dice, isPickable) {
+    if (!isPickable || !Array.isArray(dice) || state.selectedDice.size <= 0) return null;
+    const indices = Array.from(state.selectedDice).filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < dice.length);
+    if (!indices.length) return null;
+    const previewValue = GPP.getPreviewSelectionValue(game, lane, playerId, dice, indices);
+    return {
+      className: 'previewHint',
+      text: `${lane === 'attack' ? '攻击实时' : '防守实时'}：${previewValue.sum}（已选 ${indices.length} 枚）`,
+    };
+  }
+
+  function getSelectionHintState(game, playerId, lane, dice, isPickable) {
+    const localHint = buildLocalSelectionHint(game, lane, playerId, dice, isPickable);
+    if (localHint) return localHint;
+    const preview = GPP.getPreviewSelectionForPlayer(game, playerId);
+    const committed = GPP.getCommittedSumForPlayer(game, playerId);
+    return buildSelectionHint(preview, committed);
+  }
+
+  function updateSelectionHintUi(zone, hintData) {
+    if (!zone) return;
+    const side = zone.querySelector('[data-selection-side="true"]');
+    const badge = side ? side.querySelector('[data-selection-badge="true"]') : null;
+    if (!side || !badge) return;
+
+    if (!hintData) {
+      side.classList.add('hidden');
+      badge.textContent = '';
+      badge.classList.remove('previewBadge', 'committedBadge');
+      return;
+    }
+
+    side.classList.remove('hidden');
+    badge.textContent = hintData.text;
+    badge.classList.toggle('previewBadge', hintData.className === 'previewHint');
+    badge.classList.toggle('committedBadge', hintData.className !== 'previewHint');
+  }
+
+  function refreshDiceSelectionUi(options = {}) {
+    const me = getMe();
+    const game = state.room && state.room.game;
+    if (!me || !game || isReplayMode()) return;
+
+    const zone = dom.selfZone;
+    if (!zone) return;
+    const row = zone.querySelector('[data-selection-row="true"]');
+    if (!row) return;
+
+    const lane = row.dataset.lane === 'attack' ? 'attack' : 'defense';
+    const displayed = GPP.getDisplayedDiceForPlayer(game, me.id);
+    if (!displayed || !Array.isArray(displayed.dice)) return;
+
+    const isPickable = row.dataset.clickable === 'true';
+    const dragIndices = new Set(Array.isArray(options.dragIndices) ? options.dragIndices : []);
+    row.querySelectorAll('.die[data-die-index]').forEach((node) => {
+      const index = Number(node.dataset.dieIndex || -1);
+      const selected = state.selectedDice.has(index);
+      node.classList.toggle('selected', selected);
+      node.classList.toggle('dragSelecting', dragIndices.has(index));
+      node.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+
+    updateSelectionHintUi(
+      zone,
+      getSelectionHintState(game, me.id, lane, displayed.dice, isPickable)
+    );
   }
 
   function buildBattleResultSummary(game) {
@@ -783,9 +887,7 @@
       (game.phase === 'defense_select' && game.defenderId === player.id)
     );
     const lane = displayed.lane === 'attack' ? 'attack' : 'defense';
-    const preview = GPP.getPreviewSelectionForPlayer(game, player.id);
-    const committed = GPP.getCommittedSumForPlayer(game, player.id);
-    const hintData = buildSelectionHint(preview, committed);
+    const hintData = getSelectionHintState(game, player.id, lane, displayed.dice, isPickable);
     const maxSelectable = isPickable ? GPP.getMaxSelectableForPhase(game, lane) : null;
 
     const laneLayout = document.createElement('div');
@@ -793,20 +895,31 @@
 
     const anchor = document.createElement('div');
     anchor.className = 'diceAnchor';
-    anchor.appendChild(GPP.renderDice(displayed.dice, maxSelectable, isPickable, isPickable ? state.selectedDice : null));
+    anchor.appendChild(GPP.renderDice(
+      displayed.dice,
+      maxSelectable,
+      isPickable,
+      isPickable ? state.selectedDice : null,
+      {
+        selectionRow: isPickable,
+        playerId: player.id,
+        lane,
+      }
+    ));
     laneLayout.appendChild(anchor);
 
-    if (hintData) {
-      const side = document.createElement('div');
-      side.className = 'realtimeValueSide';
+    const side = document.createElement('div');
+    side.className = 'realtimeValueSide';
+    side.dataset.selectionSide = 'true';
+    if (!hintData) side.classList.add('hidden');
 
-      const badge = document.createElement('div');
-      badge.className = `sumBadge mainValueBadge ${hintData.className === 'previewHint' ? 'previewBadge' : 'committedBadge'}`;
-      badge.textContent = hintData.text;
-      side.appendChild(badge);
+    const badge = document.createElement('div');
+    badge.dataset.selectionBadge = 'true';
+    badge.className = `sumBadge mainValueBadge ${hintData && hintData.className === 'previewHint' ? 'previewBadge' : 'committedBadge'}`;
+    badge.textContent = hintData ? hintData.text : '';
+    side.appendChild(badge);
 
-      laneLayout.appendChild(side);
-    }
+    laneLayout.appendChild(side);
 
     zone.appendChild(laneLayout);
 
@@ -1045,6 +1158,7 @@
   }
 
   GPP.render = render;
+  GPP.refreshDiceSelectionUi = refreshDiceSelectionUi;
 })();
 
 

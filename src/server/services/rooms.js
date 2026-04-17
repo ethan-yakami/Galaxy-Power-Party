@@ -7,6 +7,29 @@ function send(ws, payload) {
   ws.send(JSON.stringify(payload));
 }
 
+function isAiPlayer(player) {
+  if (!player) return false;
+  if (player.ws && player.ws.isAI) return true;
+  return typeof player.reconnectToken === 'string' && player.reconnectToken.startsWith('ai_');
+}
+
+function isHumanPlayer(player) {
+  return !!player && !isAiPlayer(player);
+}
+
+function isReservedHumanPlayer(player, now = Date.now()) {
+  if (!isHumanPlayer(player)) return false;
+  if (player.isOnline !== false && player.ws) return false;
+  const graceDeadline = Number.isFinite(player.graceDeadline) ? player.graceDeadline : 0;
+  if (!graceDeadline) return false;
+  return graceDeadline > now;
+}
+
+function hasReservedHumanSlot(room, now = Date.now()) {
+  const players = Array.isArray(room && room.players) ? room.players : [];
+  return players.some((player) => isReservedHumanPlayer(player, now));
+}
+
 function sanitizeRoom(room, viewerPlayerId) {
   const game = room.game
     ? {
@@ -64,23 +87,23 @@ function sanitizeRoom(room, viewerPlayerId) {
     roomMode: room.roomMode || 'standard',
     isPublic: room.isPublic === true,
     waitingReason: room.waitingReason,
-    players: room.players.map((p) => {
-      const hideLoadout = room.status === 'lobby' && p.id !== viewerPlayerId;
+    players: room.players.map((player) => {
+      const hideLoadout = room.status === 'lobby' && player.id !== viewerPlayerId;
       return {
-        id: p.id,
-        name: p.name,
-        characterId: hideLoadout ? null : p.characterId,
+        id: player.id,
+        name: player.name,
+        characterId: hideLoadout ? null : player.characterId,
         characterName: hideLoadout
-          ? 'unknown'
-          : (CharacterRegistry[p.characterId] && CharacterRegistry[p.characterId].name) || p.characterId,
-        auroraDiceId: hideLoadout ? null : p.auroraDiceId,
+          ? '未公开'
+          : (CharacterRegistry[player.characterId] && CharacterRegistry[player.characterId].name) || player.characterId,
+        auroraDiceId: hideLoadout ? null : player.auroraDiceId,
         auroraDiceName: hideLoadout
           ? null
-          : (AuroraRegistry[p.auroraDiceId] && AuroraRegistry[p.auroraDiceId].name) || null,
-        isOnline: p.isOnline !== false,
-        auroraSelectionConfirmed: !!p.auroraSelectionConfirmed,
-        disconnectedAt: p.disconnectedAt || null,
-        graceDeadline: p.graceDeadline || null,
+          : (AuroraRegistry[player.auroraDiceId] && AuroraRegistry[player.auroraDiceId].name) || null,
+        isOnline: player.isOnline !== false,
+        auroraSelectionConfirmed: !!player.auroraSelectionConfirmed,
+        disconnectedAt: player.disconnectedAt || null,
+        graceDeadline: player.graceDeadline || null,
       };
     }),
     game,
@@ -89,13 +112,13 @@ function sanitizeRoom(room, viewerPlayerId) {
 
 function broadcastRoom(room) {
   const battleActions = buildBattleActionsMessage(room);
-  for (const p of room.players) {
-    send(p.ws, {
+  for (const player of room.players) {
+    send(player.ws, {
       type: 'room_state',
-      room: sanitizeRoom(room, p.id),
+      room: sanitizeRoom(room, player.id),
     });
     if (battleActions) {
-      send(p.ws, battleActions);
+      send(player.ws, battleActions);
     }
   }
 }
@@ -103,16 +126,21 @@ function broadcastRoom(room) {
 function buildPublicRoomSummary(room) {
   if (!room || room.isPublic !== true) return null;
   const players = Array.isArray(room.players) ? room.players : [];
+  const now = Date.now();
   const onlineCount = players.filter((player) => player && player.isOnline !== false).length;
+  const reservedSlot = hasReservedHumanSlot(room, now);
+
   let joinableReason = 'ok';
   if (room.status === 'ended') {
     joinableReason = 'ended';
   } else if (room.status !== 'lobby') {
     joinableReason = 'in_game';
+  } else if (reservedSlot) {
+    joinableReason = 'reserved_slot';
   } else if (players.length >= 2) {
-    joinableReason = onlineCount < players.length ? 'reserved_slot' : 'room_full';
+    joinableReason = 'room_full';
   }
-  const joinable = joinableReason === 'ok';
+
   return {
     code: room.code,
     status: room.status,
@@ -120,9 +148,9 @@ function buildPublicRoomSummary(room) {
     playerCount: players.length,
     onlineCount,
     capacity: 2,
-    joinable,
+    joinable: joinableReason === 'ok',
     joinableReason,
-    hasAi: players.some((player) => player && player.ws && player.ws.isAI),
+    hasAi: players.some((player) => isAiPlayer(player)),
     lastActiveAt: room.lastActiveAt || null,
   };
 }
@@ -144,7 +172,7 @@ function getPlayerRoom(ws, rooms) {
   if (ws.playerId) {
     for (const room of rooms.values()) {
       if (!room || !Array.isArray(room.players)) continue;
-      if (room.players.some((p) => p && p.id === ws.playerId)) {
+      if (room.players.some((player) => player && player.id === ws.playerId)) {
         ws.playerRoomCode = room.code;
         return room;
       }
@@ -154,28 +182,41 @@ function getPlayerRoom(ws, rooms) {
 }
 
 function getPlayerById(room, playerId) {
-  return room.players.find((p) => p.id === playerId) || null;
+  return room.players.find((player) => player.id === playerId) || null;
 }
 
 function isAuroraEquipRequired(player) {
   if (!player || !player.characterId) return true;
-  const ch = CharacterRegistry[player.characterId];
-  if (!ch) return true;
-  return !allowsNoAurora(ch);
+  const character = CharacterRegistry[player.characterId];
+  if (!character) return true;
+  return !allowsNoAurora(character);
+}
+
+function normalizePlayerDisplayName(name) {
+  const normalized = typeof name === 'string' ? name.trim() : '';
+  if (!normalized) return '玩家';
+  if (normalized === '鐜╁' || normalized === '缁х画鐜╁') return '玩家';
+  return normalized;
 }
 
 function readyToStart(room) {
-  if (room.players.length !== 2) return { ok: false, reason: '房间人数不足两人' };
+  if (room.players.length !== 2) {
+    return { ok: false, reason: '房间人数不足两人。' };
+  }
 
   for (const player of room.players) {
-    if (!player.characterId) return { ok: false, reason: `${player.name} 尚未选择角色` };
-    const ch = CharacterRegistry[player.characterId];
-    if (!ch) return { ok: false, reason: `${player.name} 的角色无效` };
+    if (!player.characterId) {
+      return { ok: false, reason: `${player.name} 尚未选择角色。` };
+    }
+    const character = CharacterRegistry[player.characterId];
+    if (!character) {
+      return { ok: false, reason: `${player.name} 的角色无效。` };
+    }
     if (!player.auroraSelectionConfirmed) {
-      return { ok: false, reason: `${player.name} 尚未确认曜彩骰` };
+      return { ok: false, reason: `${player.name} 尚未确认曜彩骰。` };
     }
     if (isAuroraEquipRequired(player) && !player.auroraDiceId) {
-      return { ok: false, reason: `${player.name} 尚未装备曜彩骰` };
+      return { ok: false, reason: `${player.name} 尚未装备曜彩骰。` };
     }
   }
 
@@ -183,16 +224,16 @@ function readyToStart(room) {
 }
 
 function createNewRoomPlayer(ws, name) {
-  const token = ws && ws.reconnectToken ? ws.reconnectToken : `${Date.now()}_${Math.random()}`;
+  const reconnectToken = ws && ws.reconnectToken ? ws.reconnectToken : `${Date.now()}_${Math.random()}`;
   return {
     id: ws.playerId,
     ws,
     userId: ws && ws.authUser && ws.authUser.id ? ws.authUser.id : null,
-    name,
+    name: normalizePlayerDisplayName(name),
     characterId: null,
     auroraDiceId: null,
     auroraSelectionConfirmed: false,
-    reconnectToken: token,
+    reconnectToken,
     isOnline: true,
     disconnectedAt: null,
     graceDeadline: null,
@@ -212,6 +253,10 @@ function pushEffectEvent(game, event) {
 
 module.exports = {
   send,
+  isAiPlayer,
+  isHumanPlayer,
+  isReservedHumanPlayer,
+  hasReservedHumanSlot,
   sanitizeRoom,
   broadcastRoom,
   buildPublicRoomSummary,

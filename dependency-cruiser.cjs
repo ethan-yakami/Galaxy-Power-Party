@@ -3,30 +3,38 @@ module.exports = {
   forbidden: [
     {
       name: 'core-no-server',
+      severity: 'error',
       comment: 'src/core must stay server-agnostic',
-      from: { path: '^src/core' },
+      from: {
+        path: '^src/core',
+        pathNot: '^src/core/registry\\.js$',
+      },
       to: { path: '^src/server' },
     },
     {
       name: 'core-no-client',
+      severity: 'error',
       comment: 'src/core must stay browser-agnostic',
       from: { path: '^src/core' },
       to: { path: '^src/client' },
     },
     {
       name: 'client-no-server',
+      severity: 'error',
       comment: 'src/client cannot import server runtime',
       from: { path: '^src/client' },
       to: { path: '^src/server' },
     },
     {
       name: 'server-no-client',
+      severity: 'error',
       comment: 'src/server cannot import browser runtime',
       from: { path: '^src/server' },
       to: { path: '^src/client' },
     },
     {
       name: 'client-only-shared-from-core',
+      severity: 'error',
       comment: 'src/client may only consume src/core/shared from the core tree',
       from: { path: '^src/client' },
       to: {

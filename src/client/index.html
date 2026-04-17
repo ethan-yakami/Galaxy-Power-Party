@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>银河战力党 - 启动台</title>
+    <title>银河战力党 - 启动页</title>
     <link rel="stylesheet" href="launcher.css?v=v_launcher_fix_20260416_v2" />
   </head>
   <body>
@@ -16,7 +16,7 @@
       <section class="launcherCard">
         <p class="launcherSub">GALAXY POWER PARTY</p>
         <h1>银河战力党</h1>
-        <p class="launcherDesc">从这里进入战斗、回放和角色工坊。创建/加入房间后会在当前页面直接进入战斗。</p>
+        <p class="launcherDesc">从这里进入战斗、回放和角色工坊。创建或加入房间后，会在当前页面直接打开战斗壳层。</p>
 
         <label for="nameInput">
           玩家名
@@ -30,16 +30,16 @@
           </div>
           <label for="authUsernameInput">
             用户名
-            <input id="authUsernameInput" maxlength="24" placeholder="输入用户名（至少3位）" />
+            <input id="authUsernameInput" maxlength="24" placeholder="输入用户名（至少 3 位）" />
           </label>
           <label for="authPasswordInput">
             密码
-            <input id="authPasswordInput" type="password" maxlength="64" placeholder="输入密码（至少6位）" />
+            <input id="authPasswordInput" type="password" maxlength="64" placeholder="输入密码（至少 6 位）" />
           </label>
           <div class="launcherActions">
             <button id="authRegisterBtn" type="button" class="secondaryBtn">注册</button>
             <button id="authLoginBtn" type="button" class="secondaryBtn">登录</button>
-            <button id="authLogoutBtn" type="button" class="secondaryBtn">登出</button>
+            <button id="authLogoutBtn" type="button" class="secondaryBtn">退出</button>
           </div>
         </div>
 
@@ -56,7 +56,7 @@
             <button id="refreshPublicRoomsBtn" type="button" class="secondaryBtn">刷新</button>
           </div>
           <label for="publicRoomSelect">
-            下拉可见房间
+            可见房间
             <select id="publicRoomSelect" class="launcherSelect">
               <option value="">暂无可加入房间</option>
             </select>
@@ -73,13 +73,10 @@
           <button id="joinBtn" type="button">加入房间</button>
         </div>
 
-        <p id="launcherMessage" class="launcherMessage">选择操作后将直接进入对应页面。</p>
+        <p id="launcherMessage" class="launcherMessage">选择一个操作后，会直接进入对应页面。</p>
       </section>
     </main>
 
-    <script src="js/url-utils.js?v=v_url_utils_20260416_v1"></script>
-    <script src="js/preset-schema.js?v=v_launcher_fix_20260416_v2"></script>
-    <script src="js/auth.js?v=v_launcher_auth_20260416_v1"></script>
-    <script src="js/launcher.js?v=v_launcher_fix_20260416_v2"></script>
+    <script type="module" src="app/launcher-entry.js"></script>
   </body>
 </html>

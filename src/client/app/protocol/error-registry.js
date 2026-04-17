@@ -3,6 +3,7 @@ export const ERROR_REGISTRY = Object.freeze({
   INVALID_PAYLOAD: { code: 'INVALID_PAYLOAD', category: 'protocol', severity: 'warn' },
   UNKNOWN_TYPE: { code: 'UNKNOWN_TYPE', category: 'protocol', severity: 'warn' },
   ROOM_NOT_FOUND: { code: 'ROOM_NOT_FOUND', category: 'user', severity: 'warn' },
+  ROOM_RESERVED: { code: 'ROOM_RESERVED', category: 'user', severity: 'warn' },
   NOT_IN_ROOM: { code: 'NOT_IN_ROOM', category: 'user', severity: 'warn' },
   NOT_YOUR_TURN: { code: 'NOT_YOUR_TURN', category: 'user', severity: 'warn' },
   INVALID_SELECTION: { code: 'INVALID_SELECTION', category: 'user', severity: 'warn' },

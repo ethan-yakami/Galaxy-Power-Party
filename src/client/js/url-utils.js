@@ -20,6 +20,18 @@
     return String(path || '').replace(/^\/+/, '');
   }
 
+  function getConfiguredEndpoints() {
+    if (!root || !root.__GPP_ENDPOINTS__ || typeof root.__GPP_ENDPOINTS__ !== 'object') {
+      return {};
+    }
+    return root.__GPP_ENDPOINTS__;
+  }
+
+  function withTrailingSlash(url) {
+    const value = String(url || '');
+    return value.endsWith('/') ? value : `${value}/`;
+  }
+
   function getOrigin(locationRef) {
     const target = getLocation(locationRef);
     if (target.origin) return target.origin;
@@ -53,6 +65,11 @@
   }
 
   function toApi(path, locationRef) {
+    const configured = getConfiguredEndpoints();
+    if (configured.apiOrigin) {
+      const target = new URL(`api/${stripLeadingSlash(path)}`, withTrailingSlash(configured.apiOrigin));
+      return target.toString();
+    }
     return toPath(`api/${stripLeadingSlash(path)}`, locationRef);
   }
 
@@ -61,6 +78,12 @@
   }
 
   function toWsUrl(locationRef, wsProtocol) {
+    const configured = getConfiguredEndpoints();
+    if (configured.wsOrigin) {
+      const target = new URL(configured.wsOrigin);
+      target.protocol = wsProtocol || (target.protocol === 'https:' ? 'wss:' : 'ws:');
+      return target.toString();
+    }
     const target = getLocation(locationRef);
     const url = new URL(getBasePath(target), getOrigin(target));
     url.protocol = wsProtocol || (target.protocol === 'https:' ? 'wss:' : 'ws:');

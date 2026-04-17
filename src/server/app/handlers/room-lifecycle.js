@@ -5,6 +5,8 @@ const {
   getPlayerById,
   readyToStart,
   createNewRoomPlayer,
+  isHumanPlayer,
+  isReservedHumanPlayer,
 } = require('../../services/rooms');
 const {
   createAIPlayer,
@@ -28,6 +30,7 @@ const {
   appendReplaySnapshot,
 } = require('../../services/replay');
 const { sendError, ERROR_CODES } = require('../../transport/protocol/errors');
+const { createLogger } = require('../../observability/logger');
 
 function normalizeResumeMode(mode) {
   const value = typeof mode === 'string' ? mode.trim() : '';
@@ -122,25 +125,45 @@ function resolveResumeDraft(payload) {
 }
 
 function createRoomLifecycleHandlers({ rooms, shared, platform }) {
+  const logger = createLogger('server.room-lifecycle');
   const OFFLINE_GRACE_MS = Number.isInteger(Number(process.env.GPP_PLAYER_OFFLINE_GRACE_MS))
     ? Number(process.env.GPP_PLAYER_OFFLINE_GRACE_MS)
     : 2 * 60 * 1000;
 
+  function summarizeRoom(room) {
+    if (!room) return null;
+    return {
+      code: room.code,
+      status: room.status,
+      roomMode: room.roomMode || 'standard',
+      playerCount: Array.isArray(room.players) ? room.players.length : 0,
+    };
+  }
+
+  function getReservedHumanPlayers(room, now = Date.now()) {
+    const players = Array.isArray(room && room.players) ? room.players : [];
+    return players.filter((player) => isReservedHumanPlayer(player, now));
+  }
+
   function rejectJoinRoom(ws, reason) {
     const normalized = String(reason || '').trim();
     if (normalized === 'in_game') {
-      sendError(ws, ERROR_CODES.ROOM_IN_GAME, 'Room is already in game.');
+      sendError(ws, ERROR_CODES.ROOM_IN_GAME, '房间已经开打，当前无法加入。');
       return;
     }
     if (normalized === 'ended') {
-      sendError(ws, ERROR_CODES.ROOM_ENDED, 'Room has ended.');
+      sendError(ws, ERROR_CODES.ROOM_ENDED, '房间已结束，请重新创建或加入其他房间。');
       return;
     }
     if (normalized === 'room_full') {
-      sendError(ws, ERROR_CODES.ROOM_FULL, 'Room is full.');
+      sendError(ws, ERROR_CODES.ROOM_FULL, '房间已满，请换个房间或稍后再试。');
       return;
     }
-    sendError(ws, ERROR_CODES.ROOM_NOT_FOUND, 'Room not found.');
+    if (normalized === 'reserved_slot') {
+      sendError(ws, ERROR_CODES.ROOM_RESERVED, '房主或玩家正在重连，请稍后再试。');
+      return;
+    }
+    sendError(ws, ERROR_CODES.ROOM_NOT_FOUND, '房间不存在，可能已失效或离线保留时间已结束。');
   }
 
   function applyLoadoutToPlayer(player, loadout) {
@@ -256,6 +279,11 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
 
     rooms.set(code, room);
     ws.playerRoomCode = code;
+    logger.info('room_created', {
+      room: summarizeRoom(room),
+      creatorPlayerId: ws.playerId,
+      roomType: 'standard',
+    });
     shared.getBroadcastRoom(room);
   }
 
@@ -278,6 +306,11 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
 
     rooms.set(code, room);
     ws.playerRoomCode = code;
+    logger.info('room_created', {
+      room: summarizeRoom(room),
+      creatorPlayerId: ws.playerId,
+      roomType: 'ai',
+    });
     shared.getBroadcastRoom(room);
   }
 
@@ -285,18 +318,51 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     const { code, name } = payload || {};
     const room = rooms.get(String(code || '').trim());
     if (!room) {
+      logger.warn('room_join_rejected', {
+        roomCode: String(code || '').trim(),
+        playerId: ws.playerId,
+        reason: 'not_found',
+      });
       rejectJoinRoom(ws, 'not_found');
       return;
     }
     if (room.status === 'ended') {
+      logger.warn('room_join_rejected', {
+        roomCode: room.code,
+        playerId: ws.playerId,
+        reason: 'ended',
+      });
       rejectJoinRoom(ws, 'ended');
       return;
     }
     if (room.status !== 'lobby') {
+      logger.warn('room_join_rejected', {
+        roomCode: room.code,
+        playerId: ws.playerId,
+        reason: 'in_game',
+      });
       rejectJoinRoom(ws, 'in_game');
       return;
     }
+    if (getReservedHumanPlayers(room).length > 0) {
+      logger.warn('room_join_rejected', {
+        roomCode: room.code,
+        playerId: ws.playerId,
+        reason: 'reserved_slot',
+        reservedPlayers: getReservedHumanPlayers(room).map((player) => ({
+          playerId: player.id,
+          graceDeadline: player.graceDeadline || null,
+        })),
+      });
+      rejectJoinRoom(ws, 'reserved_slot');
+      return;
+    }
     if (room.players.length >= 2) {
+      logger.warn('room_join_rejected', {
+        roomCode: room.code,
+        playerId: ws.playerId,
+        reason: 'room_full',
+      });
       rejectJoinRoom(ws, 'room_full');
       return;
     }
@@ -308,7 +374,12 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     }
 
     room.players.push(player);
+    room.lastActiveAt = Date.now();
     ws.playerRoomCode = room.code;
+    logger.info('room_joined', {
+      room: summarizeRoom(room),
+      playerId: ws.playerId,
+    });
     shared.getBroadcastRoom(room);
 
     if (room.resumeDraft) {
@@ -353,6 +424,11 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
         }
         ws.authUser = auth.profile;
         ws.authSessionId = auth.session.id;
+        const room = getPlayerRoom(ws, rooms);
+        const player = room ? getPlayerById(room, ws.playerId) : null;
+        if (player) {
+          player.userId = auth.profile && auth.profile.id ? auth.profile.id : null;
+        }
         send(ws, {
           type: 'auth_state',
           ok: true,
@@ -374,12 +450,22 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     const { roomCode, reconnectToken } = payload || {};
     const room = rooms.get(String(roomCode || '').trim());
     if (!room) {
+      logger.warn('session_resume_failed', {
+        roomCode: String(roomCode || '').trim(),
+        playerId: ws.playerId,
+        reason: 'room_not_found',
+      });
       send(ws, { type: 'session_resume_failed', reason: 'room_not_found' });
       return;
     }
 
-    const player = room.players.find((p) => p.reconnectToken === reconnectToken);
+    const player = room.players.find((candidate) => candidate.reconnectToken === reconnectToken);
     if (!player) {
+      logger.warn('session_resume_failed', {
+        roomCode: room.code,
+        playerId: ws.playerId,
+        reason: 'invalid_token',
+      });
       send(ws, { type: 'session_resume_failed', reason: 'invalid_token' });
       return;
     }
@@ -396,11 +482,17 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     ws.playerId = player.id;
     ws.reconnectToken = player.reconnectToken;
     ws.playerRoomCode = room.code;
+    room.lastActiveAt = Date.now();
 
     send(ws, {
       type: 'session_resumed',
       playerId: player.id,
       roomCode: room.code,
+    });
+    logger.info('session_resumed', {
+      room: summarizeRoom(room),
+      playerId: player.id,
+      userId: player.userId || null,
     });
     shared.getBroadcastRoom(room);
   }
@@ -451,6 +543,11 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
 
     rooms.set(code, room);
     ws.playerRoomCode = code;
+    logger.info('room_created', {
+      room: summarizeRoom(room),
+      creatorPlayerId: ws.playerId,
+      roomType: mode,
+    });
 
     if (mode === 'resume_local') {
       startGameIfReady(room);
@@ -468,14 +565,17 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     if (!room) return;
 
     clearAIActionTimer(room);
-    room.players = room.players.filter((p) => p.ws !== ws);
+    room.players = room.players.filter((player) => player.ws !== ws);
     ws.playerRoomCode = null;
 
-    if (room.players.length === 0) {
+    const hasHumanPlayers = room.players.some((player) => isHumanPlayer(player));
+    if (room.players.length === 0 || !hasHumanPlayers) {
       rooms.delete(room.code);
-    } else {
-      shared.getBroadcastRoom(room);
+      return;
     }
+
+    room.lastActiveAt = Date.now();
+    shared.getBroadcastRoom(room);
   }
 
   function handlePlayAgain(ws) {
@@ -491,15 +591,16 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     room.resumeDraft = null;
     room.pendingResumeOpponentLoadout = null;
 
-    for (const p of room.players) {
-      if (p.ws && p.ws.isAI) {
-        reRandomizeAIPlayer(p);
-        p.auroraSelectionConfirmed = true;
+    for (const player of room.players) {
+      if (player.ws && player.ws.isAI) {
+        reRandomizeAIPlayer(player);
+        player.auroraSelectionConfirmed = true;
       } else {
-        p.auroraSelectionConfirmed = false;
+        player.auroraSelectionConfirmed = false;
       }
     }
 
+    room.lastActiveAt = Date.now();
     shared.getBroadcastRoom(room);
   }
 
@@ -508,12 +609,16 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     if (!room) return;
     clearAIActionTimer(room);
     rooms.delete(room.code);
-    for (const p of room.players) {
-      if (p.ws) {
-        p.ws.playerRoomCode = null;
-        send(p.ws, { type: 'left_room', reason: '房主已解散房间。' });
+    for (const player of room.players) {
+      if (player.ws) {
+        player.ws.playerRoomCode = null;
+        send(player.ws, { type: 'left_room', reason: '房主已解散房间。' });
       }
     }
+    logger.info('room_disbanded', {
+      room: summarizeRoom(room),
+      actorPlayerId: ws.playerId,
+    });
   }
 
   function handleSocketClosed(ws) {
@@ -527,10 +632,20 @@ function createRoomLifecycleHandlers({ rooms, shared, platform }) {
     player.disconnectedAt = Date.now();
     player.graceDeadline = player.disconnectedAt + OFFLINE_GRACE_MS;
     player.ws = null;
+    room.lastActiveAt = Date.now();
 
-    if (room.players.every((p) => !p.ws || p.ws.isAI)) {
-      rooms.delete(room.code);
-    } else {
+    const humanPlayers = room.players.filter((candidate) => isHumanPlayer(candidate));
+    const allHumansOffline = humanPlayers.length > 0
+      && humanPlayers.every((candidate) => candidate.isOnline === false || !candidate.ws);
+
+    logger.info('player_marked_offline', {
+      room: summarizeRoom(room),
+      playerId: player.id,
+      graceDeadline: player.graceDeadline,
+      allHumansOffline,
+    });
+
+    if (!allHumansOffline) {
       shared.getBroadcastRoom(room);
     }
   }

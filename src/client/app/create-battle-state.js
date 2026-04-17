@@ -44,6 +44,15 @@ export function createBattleState(options) {
       wsAuthPending: false,
       wsAuthAttempted: false,
       wsAuthOk: false,
+      optimisticRoomActive: false,
+      lastLaunchIntentUrl: '',
+      launchFlow: {
+        originalIntent: options.launchIntent ? { ...options.launchIntent } : null,
+        roomRequestSent: false,
+        roomAckReceived: false,
+        lastError: '',
+        retryCount: 0,
+      },
       replay: {
         enabled: false,
         replayId: '',

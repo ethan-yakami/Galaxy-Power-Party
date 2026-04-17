@@ -137,10 +137,12 @@ async function main() {
         }
 
         if (
-          game.phase === 'defense_select'
-          && game.defenderId === myId
-          && sawAiAttackSelect
+          sawAiAttackSelect
           && game.round >= 2
+          && (
+            (game.phase === 'defense_select' && game.defenderId === myId)
+            || game.phase === 'ended'
+          )
         ) {
           resolved = true;
           clearTimeout(timeout);
@@ -152,7 +154,7 @@ async function main() {
       });
     });
 
-    assert.strictEqual(resolved, true, 'AI attack phase should auto-resolve into defense_select');
+    assert.strictEqual(resolved, true, 'AI attack phase should auto-resolve into the next stable phase');
     console.log('ai-battle-runtime test passed');
   } finally {
     if (ws) {

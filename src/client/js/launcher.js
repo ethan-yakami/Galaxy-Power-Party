@@ -10,6 +10,7 @@
       return `/api/${String(path || '').replace(/^\/+/, '')}`;
     },
   };
+
   const nameInput = document.getElementById('nameInput');
   const roomCodeInput = document.getElementById('roomCodeInput');
   const createBtn = document.getElementById('createBtn');
@@ -28,24 +29,27 @@
   const authLoginBtn = document.getElementById('authLoginBtn');
   const authLogoutBtn = document.getElementById('authLogoutBtn');
   const authApi = window.GPPAuth || null;
+  const shellApi = window.GPPShell || null;
+
   const JOINABLE_REASON_TEXT = Object.freeze({
     ok: '可加入',
     room_full: '房间已满',
     in_game: '对局进行中',
     ended: '对局已结束',
     private: '私有房间',
-    reserved_slot: '席位保留中（离线重连）',
+    reserved_slot: '席位保留中（对方重连中）',
   });
+
   let publicRoomMap = new Map();
 
   function setMessage(text, isError) {
     if (!messageEl) return;
-    messageEl.textContent = text;
+    messageEl.textContent = text || '';
     messageEl.classList.toggle('error', !!isError);
   }
 
   function getPlayerName() {
-    const raw = nameInput ? nameInput.value.trim() : '';
+    const raw = nameInput ? String(nameInput.value || '').trim() : '';
     if (raw) return raw.slice(0, 20);
     return `玩家${Math.floor(Math.random() * 1000)}`;
   }
@@ -56,6 +60,16 @@
   }
 
   function openBattlePage(mode, name, code) {
+    if (shellApi && typeof shellApi.openBattleIntent === 'function') {
+      setMessage('正在打开战斗房间...', false);
+      shellApi.openBattleIntent({
+        mode,
+        name,
+        code: code || '',
+      });
+      return;
+    }
+
     const params = new URLSearchParams();
     params.set('mode', mode);
     params.set('name', name);
@@ -95,6 +109,7 @@
 
   function renderPublicRooms(rooms) {
     if (!publicRoomSelect) return;
+
     const list = Array.isArray(rooms) ? rooms : [];
     const previousCode = String(publicRoomSelect.value || '').trim();
     indexPublicRooms(list);
@@ -108,13 +123,12 @@
     let joinableCount = 0;
     for (const room of list) {
       const option = document.createElement('option');
-      option.value = room.code;
-      const status = room.status === 'lobby' ? '大厅' : (room.status || '未知');
       const reason = normalizeJoinableReason(room);
+      const status = room.status === 'lobby' ? '大厅' : (room.status || '未知');
       if (reason === 'ok') joinableCount += 1;
-      const reasonText = getJoinableReasonText(reason);
+      option.value = room.code;
       option.disabled = reason !== 'ok';
-      option.textContent = `${room.code} | ${status} | ${room.playerCount || 0}/${room.capacity || 2} | ${reasonText}`;
+      option.textContent = `${room.code} | ${status} | ${room.playerCount || 0}/${room.capacity || 2} | ${getJoinableReasonText(reason)}`;
       publicRoomSelect.appendChild(option);
     }
 
@@ -140,14 +154,19 @@
     try {
       const response = await fetch(urls.toApi(`public-rooms?t=${Date.now()}`), { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
       const payload = await response.json();
       const list = Array.isArray(payload && payload.rooms) ? payload.rooms : [];
       const joinableCount = list.filter((item) => normalizeJoinableReason(item) === 'ok').length;
       renderPublicRooms(list);
+
       if (showMessage) {
-        setMessage(list.length
-          ? `公开房间列表已刷新（可加入 ${joinableCount} 个）。`
-          : '当前没有公开房间。', false);
+        setMessage(
+          list.length
+            ? `公开房间列表已刷新，可加入 ${joinableCount} 个。`
+            : '当前没有公开房间。',
+          false
+        );
       }
     } catch (error) {
       renderPublicRooms([]);
@@ -179,6 +198,7 @@
 
   async function runAuthAction(kind) {
     if (!authApi) return;
+
     const { username, password } = getAuthForm();
     if (kind !== 'logout') {
       if (username.length < 3) {
@@ -190,6 +210,7 @@
         return;
       }
     }
+
     try {
       if (kind === 'register') {
         const result = await authApi.register(username, password);
@@ -209,6 +230,7 @@
         await authApi.logout();
         setMessage('已退出登录。', false);
       }
+
       renderAuthStatus();
       refreshPublicRooms(false);
     } catch (error) {
@@ -231,31 +253,33 @@
   if (joinBtn) {
     joinBtn.onclick = function() {
       const selectedCode = publicRoomSelect ? String(publicRoomSelect.value || '').trim() : '';
-      const typedCode = roomCodeInput ? roomCodeInput.value.trim() : '';
+      const typedCode = roomCodeInput ? String(roomCodeInput.value || '').trim() : '';
       const code = typedCode || selectedCode;
+
       if (!/^\d{4}$/.test(code)) {
         setMessage('请输入有效的 4 位房间号。', true);
         return;
       }
+
       const knownRoom = findPublicRoom(code);
       if (knownRoom && normalizeJoinableReason(knownRoom) !== 'ok') {
-        const reasonText = getJoinableReasonText(normalizeJoinableReason(knownRoom));
-        setMessage(`房间 ${code} 当前不可加入：${reasonText}`, true);
+        setMessage(`房间 ${code} 当前不可加入：${getJoinableReasonText(normalizeJoinableReason(knownRoom))}`, true);
         return;
       }
+
       openBattlePage('join', getPlayerName(), code);
     };
   }
 
   if (replaysBtn) {
     replaysBtn.onclick = function() {
-      openStandalonePage('/replays.html', '正在打开对局回放...');
+      openStandalonePage('replays.html', '正在打开对局回放...');
     };
   }
 
   if (workshopBtn) {
     workshopBtn.onclick = function() {
-      openStandalonePage('/workshop.html', '正在打开角色工坊...');
+      openStandalonePage('workshop.html', '正在打开角色工坊...');
     };
   }
 
@@ -294,6 +318,7 @@
 
   refreshPublicRooms(false);
   renderAuthStatus();
+
   if (authApi) {
     authApi.fetchMe().finally(renderAuthStatus);
     window.addEventListener(authApi.AUTH_EVENT, () => {
@@ -301,7 +326,11 @@
       refreshPublicRooms(false);
     });
   }
+
   setInterval(() => {
+    if (shellApi && typeof shellApi.isBattleVisible === 'function' && shellApi.isBattleVisible()) {
+      return;
+    }
     refreshPublicRooms(false);
   }, 15000);
 })();

@@ -23,6 +23,14 @@ function main() {
   assert.strictEqual(urls.toAsset('shared/replay-schema.js', nestedLocation), '/gpp/shared/replay-schema.js');
   assert.strictEqual(urls.toWsUrl(nestedLocation, 'wss:'), 'wss://example.com/gpp/');
 
+  global.__GPP_ENDPOINTS__ = {
+    apiOrigin: 'https://api.example.com/base',
+    wsOrigin: 'https://rt.example.com/ws',
+  };
+  assert.strictEqual(urls.toApi('public-rooms?t=1', nestedLocation), 'https://api.example.com/base/api/public-rooms?t=1');
+  assert.strictEqual(urls.toWsUrl(nestedLocation, 'wss:'), 'wss://rt.example.com/ws');
+  delete global.__GPP_ENDPOINTS__;
+
   console.log('client-url-utils tests passed');
 }
 

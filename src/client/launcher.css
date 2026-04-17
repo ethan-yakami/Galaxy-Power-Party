@@ -11,6 +11,10 @@
   box-sizing: border-box;
 }
 
+.hidden {
+  display: none !important;
+}
+
 html,
 body {
   font-family: 'Rajdhani', 'Noto Sans SC', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
@@ -265,3 +269,62 @@ button:active {
   color: black !important;
 }
 .die.selected .dieLabel { color: #ffffff; text-shadow: 0 2px 4px rgba(0,0,0,0.4); }
+
+.gppBattleShellHost {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: linear-gradient(160deg, #eef7ff, #e2f2fb 50%, #d6f0ea);
+}
+
+.gppBattleShellFrame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.gppBattleShellOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(200, 232, 255, 0.9) 0%, transparent 44%),
+    radial-gradient(circle at 80% 12%, rgba(192, 240, 224, 0.9) 0%, transparent 42%),
+    linear-gradient(160deg, rgba(238, 247, 255, 0.94), rgba(226, 242, 251, 0.92), rgba(214, 240, 234, 0.92));
+}
+
+.gppBattleShellOverlayInteractive {
+  pointer-events: auto;
+}
+
+.gppBattleShellOverlayCard {
+  width: min(480px, calc(100vw - 32px));
+  border-radius: 18px;
+  border: 1px solid rgba(135, 190, 230, 0.5);
+  background: linear-gradient(145deg, rgba(231, 243, 261, 0.88), rgba(231, 242, 257, 0.86));
+  box-shadow: 0 20px 48px rgba(230, 240, 250, 0.35);
+  backdrop-filter: blur(8px);
+  padding: 22px;
+  display: grid;
+  gap: 10px;
+}
+
+.gppBattleShellOverlayCard h2,
+.gppBattleShellOverlayCard p {
+  margin: 0;
+}
+
+.gppBattleShellOverlaySub {
+  letter-spacing: 0.18em;
+  font-size: 14px;
+  color: #1e3a5f;
+}
+
+.gppBattleShellOverlayActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
