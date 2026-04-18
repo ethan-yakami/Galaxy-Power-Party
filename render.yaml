@@ -5,11 +5,13 @@
     plan: starter
     region: singapore
     branch: main
-    buildCommand: npm ci && npm run build:client
+    buildCommand: npm ci --include=dev && npm run build:client
     startCommand: npm run start:render
     healthCheckPath: /api/readyz
     autoDeploy: true
     envVars:
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
       - key: NODE_ENV
         value: production
       - key: HOST
