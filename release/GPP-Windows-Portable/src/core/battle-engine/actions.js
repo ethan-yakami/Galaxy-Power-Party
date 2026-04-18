@@ -46,10 +46,13 @@ function getActionMask(action) {
 
 function indicesToMask(indices, maxCount) {
   if (!Array.isArray(indices)) return 0;
+  const limit = Number.isInteger(maxCount)
+    ? Math.max(0, Math.min(MAX_ROLL_DICE, maxCount))
+    : MAX_ROLL_DICE;
   let mask = 0;
   for (let i = 0; i < indices.length; i += 1) {
     const idx = indices[i];
-    if (!Number.isInteger(idx) || idx < 0 || idx >= maxCount || idx >= MAX_ROLL_DICE) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= limit || idx >= MAX_ROLL_DICE) {
       return -1;
     }
     const bit = 1 << idx;

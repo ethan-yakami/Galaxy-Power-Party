@@ -47,6 +47,8 @@ function buildContext(runtime, actor, opponent, roll, mask, role) {
   ctx.selectedIndices = getSelectedIndices(mask);
   ctx.auroraValue = 0;
   ctx.totalDamage = 0;
+  ctx.attackValue = VALUE_NONE;
+  ctx.defenseValue = VALUE_NONE;
   ctx.hits = scratch.hits;
   ctx.hitCount = 0;
   return ctx;
@@ -522,6 +524,9 @@ function applyUseAurora(state, role, runtime) {
 function applyConfirmAttack(state, mask, runtime) {
   const attacker = state.attacker;
   const defender = state.defender;
+  if (mask <= 0 || mask >= (1 << state.attackRoll.count)) {
+    return { ok: false, reason: 'invalid_attack_mask' };
+  }
   const need = getNeedCount(state.attackLevel[attacker], state.attackRoll.count);
   if (POPCOUNT[mask] !== need) {
     return { ok: false, reason: `必须选择${need}枚不同的骰子。` };
@@ -559,6 +564,9 @@ function applyConfirmAttack(state, mask, runtime) {
 function applyConfirmDefense(state, mask, runtime) {
   const defender = state.defender;
   const attacker = state.attacker;
+  if (mask <= 0 || mask >= (1 << state.defenseRoll.count)) {
+    return { ok: false, reason: 'invalid_defense_mask' };
+  }
   const need = getNeedCount(state.defenseLevel[defender], state.defenseRoll.count);
   if (POPCOUNT[mask] !== need) {
     return { ok: false, reason: `必须选择${need}枚不同的骰子。` };
@@ -654,10 +662,14 @@ function applyConfirmDefense(state, mask, runtime) {
 
   const attackCtx = buildContext(runtime, attacker, defender, state.attackRoll, state.attackSelectionMask, ROLE_ATTACK);
   attackCtx.totalDamage = totalDamage;
+  attackCtx.attackValue = state.attackValue;
+  attackCtx.defenseValue = state.defenseValue;
   applyCharacterHook(state, attacker, 'onAttackAfterDamageResolved', attackCtx, runtime);
 
   const defendCtx = buildContext(runtime, defender, attacker, state.defenseRoll, state.defenseSelectionMask, ROLE_DEFENSE);
   defendCtx.totalDamage = totalDamage;
+  defendCtx.attackValue = state.attackValue;
+  defendCtx.defenseValue = state.defenseValue;
   defendCtx.hitCount = hitCount;
   for (let i = 0; i < hitCount; i += 1) defendCtx.hits[i] = hits[i];
   applyCharacterHook(state, defender, 'onAfterDamageResolved', defendCtx, runtime);

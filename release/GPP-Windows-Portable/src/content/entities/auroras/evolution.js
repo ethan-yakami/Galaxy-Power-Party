@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'evolution', name: '进化',
   faces: [
     { value: 3, hasA: false },{ value: 3, hasA: false },

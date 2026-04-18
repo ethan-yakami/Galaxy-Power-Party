@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'heartbeat', name: '心跳',
   faces: [
     { value: 1, hasA: false },{ value: 1, hasA: false },

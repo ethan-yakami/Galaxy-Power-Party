@@ -38,25 +38,25 @@ css = css.replace(
 
 // 4. Fix button.danger
 css = css.replace(
-  /button\.danger \{\r\n  background: linear-gradient\(140deg, rgba\(244, 244, 258, 0\.92\), rgba\(241, 242, 255, 0\.95\)\);\r\n  border-color: #1a2f4c;\r\n\}/,
+  /button\.danger \{\r\n {2}background: linear-gradient\(140deg, rgba\(244, 244, 258, 0\.92\), rgba\(241, 242, 255, 0\.95\)\);\r\n {2}border-color: #1a2f4c;\r\n\}/,
   'button.danger {\r\n  background: linear-gradient(90deg, #ffffff 0%, #ffe0e4 100%);\r\n  border-color: rgba(200, 80, 100, 0.55);\r\n  color: #7a1a24;\r\n}'
 );
 
 // 5. Fix .primaryBtn
 css = css.replace(
-  /.primaryBtn \{\r\n  background: linear-gradient\(135deg, rgba\(35, 202, 255, 0\.95\), rgba\(0, 106, 255, 0\.92\)\);\r\n  border-color: #1a2f4c;\r\n  color: #04123f;\r\n  font-weight: 700;\r\n\}/,
+  /.primaryBtn \{\r\n {2}background: linear-gradient\(135deg, rgba\(35, 202, 255, 0\.95\), rgba\(0, 106, 255, 0\.92\)\);\r\n {2}border-color: #1a2f4c;\r\n {2}color: #04123f;\r\n {2}font-weight: 700;\r\n\}/,
   '.primaryBtn {\r\n  background: linear-gradient(90deg, #ffffff 0%, #a8d8f0 100%);\r\n  border-color: rgba(0, 130, 200, 0.6);\r\n  color: #0a2a40;\r\n  font-weight: 700;\r\n}'
 );
 
 // 6. Fix .accentBtn
 css = css.replace(
-  /.accentBtn \{\r\n  background: linear-gradient\(135deg, rgba\(255, 92, 226, 0\.95\), rgba\(130, 57, 255, 0\.96\)\);\r\n  border-color: #1a2f4c;\r\n\}/,
+  /.accentBtn \{\r\n {2}background: linear-gradient\(135deg, rgba\(255, 92, 226, 0\.95\), rgba\(130, 57, 255, 0\.96\)\);\r\n {2}border-color: #1a2f4c;\r\n\}/,
   '.accentBtn {\r\n  background: linear-gradient(90deg, #ffffff 0%, #f0d8f8 100%);\r\n  border-color: rgba(160, 60, 200, 0.5);\r\n  color: #4a1060;\r\n}'
 );
 
 // 7. Fix .secondaryBtn
 css = css.replace(
-  /.secondaryBtn \{\r\n  background: linear-gradient\(135deg, rgba\(233, 245, 263, 0\.9\), rgba\(232, 243, 259, 0\.95\)\);\r\n\}/,
+  /.secondaryBtn \{\r\n {2}background: linear-gradient\(135deg, rgba\(233, 245, 263, 0\.9\), rgba\(232, 243, 259, 0\.95\)\);\r\n\}/,
   '.secondaryBtn {\r\n  background: linear-gradient(90deg, #ffffff 0%, #eef5ff 100%);\r\n  color: #2a4060;\r\n}'
 );
 
@@ -119,7 +119,7 @@ css = css.replace(
 
 // 15. Fix battleBoard background (make it a proper light field)
 css = css.replace(
-  /\.battleBoard \{\r\n  position: relative;\r\n  overflow: hidden;\r\n  border-radius: var\(--radius-lg\);\r\n  background:[^;]+;/,
+  /\.battleBoard \{\r\n {2}position: relative;\r\n {2}overflow: hidden;\r\n {2}border-radius: var\(--radius-lg\);\r\n {2}background:[^;]+;/,
   '.battleBoard {\r\n  position: relative;\r\n  overflow: hidden;\r\n  border-radius: var(--radius-lg);\r\n  background: linear-gradient(180deg, rgba(235, 248, 255, 0.9), rgba(225, 245, 235, 0.8));'
 );
 

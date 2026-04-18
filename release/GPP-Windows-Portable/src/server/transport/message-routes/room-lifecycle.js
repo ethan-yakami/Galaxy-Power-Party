@@ -18,6 +18,12 @@ function createRoomLifecycleRoutes({ handlers, ERROR_CODES, send }) {
         handlers.handleJoinRoom(ws, msg);
       },
     },
+    authenticate: {
+      errorLabel: 'handleAuthenticate',
+      run(ws, msg) {
+        handlers.handleAuthenticate(ws, msg);
+      },
+    },
     leave_room: {
       errorLabel: 'leaveRoom',
       run(ws) {

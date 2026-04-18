@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'trickster', name: '奇术师',
   faces: [
     { value: 4, hasA: false },{ value: 4, hasA: false },{ value: 4, hasA: false },

@@ -5,9 +5,11 @@ for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 if not defined PORT set "PORT=3000"
 if not defined HOST set "HOST=0.0.0.0"
 
-set "LOG_FILE=%ROOT%\server_runtime.log"
-set "ERR_FILE=%ROOT%\server_error.log"
-set "PID_FILE=%ROOT%\.gpp-server.pid"
+set "RUNTIME_DIR=%ROOT%\tmp\runtime"
+if not exist "%RUNTIME_DIR%" mkdir "%RUNTIME_DIR%"
+set "LOG_FILE=%RUNTIME_DIR%\server_runtime.log"
+set "ERR_FILE=%RUNTIME_DIR%\server_error.log"
+set "PID_FILE=%RUNTIME_DIR%\.gpp-server.pid"
 set "NODE_EXE=%ROOT%\runtime\node\node.exe"
 set "SCRIPTS_DIR=%ROOT%\scripts"
 
@@ -34,6 +36,7 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%PORT% .*LISTENING"')
 )
 
 echo Starting Galaxy Power Party...
+echo Local startup uses Express static hosting and does not require npm run build:client.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPTS_DIR%\launch_server.ps1" -Mode node -Root "%ROOT%" -BindHost "%HOST%" -Port %PORT% -NodeExe "%NODE_EXE%" -OutLog "%LOG_FILE%" -ErrLog "%ERR_FILE%" >nul
 if errorlevel 1 (
   echo [ERROR] Failed to launch server process.

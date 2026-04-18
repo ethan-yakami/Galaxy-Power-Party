@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'repeater', name: '复读',
   faces: [
     { value: 1, hasA: false },{ value: 1, hasA: false },

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>银河战力党 - Nova 战斗预览</title>
+    <link rel="stylesheet" href="styles.css?v=ui_fix_20260415_v19" />
+    <link rel="stylesheet" href="battle-next.css?v=nova_preview_20260418_v1" />
+  </head>
+  <body data-battle-theme="nova">
+    <div class="novaBackdrop" aria-hidden="true">
+      <div class="novaNebula novaNebulaA"></div>
+      <div class="novaNebula novaNebulaB"></div>
+      <div class="novaNebula novaNebulaC"></div>
+      <div class="novaStarfield"></div>
+      <div class="novaGrid"></div>
+      <div class="novaHex novaHexLeft"></div>
+      <div class="novaHex novaHexRight"></div>
+    </div>
+
+    <main class="appShell novaShell">
+      <header class="globalHeader novaHeader">
+        <div class="headerMainRow novaHeaderRow">
+          <div class="novaBrand">
+            <p class="brandSub">GALAXY POWER PARTY</p>
+            <h1>银河战力党</h1>
+            <p class="novaHeaderTagline">Nova 战斗预览版</p>
+          </div>
+          <div class="globalHeaderActions novaTopActions">
+            <p id="myId" class="myIdPill">玩家 ID: -</p>
+            <button id="backToLauncherBtn" class="secondaryBtn" type="button">返回启动台</button>
+            <button id="docBtn" class="docBtn" type="button">规则文档</button>
+          </div>
+        </div>
+
+        <div id="headerRoomInfo" class="headerRoomRow hidden">
+          <div class="roomIdentity">
+            <span class="roomTag">战斗房间</span>
+            <span id="roomCode" class="roomCodeValue">-</span>
+          </div>
+          <div class="roomTopActions">
+            <button id="confirmLoadoutTopBtn" class="primaryBtn hidden" type="button" disabled>确认当前配置</button>
+            <button id="leaveBtn" class="danger" type="button">退出房间</button>
+          </div>
+        </div>
+
+        <div id="roomStatusBar" class="roomStatusBar hidden"></div>
+      </header>
+
+      <section id="connectionPanel" class="scene sceneHome novaConnectionScene">
+        <div class="panel homeCard novaConnectionCard">
+          <p class="novaEyebrow">Connection Feed</p>
+          <h2>正在进入战斗星港</h2>
+          <div class="connectionStatusRow">
+            <span id="connectionStatusBadge" class="connectionStatusBadge statusConnecting">连接中...</span>
+          </div>
+          <p id="launchHint" class="sceneDesc">正在建立连接并自动执行建房或入房流程...</p>
+          <p id="connectionDetail" class="sceneDesc">请稍候，服务器就绪后会直接切入新版战斗界面。</p>
+          <p id="connectionError" class="connectionError hidden"></p>
+          <div id="connectionActions" class="actions connectionActions">
+            <button id="reconnectBtn" class="secondaryBtn hidden" type="button">重新连接</button>
+            <button id="retryIntentBtn" class="primaryBtn hidden" type="button">重试自动入房</button>
+            <button id="backToLauncherInlineBtn" class="secondaryBtn hidden" type="button">返回启动台</button>
+          </div>
+        </div>
+
+        <section id="msgPanel" class="panel statusPanel novaStatusPanel">
+          <p class="novaEyebrow">Status Console</p>
+          <h3>连接状态</h3>
+          <p id="message">等待与服务器建立会话...</p>
+        </section>
+      </section>
+
+      <section id="roomPanel" class="scene sceneRoom hidden">
+        <div class="roomGrid novaRoomGrid">
+          <aside class="panel roomSide novaSideRail">
+            <div class="novaPanelHeader">
+              <p class="novaEyebrow">Tactical Roster</p>
+              <h3>房间成员</h3>
+            </div>
+            <ul id="playersList" class="playersList"></ul>
+            <section id="weatherStatusCard" class="weatherStatusCard hidden" aria-live="polite"></section>
+            <section id="turnOwnershipCard" class="turnOwnershipCard hidden" aria-live="polite"></section>
+
+            <div id="lobbyControls" class="lobbyStage">
+              <div class="novaPanelHeader compact">
+                <p class="novaEyebrow">Loadout Summary</p>
+              </div>
+              <div id="selectionSummary" class="selectionSummary"></div>
+              <div class="actions">
+                <button id="confirmLoadoutBtn" class="primaryBtn" type="button">确认当前配置</button>
+                <button id="createVariantBtn" class="secondaryBtn" type="button">新建角色</button>
+                <button id="weatherGuideBtn" class="secondaryBtn" type="button">天气与机制</button>
+              </div>
+              <p id="confirmHint" class="confirmHint"></p>
+              <p id="lobbyHint" class="lobbyHint">等待双方完成配置...</p>
+            </div>
+          </aside>
+
+          <div class="novaStageShell">
+            <section id="lobbyArea" class="panel lobbyMain novaLobbyDeck">
+              <div class="novaPanelHeader">
+                <p class="novaEyebrow">Loadout Bay</p>
+                <h3>战前配置</h3>
+              </div>
+              <div class="lobbyColumns">
+                <div class="lobbyCol">
+                  <h3>选择角色</h3>
+                  <div id="characterButtons" class="actions selectGrid"></div>
+                </div>
+                <div class="lobbyCol">
+                  <h3>选择曙彩骰</h3>
+                  <div id="auroraButtons" class="actions selectGrid"></div>
+                </div>
+              </div>
+            </section>
+
+            <section id="gameArea" class="battleScene hidden">
+              <div class="panel battleTop novaBattleTop">
+                <div class="novaHudBlock">
+                  <p class="novaEyebrow">Combat Feed</p>
+                  <p id="roundInfo" class="roundInfo"></p>
+                  <p id="turnInfo" class="turnInfo"></p>
+                </div>
+                <div id="weatherBanner" class="weatherBanner hidden" aria-live="polite"></div>
+              </div>
+
+              <div class="battleMain novaBattleMain">
+                <div class="panel battleBoard novaBattleBoard">
+                  <div class="novaArenaGlow novaArenaGlowTop" aria-hidden="true"></div>
+                  <div class="novaArenaGlow novaArenaGlowBottom" aria-hidden="true"></div>
+                  <section id="enemyZone" class="zone zoneEnemy"></section>
+                  <div id="battleCenterScore" class="battleCenterScore">等待行动</div>
+                  <section id="selfZone" class="zone zoneSelf"></section>
+                </div>
+
+                <aside id="actionRail" class="panel actionRail novaActionRail"></aside>
+              </div>
+
+              <div class="panel battleBottom novaBattleBottom">
+                <div id="replayControls" class="replayControls hidden">
+                  <div class="replayControlTop">
+                    <button id="replayPrevBtn" class="secondaryBtn" type="button">上一步</button>
+                    <input id="replayStepRange" type="range" min="0" max="0" value="0" />
+                    <button id="replayNextBtn" class="secondaryBtn" type="button">下一步</button>
+                  </div>
+                  <p id="replayStepLabel" class="replayStepLabel"></p>
+                  <p id="replayActionLabel" class="replayActionLabel"></p>
+                </div>
+
+                <div class="novaLogTop">
+                  <div class="novaPanelHeader compact">
+                    <p class="novaEyebrow">Combat Archive</p>
+                    <h3>战斗日志</h3>
+                  </div>
+                  <button id="logToggleBtn" class="secondaryBtn" type="button">展开战斗日志</button>
+                </div>
+
+                <div id="logDrawer" class="logDrawer">
+                  <div id="logBox" class="logBox"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="app/battle-entry.js"></script>
+  </body>
+</html>

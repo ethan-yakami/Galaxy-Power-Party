@@ -1,2 +1,2 @@
-﻿module.exports = require('../server/services/rooms');
+module.exports = require('../server/services/rooms');
 

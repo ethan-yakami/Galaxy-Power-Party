@@ -1,0 +1,1463 @@
+body[data-battle-theme='nova'] {
+  --bg-0: #050b1d;
+  --bg-1: #09132d;
+  --bg-2: #111f45;
+  --surface: rgba(9, 17, 39, 0.68);
+  --surface-strong: rgba(10, 18, 42, 0.84);
+  --surface-soft: rgba(14, 24, 54, 0.92);
+  --line: rgba(114, 164, 255, 0.2);
+  --line-strong: rgba(121, 217, 255, 0.36);
+  --text: #f2f7ff;
+  --text-soft: #93abd3;
+  --accent: #55d7ff;
+  --accent-2: #ff4f97;
+  --accent-3: #ffd55f;
+  --danger: #ff6f98;
+  --success: #78ffc9;
+  --shadow: 0 24px 60px rgba(1, 6, 24, 0.45);
+  --radius-lg: 34px;
+  --radius-md: 22px;
+  --radius-sm: 14px;
+  color-scheme: dark;
+  min-height: 100vh;
+  font-family: 'Segoe UI Variable Display', 'Bahnschrift', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(46, 178, 255, 0.24), transparent 32%),
+    radial-gradient(circle at 84% 14%, rgba(255, 74, 132, 0.16), transparent 26%),
+    radial-gradient(circle at 52% 78%, rgba(74, 120, 255, 0.2), transparent 28%),
+    linear-gradient(180deg, #040915 0%, #091226 38%, #070d1a 100%);
+}
+
+body[data-battle-theme='nova'] * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(111, 180, 255, 0.78) rgba(7, 13, 29, 0.72);
+}
+
+body[data-battle-theme='nova'] *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+body[data-battle-theme='nova'] *::-webkit-scrollbar-track {
+  background: rgba(4, 10, 25, 0.82);
+  border-radius: 999px;
+}
+
+body[data-battle-theme='nova'] *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(77, 200, 255, 0.92), rgba(88, 111, 255, 0.92));
+  border: 2px solid rgba(7, 13, 29, 0.92);
+  border-radius: 999px;
+}
+
+body[data-battle-theme='nova']::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 22%, transparent 78%, rgba(255, 255, 255, 0.02)),
+    radial-gradient(circle at 50% 50%, transparent 32%, rgba(0, 0, 0, 0.22) 100%);
+  z-index: 0;
+}
+
+body[data-battle-theme='nova'] .novaBackdrop {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body[data-battle-theme='nova'] .novaNebula,
+body[data-battle-theme='nova'] .novaHex {
+  position: absolute;
+  opacity: 0.9;
+}
+
+body[data-battle-theme='nova'] .novaNebula {
+  border-radius: 50%;
+  filter: blur(60px);
+}
+
+body[data-battle-theme='nova'] .novaNebulaA {
+  top: -10vh;
+  left: -8vw;
+  width: 42vw;
+  height: 42vw;
+  background: radial-gradient(circle, rgba(73, 193, 255, 0.4), transparent 70%);
+}
+
+body[data-battle-theme='nova'] .novaNebulaB {
+  top: 12vh;
+  right: -12vw;
+  width: 38vw;
+  height: 38vw;
+  background: radial-gradient(circle, rgba(255, 71, 150, 0.28), transparent 72%);
+}
+
+body[data-battle-theme='nova'] .novaNebulaC {
+  bottom: -18vh;
+  left: 28vw;
+  width: 48vw;
+  height: 32vw;
+  background: radial-gradient(circle, rgba(84, 122, 255, 0.2), transparent 72%);
+}
+
+body[data-battle-theme='nova'] .novaStarfield {
+  position: absolute;
+  inset: 0;
+  opacity: 0.45;
+  background-image:
+    radial-gradient(circle at 12% 24%, rgba(255, 255, 255, 0.85) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 76% 18%, rgba(255, 255, 255, 0.72) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 64% 68%, rgba(255, 255, 255, 0.54) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 18% 72%, rgba(255, 255, 255, 0.5) 0 1px, transparent 1.3px),
+    radial-gradient(circle at 84% 54%, rgba(255, 255, 255, 0.62) 0 1px, transparent 1.3px),
+    radial-gradient(circle at 44% 36%, rgba(255, 255, 255, 0.5) 0 1px, transparent 1.3px);
+}
+
+body[data-battle-theme='nova'] .novaGrid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(rgba(117, 170, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(117, 170, 255, 0.08) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: radial-gradient(circle at center, #000 34%, transparent 92%);
+}
+
+body[data-battle-theme='nova'] .novaHex {
+  top: 10vh;
+  width: 280px;
+  height: 420px;
+  background:
+    linear-gradient(180deg, rgba(73, 125, 255, 0.2), rgba(73, 125, 255, 0)),
+    repeating-linear-gradient(
+      180deg,
+      rgba(89, 168, 255, 0.15) 0,
+      rgba(89, 168, 255, 0.15) 16px,
+      rgba(5, 12, 28, 0) 16px,
+      rgba(5, 12, 28, 0) 28px
+    );
+  clip-path: polygon(22% 0, 100% 0, 78% 100%, 0 100%);
+  opacity: 0.22;
+}
+
+body[data-battle-theme='nova'] .novaHexLeft {
+  left: -80px;
+}
+
+body[data-battle-theme='nova'] .novaHexRight {
+  right: -80px;
+  transform: scaleX(-1);
+}
+
+body[data-battle-theme='nova'] .appShell.novaShell {
+  position: relative;
+  z-index: 1;
+  width: min(1660px, 98vw);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 20px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+body[data-battle-theme='nova'] .globalHeader.novaHeader,
+body[data-battle-theme='nova'] .panel {
+  border: 1px solid rgba(123, 171, 255, 0.15);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+    linear-gradient(140deg, rgba(8, 16, 38, 0.86), rgba(12, 22, 54, 0.76));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(143, 216, 255, 0.05),
+    var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+body[data-battle-theme='nova'] .globalHeader.novaHeader {
+  border-radius: 28px;
+  padding: 18px 20px 16px;
+  gap: 10px;
+}
+
+body[data-battle-theme='nova'] .novaHeaderRow {
+  gap: 18px;
+}
+
+body[data-battle-theme='nova'] .novaBrand {
+  display: grid;
+  gap: 6px;
+}
+
+body[data-battle-theme='nova'] .brandSub {
+  color: rgba(132, 223, 255, 0.88);
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+body[data-battle-theme='nova'] h1 {
+  font-size: clamp(38px, 4vw, 58px);
+  line-height: 0.95;
+  letter-spacing: 0.08em;
+  color: #f5fbff;
+  text-shadow: 0 0 26px rgba(83, 214, 255, 0.24);
+}
+
+body[data-battle-theme='nova'] .novaHeaderTagline {
+  color: rgba(170, 201, 245, 0.78);
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+body[data-battle-theme='nova'] .globalHeaderActions.novaTopActions,
+body[data-battle-theme='nova'] .roomTopActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+body[data-battle-theme='nova'] .myIdPill,
+body[data-battle-theme='nova'] .roomTag,
+body[data-battle-theme='nova'] .infoChip,
+body[data-battle-theme='nova'] .connectionStatusBadge {
+  border-radius: 999px;
+  border: 1px solid rgba(122, 214, 255, 0.24);
+  background: linear-gradient(180deg, rgba(24, 37, 78, 0.9), rgba(10, 18, 45, 0.78));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+body[data-battle-theme='nova'] .myIdPill {
+  padding: 10px 16px;
+  color: #e9f6ff;
+  font-size: 14px;
+  letter-spacing: 0.05em;
+}
+
+body[data-battle-theme='nova'] .headerRoomRow {
+  padding-top: 14px;
+  border-top: 1px solid rgba(119, 171, 255, 0.14);
+}
+
+body[data-battle-theme='nova'] .roomIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+body[data-battle-theme='nova'] .roomTag {
+  padding: 7px 12px;
+  font-size: 12px;
+  color: rgba(166, 228, 255, 0.9);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+body[data-battle-theme='nova'] .roomCodeValue {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #fbfdff;
+  text-shadow: 0 0 20px rgba(85, 210, 255, 0.18);
+}
+
+body[data-battle-theme='nova'] .roomStatusBar {
+  margin-top: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(122, 214, 255, 0.18);
+  font-size: 14px;
+  font-weight: 700;
+  color: #eff8ff;
+  background:
+    linear-gradient(90deg, rgba(13, 21, 49, 0.92), rgba(15, 30, 72, 0.8)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  box-shadow: inset 0 0 0 1px rgba(105, 175, 255, 0.05);
+}
+
+body[data-battle-theme='nova'] .roomStatusBar-progress {
+  border-color: rgba(255, 214, 96, 0.32);
+}
+
+body[data-battle-theme='nova'] .roomStatusBar-ready {
+  border-color: rgba(120, 255, 199, 0.3);
+}
+
+body[data-battle-theme='nova'] .roomStatusBar-warning,
+body[data-battle-theme='nova'] .roomStatusBar-ended {
+  border-color: rgba(255, 111, 152, 0.28);
+}
+
+body[data-battle-theme='nova'] button {
+  border: 1px solid rgba(118, 170, 255, 0.22);
+  border-radius: 16px;
+  padding: 12px 16px;
+  background:
+    linear-gradient(180deg, rgba(20, 36, 78, 0.94), rgba(10, 17, 44, 0.94)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent);
+  color: #eff7ff;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 28px rgba(3, 8, 26, 0.26);
+}
+
+body[data-battle-theme='nova'] button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(120, 214, 255, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 16px 32px rgba(3, 8, 26, 0.34),
+    0 0 0 1px rgba(76, 205, 255, 0.06);
+}
+
+body[data-battle-theme='nova'] button:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+body[data-battle-theme='nova'] .primaryBtn {
+  border-color: rgba(116, 227, 255, 0.46);
+  background:
+    linear-gradient(135deg, rgba(37, 214, 255, 0.24), rgba(35, 99, 255, 0.18)),
+    linear-gradient(180deg, rgba(25, 42, 88, 0.98), rgba(11, 18, 46, 0.96));
+}
+
+body[data-battle-theme='nova'] .secondaryBtn {
+  background:
+    linear-gradient(180deg, rgba(19, 30, 66, 0.96), rgba(8, 14, 36, 0.96)),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent);
+}
+
+body[data-battle-theme='nova'] .danger {
+  border-color: rgba(255, 121, 162, 0.38);
+  background:
+    linear-gradient(135deg, rgba(255, 88, 146, 0.2), rgba(255, 149, 77, 0.12)),
+    linear-gradient(180deg, rgba(52, 17, 43, 0.96), rgba(24, 9, 29, 0.96));
+}
+
+body[data-battle-theme='nova'] .scene {
+  gap: 18px;
+}
+
+body[data-battle-theme='nova'] .sceneHome.novaConnectionScene {
+  grid-template-columns: minmax(360px, 1.4fr) minmax(300px, 0.9fr);
+  align-items: stretch;
+}
+
+body[data-battle-theme='nova'] .homeCard.novaConnectionCard,
+body[data-battle-theme='nova'] .statusPanel.novaStatusPanel {
+  min-height: 220px;
+  border-radius: 28px;
+  padding: 24px;
+}
+
+body[data-battle-theme='nova'] .sceneDesc,
+body[data-battle-theme='nova'] .railHint,
+body[data-battle-theme='nova'] .lobbyHint,
+body[data-battle-theme='nova'] .confirmHint,
+body[data-battle-theme='nova'] .replayStepLabel,
+body[data-battle-theme='nova'] .replayActionLabel,
+body[data-battle-theme='nova'] .playerLoadout,
+body[data-battle-theme='nova'] .selectionSummary p {
+  color: var(--text-soft);
+}
+
+body[data-battle-theme='nova'] .connectionStatusBadge {
+  padding: 7px 12px;
+  color: #eef8ff;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+}
+
+body[data-battle-theme='nova'] .statusConnecting,
+body[data-battle-theme='nova'] .statusRetrying {
+  color: #8fe3ff;
+}
+
+body[data-battle-theme='nova'] .statusOpen,
+body[data-battle-theme='nova'] .statusWelcome {
+  color: #77ffcc;
+}
+
+body[data-battle-theme='nova'] .statusFailed,
+body[data-battle-theme='nova'] .connectionError {
+  color: #ffc3d7;
+}
+
+body[data-battle-theme='nova'] .roomGrid.novaRoomGrid {
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+body[data-battle-theme='nova'] .panel {
+  border-radius: 26px;
+  padding: 18px;
+}
+
+body[data-battle-theme='nova'] .novaSideRail {
+  position: sticky;
+  top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+body[data-battle-theme='nova'] .novaStageShell {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+body[data-battle-theme='nova'] .novaPanelHeader {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+body[data-battle-theme='nova'] .novaPanelHeader.compact {
+  margin-bottom: 0;
+}
+
+body[data-battle-theme='nova'] .novaEyebrow {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(142, 215, 255, 0.82);
+}
+
+body[data-battle-theme='nova'] h2,
+body[data-battle-theme='nova'] h3 {
+  color: #f4f9ff;
+}
+
+body[data-battle-theme='nova'] .playersList {
+  gap: 12px;
+}
+
+body[data-battle-theme='nova'] .playerItem {
+  border: 1px solid rgba(106, 160, 255, 0.18);
+  border-radius: 24px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(145deg, rgba(17, 28, 64, 0.96), rgba(9, 16, 38, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 26px rgba(3, 8, 24, 0.24);
+}
+
+body[data-battle-theme='nova'] .playerItem.me {
+  border-color: rgba(97, 222, 255, 0.36);
+  box-shadow:
+    inset 0 0 0 1px rgba(97, 222, 255, 0.08),
+    0 16px 30px rgba(3, 8, 24, 0.28),
+    0 0 0 1px rgba(97, 222, 255, 0.06);
+}
+
+body[data-battle-theme='nova'] .playerName {
+  color: #f3f8ff;
+  font-size: 18px;
+}
+
+body[data-battle-theme='nova'] .playerPresence {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(118, 170, 255, 0.2);
+  background: rgba(11, 18, 42, 0.86);
+}
+
+body[data-battle-theme='nova'] .playerPresence.online {
+  color: #8cffd0;
+}
+
+body[data-battle-theme='nova'] .playerPresence.offline {
+  color: #ffb7ca;
+}
+
+body[data-battle-theme='nova'] .weatherStatusCard,
+body[data-battle-theme='nova'] .turnOwnershipCard,
+body[data-battle-theme='nova'] .selectionSummary,
+body[data-battle-theme='nova'] .auroraDesc,
+body[data-battle-theme='nova'] .replayControls {
+  border: 1px solid rgba(115, 171, 255, 0.2);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(145deg, rgba(12, 20, 48, 0.95), rgba(9, 15, 35, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body[data-battle-theme='nova'] .weatherStatusCard,
+body[data-battle-theme='nova'] .turnOwnershipCard {
+  padding: 14px;
+}
+
+body[data-battle-theme='nova'] .weatherStatusLabel,
+body[data-battle-theme='nova'] .turnOwnershipLabel {
+  color: rgba(146, 219, 255, 0.78);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+body[data-battle-theme='nova'] .weatherStatusHead h4,
+body[data-battle-theme='nova'] .turnOwnershipText {
+  color: #f7fbff;
+}
+
+body[data-battle-theme='nova'] .weatherStatusMeta,
+body[data-battle-theme='nova'] .weatherStatusDesc,
+body[data-battle-theme='nova'] .faintText {
+  color: var(--text-soft);
+}
+
+body[data-battle-theme='nova'] .turnOwner-self {
+  border-color: rgba(93, 218, 255, 0.28);
+}
+
+body[data-battle-theme='nova'] .turnOwner-enemy {
+  border-color: rgba(255, 106, 162, 0.28);
+}
+
+body[data-battle-theme='nova'] .selectionSummary {
+  min-height: 116px;
+  padding: 14px 16px;
+}
+
+body[data-battle-theme='nova'] .summaryPortraitImg {
+  width: 70px;
+  height: 70px;
+  border-radius: 18px;
+  border: 1px solid rgba(119, 201, 255, 0.22);
+  box-shadow: 0 16px 28px rgba(3, 8, 24, 0.22);
+}
+
+body[data-battle-theme='nova'] .lobbyMain.novaLobbyDeck,
+body[data-battle-theme='nova'] .battleScene,
+body[data-battle-theme='nova'] .battleTop,
+body[data-battle-theme='nova'] .battleBottom {
+  gap: 18px;
+}
+
+body[data-battle-theme='nova'] .lobbyColumns {
+  gap: 16px;
+}
+
+body[data-battle-theme='nova'] .lobbyCol {
+  gap: 12px;
+}
+
+body[data-battle-theme='nova'] .selectGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+body[data-battle-theme='nova'] .selectionBtn {
+  min-height: 78px;
+  border-radius: 20px;
+  padding: 12px 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    linear-gradient(145deg, rgba(14, 26, 60, 0.98), rgba(7, 13, 33, 0.96));
+}
+
+body[data-battle-theme='nova'] .pendingSelection {
+  outline: 2px solid rgba(255, 213, 95, 0.96) !important;
+  outline-offset: 0 !important;
+  border: 1px solid rgba(255, 213, 95, 0.42) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 213, 95, 0.12), transparent),
+    linear-gradient(145deg, rgba(32, 28, 10, 0.96), rgba(12, 14, 26, 0.96)) !important;
+}
+
+body[data-battle-theme='nova'] .confirmedSelection {
+  outline: 2px solid rgba(96, 226, 255, 0.96) !important;
+  outline-offset: 0 !important;
+  border: 1px solid rgba(96, 226, 255, 0.42) !important;
+  background:
+    linear-gradient(180deg, rgba(96, 226, 255, 0.12), transparent),
+    linear-gradient(145deg, rgba(8, 31, 44, 0.98), rgba(7, 13, 33, 0.96)) !important;
+}
+
+body[data-battle-theme='nova'] .battleTop.novaBattleTop,
+body[data-battle-theme='nova'] .battleBottom.novaBattleBottom {
+  padding: 18px 20px;
+}
+
+body[data-battle-theme='nova'] .novaBattleTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, auto);
+  align-items: center;
+  gap: 18px;
+}
+
+body[data-battle-theme='nova'] .roundInfo {
+  color: rgba(146, 219, 255, 0.76);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+body[data-battle-theme='nova'] .turnInfo {
+  margin-top: 6px;
+  font-size: clamp(24px, 2vw, 34px);
+  line-height: 1.12;
+  color: #f8fbff;
+  text-shadow: 0 0 28px rgba(94, 198, 255, 0.18);
+}
+
+body[data-battle-theme='nova'] .weatherBanner {
+  margin-top: 0;
+  border: 1px solid rgba(255, 213, 95, 0.34);
+  border-radius: 20px;
+  padding: 14px 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 214, 95, 0.14), rgba(255, 104, 160, 0.1)),
+    linear-gradient(180deg, rgba(22, 29, 58, 0.98), rgba(10, 15, 34, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 16px 30px rgba(3, 8, 24, 0.28);
+  color: #f7f0c7;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+body[data-battle-theme='nova'] .battleMain.novaBattleMain {
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 18px;
+  align-items: stretch;
+}
+
+body[data-battle-theme='nova'] .battleBoard.novaBattleBoard {
+  position: relative;
+  overflow: hidden;
+  min-height: 760px;
+  padding: 30px 28px;
+  border-radius: 36px;
+  gap: 24px;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 91, 152, 0.16), transparent 26%),
+    radial-gradient(circle at 50% 86%, rgba(82, 198, 255, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 24%),
+    linear-gradient(180deg, rgba(18, 28, 61, 0.98), rgba(8, 12, 29, 0.98));
+  box-shadow:
+    inset 0 0 0 1px rgba(144, 216, 255, 0.08),
+    inset 0 30px 60px rgba(255, 255, 255, 0.02),
+    0 28px 60px rgba(1, 6, 24, 0.5);
+}
+
+body[data-battle-theme='nova'] .battleBoard.novaBattleBoard::before,
+body[data-battle-theme='nova'] .battleBoard.novaBattleBoard::after {
+  content: '';
+  position: absolute;
+  inset: 18px;
+  border-radius: 30px;
+  pointer-events: none;
+}
+
+body[data-battle-theme='nova'] .battleBoard.novaBattleBoard::before {
+  border: 1px solid rgba(118, 197, 255, 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    inset 0 0 50px rgba(89, 150, 255, 0.06);
+}
+
+body[data-battle-theme='nova'] .battleBoard.novaBattleBoard::after {
+  inset: 52px 120px;
+  background:
+    linear-gradient(180deg, rgba(255, 92, 153, 0.08), rgba(255, 92, 153, 0)),
+    linear-gradient(180deg, rgba(85, 206, 255, 0), rgba(85, 206, 255, 0.08));
+  clip-path: polygon(10% 0, 90% 0, 100% 16%, 100% 84%, 90% 100%, 10% 100%, 0 84%, 0 16%);
+  opacity: 0.82;
+}
+
+body[data-battle-theme='nova'] .novaArenaGlow {
+  position: absolute;
+  left: 50%;
+  width: 68%;
+  height: 180px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  filter: blur(54px);
+  pointer-events: none;
+  opacity: 0.46;
+}
+
+body[data-battle-theme='nova'] .novaArenaGlowTop {
+  top: -86px;
+  background: radial-gradient(circle, rgba(255, 86, 154, 0.48), transparent 72%);
+}
+
+body[data-battle-theme='nova'] .novaArenaGlowBottom {
+  bottom: -94px;
+  background: radial-gradient(circle, rgba(78, 210, 255, 0.48), transparent 72%);
+}
+
+body[data-battle-theme='nova'] .zone {
+  position: relative;
+  min-height: 248px;
+  padding: 22px 22px 20px;
+  border-radius: 30px;
+  border: 1px solid rgba(116, 165, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    linear-gradient(145deg, rgba(15, 25, 58, 0.88), rgba(8, 14, 33, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 20px 36px rgba(2, 7, 20, 0.24);
+}
+
+body[data-battle-theme='nova'] .zoneEnemy {
+  border-color: rgba(255, 107, 165, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 107, 165, 0.08), transparent 20%),
+    linear-gradient(145deg, rgba(20, 22, 54, 0.88), rgba(8, 12, 30, 0.82));
+}
+
+body[data-battle-theme='nova'] .zoneSelf {
+  border-color: rgba(98, 214, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(98, 214, 255, 0.08), transparent 20%),
+    linear-gradient(145deg, rgba(14, 29, 60, 0.88), rgba(8, 12, 30, 0.82));
+}
+
+body[data-battle-theme='nova'] .zoneHeader,
+body[data-battle-theme='nova'] .zoneProfile {
+  gap: 14px;
+}
+
+body[data-battle-theme='nova'] .portrait {
+  width: 76px;
+  height: 76px;
+  border-radius: 22px;
+  border: 1px solid rgba(118, 204, 255, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(145deg, rgba(33, 78, 152, 0.96), rgba(16, 31, 76, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 18px 28px rgba(2, 7, 20, 0.3);
+}
+
+body[data-battle-theme='nova'] .portrait span {
+  color: #f4f8ff;
+  font-size: 26px;
+}
+
+body[data-battle-theme='nova'] .zoneHeader h3 {
+  font-size: clamp(24px, 2vw, 32px);
+  color: #f7fbff;
+  text-shadow: 0 0 24px rgba(91, 179, 255, 0.14);
+}
+
+body[data-battle-theme='nova'] .charName,
+body[data-battle-theme='nova'] .auroraName,
+body[data-battle-theme='nova'] .metaLine,
+body[data-battle-theme='nova'] .extraLine,
+body[data-battle-theme='nova'] .detailLine,
+body[data-battle-theme='nova'] .bonusLine,
+body[data-battle-theme='nova'] .diceTitle,
+body[data-battle-theme='nova'] .zoneEmpty,
+body[data-battle-theme='nova'] .auroraDesc p {
+  color: var(--text-soft);
+}
+
+body[data-battle-theme='nova'] .bonusLine {
+  color: #86ffd2;
+}
+
+body[data-battle-theme='nova'] .detailLine {
+  color: #ffd8a1;
+}
+
+body[data-battle-theme='nova'] .zoneHeaderStatus {
+  gap: 10px;
+}
+
+body[data-battle-theme='nova'] .hpBadge,
+body[data-battle-theme='nova'] .atkDefBox {
+  min-width: 132px;
+  width: 132px;
+}
+
+body[data-battle-theme='nova'] .hpBadge {
+  border-radius: 20px;
+  border: 1px solid rgba(255, 215, 97, 0.34);
+  padding: 10px 12px;
+  font-size: 34px;
+  color: #fff0bb;
+  background:
+    linear-gradient(135deg, rgba(255, 214, 97, 0.18), rgba(255, 116, 154, 0.06)),
+    linear-gradient(180deg, rgba(34, 26, 11, 0.96), rgba(17, 14, 9, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 16px 30px rgba(2, 7, 20, 0.28);
+}
+
+body[data-battle-theme='nova'] .atkDefBox {
+  gap: 4px;
+  border: 1px solid rgba(104, 184, 255, 0.2);
+  border-radius: 20px;
+  padding: 10px 10px 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(145deg, rgba(16, 28, 64, 0.95), rgba(8, 14, 34, 0.95));
+}
+
+body[data-battle-theme='nova'] .atkDefItem {
+  font-size: 15px;
+  color: #edf6ff;
+}
+
+body[data-battle-theme='nova'] .statusBadge {
+  gap: 8px;
+}
+
+body[data-battle-theme='nova'] .statusPill {
+  border-radius: 999px;
+  padding: 7px 11px;
+  border: 1px solid rgba(120, 171, 255, 0.2);
+  background: rgba(13, 23, 53, 0.86);
+  color: #edf7ff;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body[data-battle-theme='nova'] .status-poison {
+  border-color: rgba(116, 255, 190, 0.26);
+  color: #9bffcc;
+}
+
+body[data-battle-theme='nova'] .status-thorns,
+body[data-battle-theme='nova'] .status-overload {
+  border-color: rgba(255, 163, 112, 0.26);
+  color: #ffd0b1;
+}
+
+body[data-battle-theme='nova'] .status-power,
+body[data-battle-theme='nova'] .status-forceField {
+  border-color: rgba(255, 213, 95, 0.24);
+  color: #ffe9ab;
+}
+
+body[data-battle-theme='nova'] .status-resilience,
+body[data-battle-theme='nova'] .status-hackActive,
+body[data-battle-theme='nova'] .status-counterActive,
+body[data-battle-theme='nova'] .status-unyielding {
+  border-color: rgba(111, 204, 255, 0.24);
+  color: #caf1ff;
+}
+
+body[data-battle-theme='nova'] .battleCenterScore {
+  position: relative;
+  z-index: 2;
+  padding: 14px 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 203, 255, 0.28);
+  background:
+    linear-gradient(135deg, rgba(255, 108, 165, 0.16), rgba(82, 205, 255, 0.18)),
+    linear-gradient(180deg, rgba(12, 22, 52, 0.97), rgba(8, 14, 34, 0.97));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 22px 38px rgba(2, 7, 20, 0.34),
+    0 0 0 1px rgba(98, 212, 255, 0.06);
+}
+
+body[data-battle-theme='nova'] .scoreLabel {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+body[data-battle-theme='nova'] .scoreLabelAttack {
+  color: #ffb7d0;
+}
+
+body[data-battle-theme='nova'] .scoreLabelDefense {
+  color: #a9ebff;
+}
+
+body[data-battle-theme='nova'] .scoreValueAttack {
+  font-size: clamp(48px, 4.4vw, 72px);
+  color: #fff1f6;
+  text-shadow: 0 0 26px rgba(255, 90, 150, 0.38);
+}
+
+body[data-battle-theme='nova'] .scoreValueDefense {
+  font-size: clamp(34px, 3vw, 48px);
+  color: #edf9ff;
+  text-shadow: 0 0 24px rgba(82, 205, 255, 0.32);
+}
+
+body[data-battle-theme='nova'] .scoreDivider {
+  color: rgba(173, 198, 237, 0.72);
+}
+
+body[data-battle-theme='nova'] .diceLaneLayout {
+  min-height: 112px;
+  padding-right: 240px;
+}
+
+body[data-battle-theme='nova'] .diceRow {
+  gap: 12px;
+}
+
+body[data-battle-theme='nova'] .die {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(145deg, rgba(56, 88, 219, 0.96), rgba(17, 34, 88, 0.96));
+  filter: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 18px 28px rgba(2, 7, 20, 0.34),
+    0 0 0 1px rgba(114, 162, 255, 0.06);
+}
+
+body[data-battle-theme='nova'] .die::after {
+  inset: -5px;
+}
+
+body[data-battle-theme='nova'] .die:hover,
+body[data-battle-theme='nova'] .die:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 20px 30px rgba(2, 7, 20, 0.38),
+    0 0 0 1px rgba(114, 210, 255, 0.16),
+    0 0 30px rgba(70, 187, 255, 0.18);
+}
+
+body[data-battle-theme='nova'] .die.selected {
+  border-color: rgba(255, 216, 101, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent),
+    linear-gradient(145deg, rgba(255, 220, 117, 0.96), rgba(255, 142, 84, 0.94));
+  transform: translateY(-5px) scale(1.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 22px 34px rgba(2, 7, 20, 0.4),
+    0 0 0 1px rgba(255, 216, 101, 0.18),
+    0 0 34px rgba(255, 210, 96, 0.24);
+}
+
+body[data-battle-theme='nova'] .die.selected::after {
+  border-color: rgba(255, 238, 181, 0.92);
+  box-shadow: 0 0 0 3px rgba(255, 216, 101, 0.14);
+}
+
+body[data-battle-theme='nova'] .die.dragSelecting:not(.selected) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 30px rgba(2, 7, 20, 0.38),
+    0 0 0 1px rgba(95, 211, 255, 0.16),
+    0 0 24px rgba(95, 211, 255, 0.18);
+}
+
+body[data-battle-theme='nova'] .die.dragSelecting::after {
+  border-color: rgba(95, 211, 255, 0.86);
+  box-shadow: 0 0 0 2px rgba(95, 211, 255, 0.12);
+}
+
+body[data-battle-theme='nova'] .dieLabel {
+  font-size: 32px;
+  font-weight: 900;
+  color: #f8fbff;
+  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+}
+
+body[data-battle-theme='nova'] .die.selected .dieLabel {
+  color: #2a1b08;
+  text-shadow: none;
+}
+
+body[data-battle-theme='nova'] .shape-d4 {
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(145deg, rgba(198, 72, 255, 0.98), rgba(99, 25, 176, 0.96));
+}
+
+body[data-battle-theme='nova'] .shape-d6 {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(145deg, rgba(204, 69, 255, 0.98), rgba(114, 28, 186, 0.96));
+}
+
+body[data-battle-theme='nova'] .shape-d8 {
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(145deg, rgba(255, 165, 77, 0.98), rgba(224, 89, 25, 0.96));
+}
+
+body[data-battle-theme='nova'] .shape-d12 {
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(145deg, rgba(255, 207, 82, 0.98), rgba(216, 125, 24, 0.98));
+}
+
+body[data-battle-theme='nova'] .shape-aurora {
+  border-radius: 50%;
+  border-color: rgba(97, 220, 255, 0.62);
+  background:
+    radial-gradient(circle at 30% 28%, rgba(212, 247, 255, 0.94), rgba(94, 219, 255, 0.72) 28%, rgba(28, 63, 211, 0.94) 72%),
+    linear-gradient(145deg, rgba(46, 92, 255, 0.98), rgba(23, 38, 111, 0.98));
+}
+
+body[data-battle-theme='nova'] .realtimeValueSide {
+  gap: 12px;
+  max-width: 48%;
+}
+
+body[data-battle-theme='nova'] .sumBadge {
+  min-width: 118px;
+  border-radius: 18px;
+  border: 1px solid rgba(119, 176, 255, 0.2);
+  padding: 10px 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+    linear-gradient(145deg, rgba(14, 27, 61, 0.97), rgba(9, 15, 35, 0.96));
+  color: #f0f6ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 18px 28px rgba(2, 7, 20, 0.26);
+}
+
+body[data-battle-theme='nova'] .sumBadge.mainValueBadge {
+  min-width: 184px;
+  font-size: 20px;
+}
+
+body[data-battle-theme='nova'] .sumBadge.previewBadge {
+  border-color: rgba(255, 216, 101, 0.36);
+  background:
+    linear-gradient(135deg, rgba(255, 216, 101, 0.14), rgba(255, 115, 112, 0.08)),
+    linear-gradient(145deg, rgba(34, 24, 8, 0.96), rgba(14, 13, 11, 0.96));
+  color: #fff0c7;
+}
+
+body[data-battle-theme='nova'] .sumBadge.committedBadge {
+  border-color: rgba(95, 211, 255, 0.28);
+}
+
+body[data-battle-theme='nova'] .actionRail.novaActionRail {
+  align-content: start;
+  gap: 14px;
+  padding: 20px 18px;
+}
+
+body[data-battle-theme='nova'] .actionRail h3 {
+  font-size: 24px;
+  letter-spacing: 0.03em;
+  color: #f4f9ff;
+}
+
+body[data-battle-theme='nova'] .railInfo {
+  gap: 8px;
+}
+
+body[data-battle-theme='nova'] .infoChip {
+  padding: 7px 12px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: #d7f4ff;
+  text-transform: uppercase;
+}
+
+body[data-battle-theme='nova'] .railActions {
+  gap: 14px;
+}
+
+body[data-battle-theme='nova'] .railActions button {
+  min-height: 58px;
+  border-radius: 18px;
+  font-size: 16px;
+}
+
+body[data-battle-theme='nova'] .battleBottom.novaBattleBottom {
+  overflow: hidden;
+}
+
+body[data-battle-theme='nova'] .novaLogTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+body[data-battle-theme='nova'] .logDrawer {
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 220ms ease, opacity 160ms ease;
+}
+
+body[data-battle-theme='nova'] .logDrawer.open {
+  max-height: 360px;
+  opacity: 1;
+}
+
+body[data-battle-theme='nova'] .logBox {
+  max-height: 320px;
+  border-radius: 22px;
+  border: 1px solid rgba(116, 168, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    linear-gradient(180deg, rgba(9, 17, 40, 0.98), rgba(6, 10, 24, 0.98));
+  padding: 14px;
+  color: #dfeafc;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+body[data-battle-theme='nova'] .logEntry {
+  padding: 9px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body[data-battle-theme='nova'] .logEntry + .logEntry {
+  margin-top: 6px;
+}
+
+body[data-battle-theme='nova'] .replayControls {
+  padding: 14px;
+}
+
+body[data-battle-theme='nova'] .replayControlTop {
+  gap: 12px;
+}
+
+body[data-battle-theme='nova'] input[type='range'] {
+  accent-color: #66d8ff;
+}
+
+body[data-battle-theme='nova'] .floatingTooltip,
+body[data-battle-theme='nova'] .tooltip {
+  border: 1px solid rgba(120, 171, 255, 0.24);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    linear-gradient(145deg, rgba(14, 24, 58, 0.98), rgba(8, 14, 33, 0.98));
+  color: #eef8ff;
+  box-shadow: 0 24px 44px rgba(2, 7, 20, 0.42);
+}
+
+body[data-battle-theme='nova'] .winnerOverlay,
+body[data-battle-theme='nova'] .docOverlay {
+  background: rgba(4, 9, 20, 0.74);
+  backdrop-filter: blur(12px);
+}
+
+body[data-battle-theme='nova'] .winnerOverlayCard,
+body[data-battle-theme='nova'] .docCard {
+  border-radius: 30px;
+  border: 1px solid rgba(120, 171, 255, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+    linear-gradient(145deg, rgba(13, 23, 56, 0.98), rgba(7, 13, 33, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 30px 56px rgba(2, 7, 20, 0.52);
+}
+
+body[data-battle-theme='nova'] .winnerOverlayCard {
+  min-width: min(92vw, 720px);
+  padding: 34px 36px;
+}
+
+body[data-battle-theme='nova'] .winnerOverlayText {
+  color: #f8fbff;
+  text-shadow:
+    0 0 18px rgba(255, 91, 152, 0.22),
+    0 0 28px rgba(82, 205, 255, 0.18);
+}
+
+body[data-battle-theme='nova'] .winnerOverlayDetail,
+body[data-battle-theme='nova'] .winnerOverlayMeta,
+body[data-battle-theme='nova'] .docCard p,
+body[data-battle-theme='nova'] .docCard li,
+body[data-battle-theme='nova'] .docCard dd,
+body[data-battle-theme='nova'] .docCard dt,
+body[data-battle-theme='nova'] .docCard pre {
+  color: #dbe9ff;
+}
+
+body[data-battle-theme='nova'] .docCard pre,
+body[data-battle-theme='nova'] .guideRuleBox,
+body[data-battle-theme='nova'] .customCharacterForm select,
+body[data-battle-theme='nova'] .customCharacterForm input {
+  border-color: rgba(120, 171, 255, 0.2);
+  border-radius: 18px;
+  background: rgba(10, 18, 42, 0.94);
+  color: #eef8ff;
+}
+
+body[data-battle-theme='nova'] .guideTopTabs {
+  border-bottom-color: rgba(120, 171, 255, 0.14);
+}
+
+body[data-battle-theme='nova'] .guideTopTab {
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(19, 31, 69, 0.96), rgba(8, 14, 36, 0.96));
+}
+
+body[data-battle-theme='nova'] .guideTopTab.active {
+  color: #f8fcff;
+  background:
+    linear-gradient(135deg, rgba(255, 92, 153, 0.2), rgba(82, 205, 255, 0.2)),
+    linear-gradient(180deg, rgba(23, 40, 84, 0.98), rgba(10, 18, 46, 0.98));
+}
+
+body[data-battle-theme='nova'] .guideRuleBox {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    linear-gradient(145deg, rgba(12, 21, 49, 0.94), rgba(8, 14, 34, 0.94));
+}
+
+body[data-battle-theme='nova'] .errorToastContainer {
+  top: 18px;
+}
+
+body[data-battle-theme='nova'] .errorToast {
+  border: 1px solid rgba(255, 120, 162, 0.26);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+    linear-gradient(145deg, rgba(48, 16, 39, 0.96), rgba(19, 9, 23, 0.96));
+  color: #ffe5ef;
+  box-shadow: 0 20px 34px rgba(2, 7, 20, 0.38);
+}
+
+body[data-battle-theme='nova'] .errorToast.important {
+  border-color: rgba(255, 214, 95, 0.24);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent),
+    linear-gradient(145deg, rgba(51, 36, 12, 0.96), rgba(21, 17, 8, 0.96));
+  color: #fff0c5;
+}
+
+body[data-battle-theme='nova'] .errorToastClose {
+  border-radius: 12px;
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body[data-battle-theme='nova'] .weatherBroadcast {
+  top: 22px;
+  border: 1px solid rgba(255, 214, 95, 0.3);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 214, 95, 0.16), rgba(255, 104, 160, 0.08)),
+    linear-gradient(180deg, rgba(28, 28, 39, 0.98), rgba(12, 12, 20, 0.96));
+  color: #fff2c8;
+  box-shadow: 0 20px 40px rgba(2, 7, 20, 0.42);
+}
+
+@media (max-width: 1480px) {
+  body[data-battle-theme='nova'] .battleBoard.novaBattleBoard {
+    min-height: 700px;
+  }
+
+  body[data-battle-theme='nova'] .battleMain.novaBattleMain {
+    grid-template-columns: minmax(0, 1fr) 270px;
+  }
+}
+
+@media (max-width: 1260px) {
+  body[data-battle-theme='nova'] .roomGrid.novaRoomGrid {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-battle-theme='nova'] .novaSideRail {
+    position: static;
+  }
+
+  body[data-battle-theme='nova'] .battleMain.novaBattleMain {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-battle-theme='nova'] .actionRail.novaActionRail {
+    order: 2;
+  }
+}
+
+@media (max-width: 980px) {
+  body[data-battle-theme='nova'] .appShell.novaShell {
+    padding: 14px 12px 20px;
+    gap: 14px;
+  }
+
+  body[data-battle-theme='nova'] .sceneHome.novaConnectionScene,
+  body[data-battle-theme='nova'] .novaBattleTop {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-battle-theme='nova'] .globalHeader.novaHeader,
+  body[data-battle-theme='nova'] .panel {
+    border-radius: 24px;
+  }
+
+  body[data-battle-theme='nova'] .lobbyColumns {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-battle-theme='nova'] .battleBoard.novaBattleBoard {
+    min-height: auto;
+    padding: 24px 18px;
+  }
+
+  body[data-battle-theme='nova'] .battleBoard.novaBattleBoard::after {
+    inset: 44px 48px;
+  }
+
+  body[data-battle-theme='nova'] .zone {
+    min-height: 220px;
+    padding: 18px;
+  }
+
+  body[data-battle-theme='nova'] .diceLaneLayout {
+    min-height: unset;
+    padding-right: 0;
+    display: grid;
+    gap: 12px;
+  }
+
+  body[data-battle-theme='nova'] .diceAnchor,
+  body[data-battle-theme='nova'] .realtimeValueSide {
+    justify-content: flex-start;
+  }
+
+  body[data-battle-theme='nova'] .realtimeValueSide {
+    position: static;
+    transform: none;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  body[data-battle-theme='nova'] h1 {
+    font-size: clamp(28px, 10vw, 42px);
+  }
+
+  body[data-battle-theme='nova'] .headerMainRow.novaHeaderRow,
+  body[data-battle-theme='nova'] .headerRoomRow,
+  body[data-battle-theme='nova'] .novaLogTop {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  body[data-battle-theme='nova'] .globalHeaderActions.novaTopActions,
+  body[data-battle-theme='nova'] .roomTopActions {
+    justify-content: flex-start;
+  }
+
+  body[data-battle-theme='nova'] .selectGrid {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-battle-theme='nova'] .zoneHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body[data-battle-theme='nova'] .zoneProfile {
+    align-items: center;
+  }
+
+  body[data-battle-theme='nova'] .zoneHeaderStatus {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body[data-battle-theme='nova'] .hpBadge,
+  body[data-battle-theme='nova'] .atkDefBox {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body[data-battle-theme='nova'] .battleCenterScore {
+    gap: 8px;
+    padding: 12px 16px;
+  }
+
+  body[data-battle-theme='nova'] .die {
+    width: 58px;
+    height: 58px;
+  }
+
+  body[data-battle-theme='nova'] .dieLabel {
+    font-size: 28px;
+  }
+
+  body[data-battle-theme='nova'] .sumBadge.mainValueBadge {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  body[data-battle-theme='nova'] .panel,
+  body[data-battle-theme='nova'] .globalHeader.novaHeader {
+    padding: 16px 14px;
+    border-radius: 20px;
+  }
+
+  body[data-battle-theme='nova'] .playerItem,
+  body[data-battle-theme='nova'] .selectionSummary,
+  body[data-battle-theme='nova'] .weatherStatusCard,
+  body[data-battle-theme='nova'] .turnOwnershipCard,
+  body[data-battle-theme='nova'] .replayControls,
+  body[data-battle-theme='nova'] .logBox {
+    border-radius: 18px;
+  }
+
+  body[data-battle-theme='nova'] .zone {
+    border-radius: 22px;
+    padding: 16px 14px;
+  }
+
+  body[data-battle-theme='nova'] .portrait {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+  }
+
+  body[data-battle-theme='nova'] .zoneHeader h3 {
+    font-size: 22px;
+  }
+
+  body[data-battle-theme='nova'] .scoreValueAttack {
+    font-size: 40px;
+  }
+
+  body[data-battle-theme='nova'] .scoreValueDefense {
+    font-size: 28px;
+  }
+
+  body[data-battle-theme='nova'] .winnerOverlayCard,
+  body[data-battle-theme='nova'] .docCard {
+    border-radius: 22px;
+    padding: 22px 18px;
+  }
+}

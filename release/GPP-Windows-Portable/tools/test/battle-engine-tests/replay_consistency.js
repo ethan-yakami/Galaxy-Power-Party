@@ -1,15 +1,12 @@
-﻿const {
+const {
   assert,
   createHandlers,
   engine,
-  PHASE_ATTACK_REROLL_OR_SELECT,
   STATUS_ENDED,
   createProjectionUi,
-  setRollBuffer,
   makeWs,
   highestIndices,
   drivePureGameToEnd,
-  withSeededRandom,
 } = require('./common');
 
 module.exports = [
@@ -67,12 +64,12 @@ module.exports = [
         pureState,
         engine.encodeAction(engine.OPCODES.CONFIRM_ATTACK, engine.indicesToMask(attackIndices, pureState.attackRoll.count)),
       );
+      if (room.game.phase === 'defense_select') {
+        engine.applyActionInPlace(pureState, engine.encodeAction(engine.OPCODES.ROLL_DEFENSE, 0));
+      }
       pureGame = engine.projectStateToLegacyRoom(pureState, ui);
       assert.strictEqual(room.game.attackValue, pureGame.attackValue);
       assert.strictEqual(room.game.phase, pureGame.phase);
-
-      handlers.handleRollDefense(defenderWs);
-      engine.applyActionInPlace(pureState, engine.encodeAction(engine.OPCODES.ROLL_DEFENSE, 0));
       pureGame = engine.projectStateToLegacyRoom(pureState, ui);
       assert.deepStrictEqual(room.game.defenseDice.map((die) => die.value), pureGame.defenseDice.map((die) => die.value));
 
@@ -206,13 +203,21 @@ module.exports = [
       assert(replayMessage, 'should receive replay export payload');
       assert.strictEqual(replayMessage.type, 'replay_export');
       assert.strictEqual(replayMessage.meta.requestId, 'test-replay-1');
-      assert.strictEqual(typeof replayMessage.content, 'string');
+      assert.ok(
+        typeof replayMessage.content === 'string' || typeof replayMessage.content === 'object',
+        'replay export content should be string or object',
+      );
 
-      const replay = JSON.parse(replayMessage.content);
+      const replay = typeof replayMessage.content === 'string'
+        ? JSON.parse(replayMessage.content)
+        : replayMessage.content;
       assert.strictEqual(typeof replay.replayId, 'string');
       assert(replay.replayId.length > 0, 'replayId should exist');
       assert.strictEqual(replay.version, 'ReplayV2');
+      assert.strictEqual(replay.protocolModel, 'action_ticket');
       assert(Array.isArray(replay.actions) && replay.actions.length > 0, 'replay actions should not be empty');
+      assert(replay.actions.every((action) => Number.isInteger(action.turnId)), 'replay actions should contain turnId');
+      assert(replay.actions.every((action) => typeof action.actionId === 'string' && action.actionId.length > 0), 'replay actions should contain actionId');
       assert(Array.isArray(replay.snapshots) && replay.snapshots.length > 0, 'replay snapshots should not be empty');
       assert.strictEqual(replay.snapshots.length, replay.actions.length + 1, 'snapshots should include step 0 + each action');
       assert.strictEqual(replay.snapshots[0].step, 0, 'first snapshot should be step 0');

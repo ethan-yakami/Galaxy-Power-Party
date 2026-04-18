@@ -1,4 +1,4 @@
-﻿const { CharacterRegistry, AuroraRegistry, triggerCharacterHook, saveCustomVariant } = require('./registry');
+const { CharacterRegistry, AuroraRegistry, triggerCharacterHook, saveCustomVariant } = require('./registry');
 const {
   makeNormalDiceFromPool,
   rollAuroraFace,

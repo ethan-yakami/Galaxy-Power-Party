@@ -1,9 +1,21 @@
 (function() {
   const { state, send } = GPP;
+  const LIVE_SELECTION_SYNC_MS = 20;
+  const POINTER_CLICK_SUPPRESS_MS = 120;
 
   let liveSelectionTimeout = null;
   let dragSelection = null;
   let lastSelectionInputAt = 0;
+
+  function refreshSelectionUi() {
+    if (typeof GPP.refreshDiceSelectionUi === 'function') {
+      GPP.refreshDiceSelectionUi({
+        dragIndices: dragSelection ? [...dragSelection.visited] : [],
+      });
+      return;
+    }
+    GPP.render();
+  }
 
   function sumSelectedIndices(dice, indices) {
     let sum = 0;
@@ -11,6 +23,66 @@
       if (dice[idx]) sum += dice[idx].value;
     });
     return sum;
+  }
+
+  function hasDuplicates(values) {
+    return new Set(values).size !== values.length;
+  }
+
+  function areAllSame(values) {
+    return values.length > 0 && values.every((value) => value === values[0]);
+  }
+
+  function includesValue(values, target) {
+    return values.includes(target);
+  }
+
+  function countOddValues(values) {
+    return values.filter((value) => value % 2 !== 0).length;
+  }
+
+  function getSelectedValues(dice, indices) {
+    return indices.map((idx) => (dice[idx] ? dice[idx].value : null)).filter((value) => Number.isFinite(value));
+  }
+
+  function getPreviewWeatherBonus(game, playerId, lane, values, baseSum) {
+    const weatherId = game && game.weather && typeof game.weather.weatherId === 'string'
+      ? game.weather.weatherId
+      : '';
+    if (!weatherId || !values.length) return 0;
+
+    if (lane === 'defense') {
+      if (weatherId === 'thunder_rain') return 4;
+      if (weatherId === 'big_snow' && includesValue(values, 7)) return 4;
+      return 0;
+    }
+
+    if (weatherId === 'thunder_rain') return 4;
+    if (weatherId === 'big_snow' && includesValue(values, 7)) return 4;
+    if (weatherId === 'eclipse' && !areAllSame(values)) return 4;
+    if (weatherId === 'drought') {
+      const defenderId = game.defenderId;
+      const defenseLevel = defenderId && game.defenseLevel ? game.defenseLevel[defenderId] : 0;
+      return (Number.isFinite(defenseLevel) ? defenseLevel : 0) * 3;
+    }
+    if (weatherId === 'sun_moon' && game.hp && playerId && Number(game.hp[playerId]) <= 3) {
+      return baseSum;
+    }
+    if (weatherId === 'sandstorm' && countOddValues(values) === values.length) {
+      return 3;
+    }
+    return 0;
+  }
+
+  function getPreviewSelectionValue(game, lane, playerId, dice, indices) {
+    const baseSum = sumSelectedIndices(dice, indices);
+    const values = getSelectedValues(dice, indices);
+    const weatherBonus = getPreviewWeatherBonus(game, playerId, lane, values, baseSum);
+    return {
+      baseSum,
+      weatherBonus,
+      sum: baseSum + weatherBonus,
+    };
   }
 
   function getRawNeedCountForPhase(game, phase) {
@@ -35,6 +107,14 @@
     return getEffectiveSelectionCount(rawNeed, diceCount);
   }
 
+  function getMaxSelectableForPhase(game, phase) {
+    if (!game) return null;
+    if (phase === 'attack' && game.phase === 'attack_reroll_or_select') {
+      return null;
+    }
+    return getNeedCountForPhase(game, phase);
+  }
+
   function toggleDie(index, maxSelectable) {
     if (state.selectedDice.has(index)) {
       state.selectedDice.delete(index);
@@ -44,8 +124,8 @@
     clearTimeout(liveSelectionTimeout);
     liveSelectionTimeout = setTimeout(() => {
       send('update_live_selection', { indices: [...state.selectedDice] });
-    }, 80);
-    GPP.render();
+    }, LIVE_SELECTION_SYNC_MS);
+    refreshSelectionUi();
   }
 
   function applySelectionMode(index, maxSelectable, mode) {
@@ -62,7 +142,7 @@
     clearTimeout(liveSelectionTimeout);
     liveSelectionTimeout = setTimeout(() => {
       send('update_live_selection', { indices: [...state.selectedDice] });
-    }, 80);
+    }, LIVE_SELECTION_SYNC_MS);
   }
 
   function beginDragSelection(index, maxSelectable) {
@@ -76,7 +156,7 @@
     dragSelection.visited.add(index);
     applySelectionMode(index, maxSelectable, mode);
     syncLiveSelection();
-    GPP.render();
+    refreshSelectionUi();
   }
 
   function moveDragSelection(index) {
@@ -85,11 +165,13 @@
     dragSelection.visited.add(index);
     applySelectionMode(index, dragSelection.maxSelectable, dragSelection.mode);
     syncLiveSelection();
-    GPP.render();
+    refreshSelectionUi();
   }
 
   function endDragSelection() {
+    if (!dragSelection) return;
     dragSelection = null;
+    refreshSelectionUi();
   }
 
   function getDieShapeClass(die) {
@@ -101,13 +183,18 @@
     return 'shape-d6';
   }
 
-  function renderDice(dice, maxSelectable, clickable, selectedSet) {
+  function renderDice(dice, maxSelectable, clickable, selectedSet, options = {}) {
     const row = document.createElement('div');
     row.className = 'diceRow';
+    row.dataset.selectionRow = options.selectionRow ? 'true' : 'false';
+    row.dataset.playerId = options.playerId || '';
+    row.dataset.lane = options.lane || '';
+    row.dataset.clickable = clickable ? 'true' : 'false';
 
     dice.forEach((die, index) => {
       const node = document.createElement('div');
       node.className = `die ${getDieShapeClass(die)}`;
+      node.dataset.dieIndex = String(index);
       if (selectedSet && selectedSet.has(index)) node.classList.add('selected');
 
       const label = document.createElement('span');
@@ -136,7 +223,7 @@
           if (!dragSelection) return;
         };
         node.onclick = (event) => {
-          if (Date.now() - lastSelectionInputAt < 250) return;
+          if (Date.now() - lastSelectionInputAt < POINTER_CLICK_SUPPRESS_MS) return;
           event.preventDefault();
           toggleDie(index, maxSelectable);
         };
@@ -222,18 +309,24 @@
   function getPreviewSelectionForPlayer(game, playerId) {
     if (game.phase === 'attack_reroll_or_select' && game.attackerId === playerId && game.attackDice) {
       const indices = game.attackPreviewSelection || [];
+      const previewValue = getPreviewSelectionValue(game, 'attack', playerId, game.attackDice, indices);
       return {
         indices,
-        sum: sumSelectedIndices(game.attackDice, indices),
+        sum: previewValue.sum,
+        baseSum: previewValue.baseSum,
+        weatherBonus: previewValue.weatherBonus,
         kind: '攻击实时',
       };
     }
 
     if (game.phase === 'defense_select' && game.defenderId === playerId && game.defenseDice) {
       const indices = game.defensePreviewSelection || [];
+      const previewValue = getPreviewSelectionValue(game, 'defense', playerId, game.defenseDice, indices);
       return {
         indices,
-        sum: sumSelectedIndices(game.defenseDice, indices),
+        sum: previewValue.sum,
+        baseSum: previewValue.baseSum,
+        weatherBonus: previewValue.weatherBonus,
         kind: '防守实时',
       };
     }
@@ -246,6 +339,8 @@
     getRawNeedCountForPhase,
     getEffectiveSelectionCount,
     getNeedCountForPhase,
+    getMaxSelectableForPhase,
+    getPreviewSelectionValue,
     toggleDie,
     renderDice,
     renderAuroraHints,

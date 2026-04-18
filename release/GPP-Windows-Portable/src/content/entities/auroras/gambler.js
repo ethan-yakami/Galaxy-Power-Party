@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'gambler', name: '赌徒',
   faces: [
     { value: 1,  hasA: false },{ value: 1,  hasA: false },

@@ -1,5 +1,4 @@
 const { CharacterRegistry, AuroraRegistry, getRegistryRevision } = require('../../registry');
-const { WEATHER_DEFS, WEATHER_POOLS } = require('../../weather');
 const { MASKS_BY_ROLL_AND_COUNT, INDICES_BY_MASK } = require('../actions');
 const { CHARACTER_RULES } = require('../rules/characters');
 const { AURORA_RULES } = require('../rules/auroras');
@@ -94,6 +93,9 @@ function compileAuroras() {
 }
 
 function compileWeather() {
+  const weatherRegistry = require('../../weather');
+  const WEATHER_DEFS = (weatherRegistry && weatherRegistry.WEATHER_DEFS) || {};
+  const WEATHER_POOLS = (weatherRegistry && weatherRegistry.WEATHER_POOLS) || {};
   const weatherIds = Object.keys(WEATHER_DEFS).sort();
   const weatherDefs = [];
   const weatherIndexById = Object.create(null);

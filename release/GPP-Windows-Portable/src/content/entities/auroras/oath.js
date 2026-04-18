@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'oath', name: '誓言',
   faces: [
     { value: 8, hasA: false },{ value: 8, hasA: false },

@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'legacy', name: '遗语',
   faces: [
     { value: 4, hasA: false },{ value: 5, hasA: false },{ value: 5, hasA: false },

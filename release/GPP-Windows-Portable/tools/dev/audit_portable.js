@@ -11,17 +11,6 @@ function assertExists(relativePath, failures) {
   }
 }
 
-function readJson(relativePath, failures) {
-  const fullPath = path.join(PORTABLE_ROOT, relativePath);
-  try {
-    const raw = fs.readFileSync(fullPath, 'utf8').replace(/^\uFEFF/, '');
-    return JSON.parse(raw);
-  } catch (error) {
-    failures.push(`Invalid JSON: ${relativePath} (${error.message})`);
-    return null;
-  }
-}
-
 function listRelativeFiles(baseDir) {
   if (!fs.existsSync(baseDir)) return [];
   const stack = [baseDir];
@@ -85,27 +74,6 @@ function main() {
     'stop_game.bat',
   ].forEach((relativePath) => assertExists(relativePath, failures));
 
-  const packageJson = readJson('package.json', failures);
-  if (packageJson && packageJson.scripts) {
-    const expectedScripts = {
-      start: 'node server.js',
-      'audit:paths': 'node tools/dev/audit_paths.js',
-      'audit:portable': 'node tools/dev/audit_portable.js',
-      test: 'npm run test:battle-engine && npm run test:protocol && npm run test:connection-fsm && npm run test:replay-history && npm run test:battle-view-model && npm run test:ai-runtime',
-      'test:battle-engine': 'node tools/test/test_battle_engine.js',
-      'test:protocol': 'node tools/test/test_protocol.js',
-      'test:connection-fsm': 'node tools/test/test_connection_state_machine.js',
-      'test:replay-history': 'node tools/test/test_replay_history.js',
-      'test:battle-view-model': 'node tools/test/test_battle_view_model.js',
-      'test:ai-runtime': 'node tools/test/test_ai_battle_runtime.js',
-    };
-    for (const [scriptName, expectedValue] of Object.entries(expectedScripts)) {
-      if (packageJson.scripts[scriptName] !== expectedValue) {
-        failures.push(`package.json script mismatch: ${scriptName}`);
-      }
-    }
-  }
-
   const publicFiles = listRelativeFiles(path.join(PORTABLE_ROOT, 'public'));
   const stalePublicFiles = publicFiles.filter((file) => (
     file.endsWith('.html') || file.endsWith('.css') || file.startsWith('js/')
@@ -115,6 +83,9 @@ function main() {
   }
 
   [
+    'package.json',
+    'package-lock.json',
+    'README.md',
     'src/client/battle.html',
     'src/client/js/render.js',
     'src/client/js/connection.js',

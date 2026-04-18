@@ -1,4 +1,12 @@
-﻿(function() {
+(function() {
+  const urls = window.GPPUrls || {
+    getBasePath() {
+      return '/';
+    },
+    toPath(path) {
+      return `/${String(path || '').replace(/^\/+/, '')}`;
+    },
+  };
   const replayHistory = window.GPPReplayHistory;
   const schema = window.GPPReplaySchema || {};
   const REPLAY_ERROR_CODES = schema.REPLAY_ERROR_CODES || {};
@@ -54,6 +62,11 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  function displayValue(value, fallback = '-') {
+    if (value === null || value === undefined || value === '') return fallback;
+    return String(value);
   }
 
   function setResumePayload(entry, snapshotIndex) {
@@ -137,7 +150,7 @@
       window.alert('浏览器无法写入继续对局数据，请稍后重试。');
       return;
     }
-    location.href = `/battle.html?mode=${encodeURIComponent(mode)}&name=${encodeURIComponent(`继续玩家${Math.floor(Math.random() * 1000)}`)}`;
+    location.href = urls.toPath(`battle.html?mode=${encodeURIComponent(mode)}&name=${encodeURIComponent(`继续玩家${Math.floor(Math.random() * 1000)}`)}`);
   }
 
   function renderHistoryList() {
@@ -172,7 +185,7 @@
       replayBtn.type = 'button';
       replayBtn.textContent = '战斗页回看';
       replayBtn.onclick = () => {
-        location.href = `/battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`;
+        location.href = urls.toPath(`battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`);
       };
 
       const deleteBtn = document.createElement('button');
@@ -253,7 +266,9 @@
     dom.actionSummary.innerHTML = [
       `<div><strong>快照原因：</strong>${escapeHtml(snapshot.reason || 'snapshot')}</div>`,
       `<div><strong>时间：</strong>${escapeHtml(fmtTime(snapshot.timestamp))}</div>`,
-      `<div><strong>动作：</strong>${escapeHtml(action ? `${action.actionCode} (actor=${action.actor || '-'})` : '开局初始快照')}</div>`,
+      `<div><strong>动作：</strong>${escapeHtml(action
+        ? `${action.actionCode} (actor=${action.actor || '-'}, indices=${(action.indices || []).join(',') || '-'})`
+        : '开局初始快照')}</div>`,
     ].join('');
 
     dom.stepDetailView.classList.remove('hidden');
@@ -281,14 +296,14 @@
 
     const playersHtml = Array.isArray(view.players)
       ? view.players.map((player) => (
-        `<div class="playerCard"><strong>${escapeHtml(player.name || player.playerId || '-')}</strong><div>HP: ${escapeHtml(player.hp)} / ${escapeHtml(player.maxHp)}</div><div>${escapeHtml(player.characterId || '-')} | ${escapeHtml(player.auroraDiceId || '-')}</div></div>`
+        `<div class="playerCard"><strong>${escapeHtml(player.name || player.playerId || '-')}</strong><div>HP: ${escapeHtml(displayValue(player.hp))} / ${escapeHtml(displayValue(player.maxHp))}</div><div>${escapeHtml(player.characterId || '-')} | ${escapeHtml(player.auroraDiceId || '-')}</div></div>`
       )).join('')
       : '';
     dom.overview.classList.remove('hidden');
     dom.overview.innerHTML = [
       `<div>回合 ${escapeHtml(view.round)} | 阶段 ${escapeHtml(view.phase)} | 状态 ${escapeHtml(view.status)}</div>`,
       `<div>攻击方 ${escapeHtml(view.attackerId || '-')} | 防守方 ${escapeHtml(view.defenderId || '-')} | 胜者 ${escapeHtml(view.winnerId || '-')}</div>`,
-      `<div>攻击值 ${escapeHtml(view.attackValue)} | 防御值 ${escapeHtml(view.defenseValue)} | 上次伤害 ${escapeHtml(view.lastDamage)}</div>`,
+      `<div>攻击值 ${escapeHtml(displayValue(view.attackValue))} | 防御值 ${escapeHtml(displayValue(view.defenseValue))} | 上次伤害 ${escapeHtml(displayValue(view.lastDamage))}</div>`,
       `<div class="overviewGrid">${playersHtml}</div>`,
     ].join('');
 
@@ -317,7 +332,7 @@
   }
 
   function bindEvents() {
-    dom.backHomeBtn.onclick = () => { location.href = '/'; };
+    dom.backHomeBtn.onclick = () => { location.href = urls.getBasePath(location); };
     dom.clearAllBtn.onclick = () => {
       replayHistory.clearHistory();
       state.entries = [];
@@ -365,10 +380,14 @@
     dom.openBattleReplayBtn.onclick = () => {
       const entry = getSelectedEntry();
       if (!entry) return;
-      location.href = `/battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`;
+      location.href = urls.toPath(`battle.html?mode=replay&replayId=${encodeURIComponent(entry.replayId)}`);
     };
     dom.continueLocalBtn.onclick = () => openResumeBattle('resume_local');
     dom.continueRoomBtn.onclick = () => openResumeBattle('resume_room');
+    window.addEventListener('gpp_replays_local_updated', () => {
+      loadEntries();
+      render();
+    });
   }
 
   loadEntries();

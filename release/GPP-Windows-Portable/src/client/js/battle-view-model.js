@@ -12,7 +12,22 @@
     defense_select: '选择防御骰',
   });
 
-  function getPendingActionKind(game) {
+  function getPendingActionKind(game, battleActions) {
+    const ticket = (
+      battleActions
+      && game
+      && battleActions.phase === game.phase
+      && battleActions.round === game.round
+    ) ? battleActions : null;
+    if (ticket && ticket.phase) {
+      switch (ticket.phase) {
+        case 'attack_roll': return 'attack_roll';
+        case 'attack_reroll_or_select': return 'attack_select';
+        case 'defense_roll': return 'defense_roll';
+        case 'defense_select': return 'defense_select';
+        default: return null;
+      }
+    }
     if (!game) return null;
     if (game.pendingActionKind) return game.pendingActionKind;
     switch (game.phase) {
@@ -24,10 +39,17 @@
     }
   }
 
-  function getPendingActorId(game) {
+  function getPendingActorId(game, battleActions) {
+    const ticket = (
+      battleActions
+      && game
+      && battleActions.phase === game.phase
+      && battleActions.round === game.round
+    ) ? battleActions : null;
+    if (ticket && ticket.actorId) return ticket.actorId;
     if (!game) return null;
     if (game.pendingActorId) return game.pendingActorId;
-    const kind = getPendingActionKind(game);
+    const kind = getPendingActionKind(game, battleActions);
     if (kind === 'attack_roll' || kind === 'attack_select') return game.attackerId || null;
     if (kind === 'defense_roll' || kind === 'defense_select') return game.defenderId || null;
     return null;
@@ -53,7 +75,7 @@
     return actor && actor.name ? `等待 ${actor.name}${label}` : `等待对手${label}`;
   }
 
-  function deriveBattleView(game, meId, players) {
+  function deriveBattleView(game, meId, players, battleActions) {
     if (!game) {
       return {
         kind: 'idle',
@@ -88,8 +110,8 @@
       };
     }
 
-    const actionKind = getPendingActionKind(game);
-    const actorId = getPendingActorId(game);
+    const actionKind = getPendingActionKind(game, battleActions);
+    const actorId = getPendingActorId(game, battleActions);
     const actor = getPlayer(players, actorId);
     const actionLabel = getActionLabel(actionKind, game.pendingActionLabel);
     const isMyTurn = !!actorId && actorId === meId;

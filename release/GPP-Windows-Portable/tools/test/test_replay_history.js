@@ -1,4 +1,4 @@
-﻿const assert = require('assert');
+const assert = require('assert');
 
 const replayHistory = require('../../src/client/js/replay-history');
 

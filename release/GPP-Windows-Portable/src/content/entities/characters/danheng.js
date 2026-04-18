@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id:           'danheng',
   name:         '丹恒·腾荒',
   hp:           25,

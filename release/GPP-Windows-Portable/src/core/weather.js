@@ -1,2 +1,1 @@
-﻿module.exports = require('../server/services/weather');
-
+module.exports = require('../content/entities/weather');

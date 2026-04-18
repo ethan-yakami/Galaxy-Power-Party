@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'destiny', name: '命运',
   faces: [
     { value: 1,  hasA: true },{ value: 3,  hasA: true },{ value: 3,  hasA: true },

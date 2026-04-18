@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'starshield', name: '星盾',
   faces: [
     { value: 7, hasA: false },{ value: 7, hasA: false },{ value: 7, hasA: false },

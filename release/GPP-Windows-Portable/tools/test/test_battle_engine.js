@@ -1,3 +1,3 @@
-﻿const { runAll } = require('./battle-engine-tests/runner');
+const { runAll } = require('./battle-engine-tests/runner');
 
 runAll();

@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'berserker', name: '战狂',
   faces: [
     { value: 4,  hasA: false },{ value: 4,  hasA: false },

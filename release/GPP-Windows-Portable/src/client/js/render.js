@@ -1,5 +1,12 @@
 (function() {
   const { state, dom, send } = GPP;
+  const pathUtils = window.GPPUrls || {
+    toAsset(path) {
+      return `/${String(path || '').replace(/^\/+/, '')}`;
+    },
+  };
+  const selectors = GPP.selectors || {};
+  const battleActionMap = GPP.battleActionMap || {};
   const BattleViewModel = window.GPPBattleViewModel || {
     deriveBattleView() {
       return {
@@ -29,6 +36,25 @@
     hackActive: '骇入',
     counterActive: '反击',
   };
+  const STATUS_TOOLTIP_MAP = {
+    poison: ['回合推进时会受到等同于层数的伤害，然后层数减少 1。'],
+    thorns: ['伤害结算前先承受等同于层数的荆棘伤害，结算后清空。'],
+    power: ['在攻击值计算阶段按层数直接提高攻击值。'],
+    resilience: ['在防守值计算阶段按层数直接提高防御值。'],
+    overload: ['会提高攻击值；作为防守方确认防御后，还会承受一半层数的自伤。'],
+    unyielding: ['受到致命伤害时，生命值会保留到 1。'],
+    forceField: ['本回合获得力场，非洞穿伤害会被抵消。'],
+    hackActive: ['本回合获得骇入，会压低对方已选中的最高非曜彩骰。'],
+    counterActive: ['若本次防御值高于攻击值，会对攻击方造成反击伤害。'],
+  };
+  const PHASE_LABEL_MAP = {
+    attack_roll: '攻击掷骰',
+    attack_reroll_or_select: '攻击重投/选骰',
+    defense_roll: '防御掷骰',
+    defense_select: '防御选骰',
+    ended: '对战结束',
+  };
+
 
   const PORTRAIT_NAME_ALIAS = {
     '丹恒-腾荒': '丹恒',
@@ -52,6 +78,10 @@
     return (state.auroraDice || []).find((item) => item.id === auroraId) || null;
   }
 
+  function isOptimisticRoom() {
+    return !!(state.ui && state.ui.optimisticRoomActive);
+  }
+
   function allowsNoAurora(character) {
     return !!(character && character.allowsNoAurora);
   }
@@ -69,14 +99,23 @@
       .replace(/"/g, '&quot;');
   }
 
+  function getPhaseLabel(phase) {
+    return PHASE_LABEL_MAP[phase] || String(phase || '-');
+  }
+
+  function isReplayMode() {
+    return !!(state.ui && state.ui.replay && state.ui.replay.enabled);
+  }
+
+
   function getPortraitUrls(name, portraitUrl) {
     const urls = [];
     if (portraitUrl) urls.push(portraitUrl);
     const sanitized = sanitizeDisplayName(name);
     if (!sanitized || sanitized === '未公开') return urls;
     const fileName = PORTRAIT_NAME_ALIAS[sanitized] || sanitized;
-    urls.push(`/portraits/${encodeURIComponent(fileName)}.png`);
-    urls.push(`/picture/${encodeURIComponent(fileName)}.png`);
+    urls.push(pathUtils.toAsset(`portraits/${encodeURIComponent(fileName)}.png`));
+    urls.push(pathUtils.toAsset(`picture/${encodeURIComponent(fileName)}.png`));
     return urls.filter((url, index, arr) => url && arr.indexOf(url) === index);
   }
 
@@ -164,6 +203,16 @@
 
   function bindLobbyTooltip(button, title, lines) {
     if (!button) return;
+    const tooltipLines = [title, ...(lines || []).filter(Boolean)];
+    const tooltipText = tooltipLines.join('\n').trim();
+    button.classList.add('hasTooltip');
+    if (!button.hasAttribute('tabindex')) {
+      button.tabIndex = 0;
+    }
+    if (tooltipText) {
+      button.removeAttribute('title');
+      button.setAttribute('aria-label', tooltipText);
+    }
     button.addEventListener('mouseenter', (event) => showLobbyTooltip(event, button, title, lines));
     button.addEventListener('mousemove', (event) => showLobbyTooltip(event, button, title, lines));
     button.addEventListener('mouseleave', hideLobbyTooltip);
@@ -351,6 +400,17 @@
 
   function renderSelectionSummary() {
     if (!dom.selectionSummary) return;
+    if (isOptimisticRoom()) {
+      dom.selectionSummary.innerHTML = '<div class="summaryMain"><p><b>房间状态</b>：正在向服务器申请真实房间...</p><p><b>下一步</b>：收到房间状态后即可选择角色与曜彩骰。</p></div>';
+      if (dom.confirmHint) {
+        dom.confirmHint.textContent = '房间壳已打开，正在等待服务端回填。';
+      }
+      if (dom.lobbyHint) {
+        dom.lobbyHint.textContent = '正在分配房间，请稍候。';
+      }
+      updateConfirmButtons('分配房间中...', true, false);
+      return;
+    }
     const me = getMe();
     if (!me) {
       dom.selectionSummary.textContent = '等待房间信息...';
@@ -447,6 +507,7 @@
       const label = character.isCustomVariant ? `${character.name} [变体]` : character.name;
       const button = buildLobbyButton(label, character.id === draftSelection.characterId, () => chooseCharacter(character.id));
       bindLobbyTooltip(button, character.name, [
+        `生命值：${character.hp}`,
         character.shortSpec || '',
         character.skillText || '',
       ]);
@@ -487,16 +548,45 @@
   }
 
   function renderLobby() {
+    if (isOptimisticRoom()) {
+      renderSelectionSummary();
+      if (dom.characterButtons) {
+        dom.characterButtons.innerHTML = '<p class="lobbyHint">角色列表即将就绪...</p>';
+      }
+      if (dom.auroraButtons) {
+        dom.auroraButtons.innerHTML = '<p class="lobbyHint">曜彩骰列表即将就绪...</p>';
+      }
+      return;
+    }
     renderSelectionSummary();
     renderCharacterButtons();
     renderAuroraButtons();
+    const players = (state.room && state.room.players) || [];
+    const hasAiOpponent = players.some((player) => player && player.id === 'AI');
+    if (hasAiOpponent && dom.lobbyHint && !state.ui.loadoutSubmitting) {
+      const me = getMe();
+      const draftSelection = getDraftSelection(me);
+      const completeDraft = hasCompleteDraft(draftSelection);
+      const serverSelection = me ? getServerSelection(me) : null;
+      const alreadyApplied = !!(me && serverSelection && loadoutsMatch(serverSelection, draftSelection) && serverSelection.auroraConfirmed);
+      if (!completeDraft) {
+        dom.lobbyHint.textContent = draftSelection.skipAurora
+          ? 'AI 已就绪，请先选择角色，然后点击“开始对战”。'
+          : 'AI 已就绪，请选择角色与曜彩骰，然后点击“开始对战”。';
+      } else if (alreadyApplied) {
+        dom.lobbyHint.textContent = '你的配置已提交，正在等待进入 AI 对局...';
+      } else {
+        dom.lobbyHint.textContent = 'AI 已就绪，点击“开始对战”后会直接进入对局。';
+      }
+    }
   }
 
   function getBattleView() {
     return BattleViewModel.deriveBattleView(
       state.room && state.room.game,
       state.me,
-      state.room && state.room.players
+      state.room && state.room.players,
+      state.battleActions
     );
   }
 
@@ -516,6 +606,7 @@
       `  <h4>${escapeHtml(display.name)}</h4>`,
       `  <p class="weatherStatusMeta">${escapeHtml(display.type)} | 阶段 ${display.stageRound}</p>`,
       '</div>',
+      `  <p class="weatherStatusDesc">条件：${escapeHtml(display.condition || '见天气说明')}</p>`,
       `  <p class="weatherStatusDesc">${escapeHtml(display.effect)}</p>`,
     ].join('');
     setHidden(dom.weatherStatusCard, false);
@@ -551,6 +642,17 @@
     let tone = 'waiting';
     let text = `房间 ${state.room.code}`;
 
+    if (isOptimisticRoom()) {
+      dom.roomStatusBar.className = 'roomStatusBar roomStatusBar-progress';
+      dom.roomStatusBar.textContent = state.room.roomMode === 'ai'
+        ? 'AI 房间壳已打开，正在分配真实房间...'
+        : (state.room.roomMode === 'standard' && /^-+$/.test(String(state.room.code || ''))
+          ? '正在创建房间并回填真实房间号...'
+          : `正在加入房间 ${state.room.code}...`);
+      setHidden(dom.roomStatusBar, false);
+      return;
+    }
+
     if (!state.room.game) {
       const readyCount = (state.room.players || []).filter((player) => player && player.auroraSelectionConfirmed).length;
       tone = readyCount >= 2 ? 'ready' : (readyCount > 0 ? 'progress' : 'waiting');
@@ -563,6 +665,18 @@
     } else {
       tone = view.roomStatusTone || 'active';
       text = view.turnText;
+    }
+
+    if (!state.room.game) {
+      const players = state.room.players || [];
+      const hasAiOpponent = players.some((player) => player && player.id === 'AI');
+      const readyCount = players.filter((player) => player && player.auroraSelectionConfirmed).length;
+      if (hasAiOpponent) {
+        tone = readyCount >= 2 ? 'ready' : (readyCount > 0 ? 'progress' : 'waiting');
+        text = readyCount >= 2
+          ? 'AI 与你的配置已完成，正在准备开局...'
+          : 'AI 已就绪，请选择你的角色与曜彩骰后点击“开始对战”';
+      }
     }
 
     dom.roomStatusBar.className = `roomStatusBar roomStatusBar-${tone}`;
@@ -580,10 +694,110 @@
       const item = document.createElement('div');
       item.className = `statusPill status-${key}`;
       item.textContent = typeof value === 'boolean' ? STATUS_NAME_MAP[key] : `${STATUS_NAME_MAP[key]} ${value}`;
+      bindLobbyTooltip(item, item.textContent, STATUS_TOOLTIP_MAP[key] || []);
       wrap.appendChild(item);
     });
 
     return wrap.childNodes.length ? wrap : null;
+  }
+
+  function buildSelectionHint(preview, committed) {
+    if (preview && preview.indices.length > 0) {
+      return {
+        className: 'previewHint',
+        text: `${preview.kind}：${preview.sum}（已选 ${preview.indices.length} 枚）`,
+      };
+    }
+    if (committed) {
+      return {
+        className: 'committedHint',
+        text: `${committed.kind}：${committed.sum}（已用 ${committed.count} 枚）`,
+      };
+    }
+    return null;
+  }
+
+  function buildLocalSelectionHint(game, lane, playerId, dice, isPickable) {
+    if (!isPickable || !Array.isArray(dice) || state.selectedDice.size <= 0) return null;
+    const indices = Array.from(state.selectedDice).filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < dice.length);
+    if (!indices.length) return null;
+    const previewValue = GPP.getPreviewSelectionValue(game, lane, playerId, dice, indices);
+    return {
+      className: 'previewHint',
+      text: `${lane === 'attack' ? '攻击实时' : '防守实时'}：${previewValue.sum}（已选 ${indices.length} 枚）`,
+    };
+  }
+
+  function getSelectionHintState(game, playerId, lane, dice, isPickable) {
+    const localHint = buildLocalSelectionHint(game, lane, playerId, dice, isPickable);
+    if (localHint) return localHint;
+    const preview = GPP.getPreviewSelectionForPlayer(game, playerId);
+    const committed = GPP.getCommittedSumForPlayer(game, playerId);
+    return buildSelectionHint(preview, committed);
+  }
+
+  function updateSelectionHintUi(zone, hintData) {
+    if (!zone) return;
+    const side = zone.querySelector('[data-selection-side="true"]');
+    const badge = side ? side.querySelector('[data-selection-badge="true"]') : null;
+    if (!side || !badge) return;
+
+    if (!hintData) {
+      side.classList.add('hidden');
+      badge.textContent = '';
+      badge.classList.remove('previewBadge', 'committedBadge');
+      return;
+    }
+
+    side.classList.remove('hidden');
+    badge.textContent = hintData.text;
+    badge.classList.toggle('previewBadge', hintData.className === 'previewHint');
+    badge.classList.toggle('committedBadge', hintData.className !== 'previewHint');
+  }
+
+  function refreshDiceSelectionUi(options = {}) {
+    const me = getMe();
+    const game = state.room && state.room.game;
+    if (!me || !game || isReplayMode()) return;
+
+    const zone = dom.selfZone;
+    if (!zone) return;
+    const row = zone.querySelector('[data-selection-row="true"]');
+    if (!row) return;
+
+    const lane = row.dataset.lane === 'attack' ? 'attack' : 'defense';
+    const displayed = GPP.getDisplayedDiceForPlayer(game, me.id);
+    if (!displayed || !Array.isArray(displayed.dice)) return;
+
+    const isPickable = row.dataset.clickable === 'true';
+    const dragIndices = new Set(Array.isArray(options.dragIndices) ? options.dragIndices : []);
+    row.querySelectorAll('.die[data-die-index]').forEach((node) => {
+      const index = Number(node.dataset.dieIndex || -1);
+      const selected = state.selectedDice.has(index);
+      node.classList.toggle('selected', selected);
+      node.classList.toggle('dragSelecting', dragIndices.has(index));
+      node.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+
+    updateSelectionHintUi(
+      zone,
+      getSelectionHintState(game, me.id, lane, displayed.dice, isPickable)
+    );
+  }
+
+  function buildBattleResultSummary(game) {
+    const players = (state.room && state.room.players) || [];
+    const winner = players.find((player) => player && player.id === game.winnerId) || null;
+    const loser = players.find((player) => player && player.id !== game.winnerId) || null;
+    const winnerName = winner ? sanitizeDisplayName(winner.name) : (game.winnerId === state.me ? '你' : '对手');
+    const loserName = loser ? sanitizeDisplayName(loser.name) : (game.winnerId === state.me ? '对手' : '你');
+    const title = game.winnerId === state.me ? '胜利' : '失败';
+    const detail = `${winnerName} 击败了 ${loserName}`;
+    const meta = [
+      `最终一击 攻 ${game.attackValue == null ? '-' : game.attackValue} / 防 ${game.defenseValue == null ? '-' : game.defenseValue}`,
+      game.lastDamage == null ? null : `伤害 ${game.lastDamage}`,
+    ].filter(Boolean).join('  ·  ');
+    return { title, detail, meta };
   }
 
   function renderBattlePlayerZone(player, isEnemy) {
@@ -614,14 +828,30 @@
 
     const characterLine = document.createElement('p');
     characterLine.className = 'charName';
-    characterLine.textContent = `角色：${character ? character.name : (player.characterName || player.characterId || '未知')}`;
+    const characterName = character ? character.name : (player.characterName || player.characterId || '未知');
+    characterLine.textContent = `角色：${characterName}`;
+    if (character) {
+      bindLobbyTooltip(characterLine, character.name, [
+        `生命值：${character.hp}`,
+        character.shortSpec || '',
+        character.skillText || '',
+      ]);
+    }
     profileText.appendChild(characterLine);
 
     const auroraLine = document.createElement('p');
     auroraLine.className = 'auroraName';
+    const aurora = player.auroraDiceId ? getAurora(player.auroraDiceId) : null;
     auroraLine.textContent = player.auroraDiceId
-      ? `曜彩骰：${getAurora(player.auroraDiceId)?.name || player.auroraDiceName || player.auroraDiceId}`
+      ? `曜彩骰：${aurora ? aurora.name : (player.auroraDiceName || player.auroraDiceId)}`
       : `曜彩骰：${allowsNoAurora(character) ? '无需装备' : '未装备'}`;
+    if (aurora) {
+      bindLobbyTooltip(auroraLine, aurora.name || player.auroraDiceName || player.auroraDiceId, [
+        aurora.facesText || '',
+        aurora.effectText || '',
+        `条件：${aurora.conditionText || '无'}`,
+      ]);
+    }
     profileText.appendChild(auroraLine);
 
     profile.appendChild(profileText);
@@ -652,37 +882,49 @@
     const displayed = GPP.getDisplayedDiceForPlayer(game, player.id);
     if (!displayed || !displayed.dice || !displayed.dice.length) return;
 
-    const isPickable = !isEnemy && (
+    const isPickable = !isReplayMode() && !isEnemy && (
       (game.phase === 'attack_reroll_or_select' && game.attackerId === player.id) ||
       (game.phase === 'defense_select' && game.defenderId === player.id)
     );
     const lane = displayed.lane === 'attack' ? 'attack' : 'defense';
-    const maxSelectable = isPickable ? GPP.getNeedCountForPhase(game, lane) : null;
-    zone.appendChild(GPP.renderDice(displayed.dice, maxSelectable, isPickable, isPickable ? state.selectedDice : null));
+    const hintData = getSelectionHintState(game, player.id, lane, displayed.dice, isPickable);
+    const maxSelectable = isPickable ? GPP.getMaxSelectableForPhase(game, lane) : null;
 
-    const preview = GPP.getPreviewSelectionForPlayer(game, player.id);
-    if (preview && preview.indices.length > 0) {
-      const hint = document.createElement('div');
-      hint.className = 'previewHint';
-      hint.textContent = `${preview.kind}：${preview.sum}（已选 ${preview.indices.length} 枚）`;
-      zone.appendChild(hint);
-    }
+    const laneLayout = document.createElement('div');
+    laneLayout.className = 'diceLaneLayout';
 
-    const committed = GPP.getCommittedSumForPlayer(game, player.id);
-    if (committed && !preview) {
-      const hint = document.createElement('div');
-      hint.className = 'committedHint';
-      hint.textContent = `${committed.kind}：${committed.sum}（使用 ${committed.count} 枚）`;
-      zone.appendChild(hint);
-    }
+    const anchor = document.createElement('div');
+    anchor.className = 'diceAnchor';
+    anchor.appendChild(GPP.renderDice(
+      displayed.dice,
+      maxSelectable,
+      isPickable,
+      isPickable ? state.selectedDice : null,
+      {
+        selectionRow: isPickable,
+        playerId: player.id,
+        lane,
+      }
+    ));
+    laneLayout.appendChild(anchor);
+
+    const side = document.createElement('div');
+    side.className = 'realtimeValueSide';
+    side.dataset.selectionSide = 'true';
+    if (!hintData) side.classList.add('hidden');
+
+    const badge = document.createElement('div');
+    badge.dataset.selectionBadge = 'true';
+    badge.className = `sumBadge mainValueBadge ${hintData && hintData.className === 'previewHint' ? 'previewBadge' : 'committedBadge'}`;
+    badge.textContent = hintData ? hintData.text : '';
+    side.appendChild(badge);
+
+    laneLayout.appendChild(side);
+
+    zone.appendChild(laneLayout);
 
     const auroraHints = GPP.renderAuroraHints(displayed.dice);
     if (auroraHints) zone.appendChild(auroraHints);
-  }
-
-  function hasAuroraInPool(game, role) {
-    const dice = role === 'attack' ? game.attackDice : game.defenseDice;
-    return Array.isArray(dice) && dice.some((die) => die && die.isAurora);
   }
 
   function appendRailButton(container, className, text, disabled, onClick) {
@@ -710,7 +952,7 @@
     const info = document.createElement('div');
     info.className = 'railInfo';
     [
-      `阶段 ${game.phase}`,
+      `阶段 ${getPhaseLabel(game.phase)}`,
       `回合 ${game.round}`,
       `攻 ${game.attackValue == null ? '-' : game.attackValue}`,
       `防 ${game.defenseValue == null ? '-' : game.defenseValue}`,
@@ -727,62 +969,34 @@
     hint.textContent = view.railHint;
     dom.actionRail.appendChild(hint);
 
+    if (isReplayMode()) {
+      const replayNote = document.createElement('p');
+      replayNote.className = 'railHint';
+      replayNote.textContent = '当前是只读回放模式，下方时间轴可切换快照。';
+      wrap.appendChild(replayNote);
+      dom.actionRail.appendChild(wrap);
+      return;
+    }
+
     if (view.kind === 'self') {
-      const myAuroraUses = (game.auroraUsesRemaining && game.auroraUsesRemaining[state.me]) || 0;
-
-      if (view.actionKind === 'attack_roll') {
-        appendRailButton(wrap, 'primaryBtn', '掷攻击骰', false, () => send('roll_attack', {}));
-      }
-
-      if (view.actionKind === 'attack_select') {
-        if (myAuroraUses > 0 && !hasAuroraInPool(game, 'attack')) {
-          appendRailButton(wrap, 'secondaryBtn', '加入曜彩骰', false, () => send('use_aurora_die', {}));
-        }
-
+      const model = battleActionMap.createBattleRailActionModel
+        ? battleActionMap.createBattleRailActionModel({ state, view, send })
+        : { buttons: [] };
+      for (let i = 0; i < model.buttons.length; i += 1) {
+        const button = model.buttons[i];
         appendRailButton(
           wrap,
-          'secondaryBtn',
-          `重投已选骰（剩余 ${game.rerollsLeft || 0} 次）`,
-          !state.selectedDice.size || (game.rerollsLeft || 0) <= 0,
-          () => {
-            send('reroll_attack', { indices: [...state.selectedDice] });
-            GPP.clearSelection();
-          }
-        );
-
-        const attackNeed = GPP.getNeedCountForPhase(game, 'attack');
-        appendRailButton(
-          wrap,
-          'primaryBtn',
-          `确认攻击（需选 ${attackNeed} 枚）`,
-          state.selectedDice.size !== attackNeed,
-          () => {
-            send('confirm_attack_selection', { indices: [...state.selectedDice] });
-            GPP.clearSelection();
-          }
+          button.className || 'secondaryBtn',
+          button.text || '动作',
+          !!button.disabled,
+          typeof button.onClick === 'function' ? button.onClick : null,
         );
       }
-
-      if (view.actionKind === 'defense_roll') {
-        appendRailButton(wrap, 'primaryBtn', '掷防御骰', false, () => send('roll_defense', {}));
-      }
-
-      if (view.actionKind === 'defense_select') {
-        if (myAuroraUses > 0 && !hasAuroraInPool(game, 'defense')) {
-          appendRailButton(wrap, 'secondaryBtn', '加入曜彩骰', false, () => send('use_aurora_die', {}));
-        }
-
-        const defenseNeed = GPP.getNeedCountForPhase(game, 'defense');
-        appendRailButton(
-          wrap,
-          'primaryBtn',
-          `确认防御（需选 ${defenseNeed} 枚）`,
-          state.selectedDice.size !== defenseNeed,
-          () => {
-            send('confirm_defense_selection', { indices: [...state.selectedDice] });
-            GPP.clearSelection();
-          }
-        );
+      if (model.note) {
+        const selfNote = document.createElement('p');
+        selfNote.className = 'railHint';
+        selfNote.textContent = model.note;
+        wrap.appendChild(selfNote);
       }
     } else if (view.kind === 'ended') {
       const endedNote = document.createElement('p');
@@ -825,7 +1039,13 @@
     if (dom.battleCenterScore) {
       const attackValue = game.attackValue == null ? '-' : game.attackValue;
       const defenseValue = game.defenseValue == null ? '-' : game.defenseValue;
-      dom.battleCenterScore.textContent = `攻 ${attackValue} / 防 ${defenseValue}`;
+      dom.battleCenterScore.innerHTML = [
+        '<span class="scoreLabel scoreLabelAttack">攻击</span>',
+        `<span class="scoreValue scoreValueAttack">${escapeHtml(attackValue)}</span>`,
+        '<span class="scoreDivider">对</span>',
+        '<span class="scoreLabel scoreLabelDefense">防御</span>',
+        `<span class="scoreValue scoreValueDefense">${escapeHtml(defenseValue)}</span>`,
+      ].join('');
     }
     if (dom.weatherBanner) {
       const weather = game.weather;
@@ -834,6 +1054,39 @@
       if (hasWeather) {
         dom.weatherBanner.textContent = `天气：${weather.weatherName} | ${weather.weatherType}`;
       }
+    }
+  }
+
+  function renderReplayControls() {
+    const replayState = state.ui && state.ui.replay ? state.ui.replay : null;
+    const enabled = !!(replayState && replayState.enabled && replayState.replay);
+    setHidden(dom.replayControls, !enabled);
+    if (!enabled) return;
+
+    const replay = replayState.replay || {};
+    const snapshots = Array.isArray(replay.snapshots) ? replay.snapshots : [];
+    const currentIndex = Math.max(0, Math.min(replayState.currentIndex || 0, Math.max(0, snapshots.length - 1)));
+    const snapshot = snapshots[currentIndex] || null;
+    const actions = Array.isArray(replay.actions) ? replay.actions : [];
+    const action = snapshot
+      ? actions.find((item) => item && item.step === snapshot.step) || null
+      : null;
+
+    if (dom.replayStepRange) {
+      dom.replayStepRange.min = '0';
+      dom.replayStepRange.max = String(Math.max(0, snapshots.length - 1));
+      dom.replayStepRange.value = String(currentIndex);
+      dom.replayStepRange.disabled = snapshots.length <= 1;
+    }
+    if (dom.replayPrevBtn) dom.replayPrevBtn.disabled = currentIndex <= 0;
+    if (dom.replayNextBtn) dom.replayNextBtn.disabled = currentIndex >= snapshots.length - 1;
+    if (dom.replayStepLabel) {
+      dom.replayStepLabel.textContent = `Step ${currentIndex}/${Math.max(0, snapshots.length - 1)} | reason: ${snapshot && snapshot.reason ? snapshot.reason : 'snapshot'}`;
+    }
+    if (dom.replayActionLabel) {
+      dom.replayActionLabel.textContent = action
+        ? `Action: ${action.actionCode || 'unknown'} | actor: ${action.actor || '-'}`
+        : 'Action: initial snapshot';
     }
   }
 
@@ -852,12 +1105,19 @@
     renderBattlePlayerZone(getEnemy(), true);
     renderBattlePlayerZone(getMe(), false);
     renderActionRail(view);
+    renderReplayControls();
     renderLog();
     if (dom.logDrawer) {
       dom.logDrawer.classList.toggle('open', !!state.ui.logDrawerOpen);
     }
     if (dom.logToggleBtn) {
       dom.logToggleBtn.textContent = state.ui.logDrawerOpen ? '收起战斗日志' : '展开战斗日志';
+    }
+    if (view.kind === 'ended' && state.room && state.room.game) {
+      const result = buildBattleResultSummary(state.room.game);
+      GPP.showWinnerOverlay(result.title, result.detail, result.meta);
+    } else {
+      GPP.hideWinnerOverlay();
     }
   }
 
@@ -872,6 +1132,9 @@
     setHidden(dom.gameArea, !inGame);
     if (dom.roomCodeEl) {
       dom.roomCodeEl.textContent = hasRoom ? state.room.code : '-';
+    }
+    if (!inGame) {
+      setHidden(dom.replayControls, true);
     }
     renderRoomStatusBar(view);
   }
@@ -895,4 +1158,10 @@
   }
 
   GPP.render = render;
+  GPP.refreshDiceSelectionUi = refreshDiceSelectionUi;
 })();
+
+
+
+
+

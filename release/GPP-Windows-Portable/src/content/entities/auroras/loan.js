@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'loan', name: '贷款',
   faces: [
     { value: 2, hasA: true },{ value: 2, hasA: true },

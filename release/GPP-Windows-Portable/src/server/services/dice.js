@@ -1,4 +1,4 @@
-﻿
+
 function newNormalDie(value, sides, slotId) {
   return {
     value,

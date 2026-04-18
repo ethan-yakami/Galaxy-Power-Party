@@ -1,4 +1,4 @@
-﻿const { CHARACTER_RULES } = require('../../../src/core/battle-engine/rules/characters');
+const { CHARACTER_RULES } = require('../../../src/core/battle-engine/rules/characters');
 const { AURORA_RULES } = require('../../../src/core/battle-engine/rules/auroras');
 
 const generalRulesCases = require('./general_rules');

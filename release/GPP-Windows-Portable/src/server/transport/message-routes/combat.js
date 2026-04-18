@@ -1,21 +1,25 @@
 function createCombatRoutes({ handlers }) {
+  function deprecated(ws) {
+    handlers.handleDeprecatedBattleProtocol(ws);
+  }
+
   return {
     roll_attack: {
-      errorLabel: 'handleRollAttack',
+      errorLabel: 'handleDeprecatedBattleProtocol',
       run(ws) {
-        handlers.handleRollAttack(ws);
+        deprecated(ws);
       },
     },
     use_aurora_die: {
-      errorLabel: 'handleUseAurora',
+      errorLabel: 'handleDeprecatedBattleProtocol',
       run(ws) {
-        handlers.handleUseAurora(ws);
+        deprecated(ws);
       },
     },
     reroll_attack: {
-      errorLabel: 'handleRerollAttack',
-      run(ws, msg) {
-        handlers.handleRerollAttack(ws, msg);
+      errorLabel: 'handleDeprecatedBattleProtocol',
+      run(ws) {
+        deprecated(ws);
       },
     },
     update_live_selection: {
@@ -26,21 +30,27 @@ function createCombatRoutes({ handlers }) {
       swallowErrors: true,
     },
     confirm_attack_selection: {
-      errorLabel: 'handleConfirmAttack',
-      run(ws, msg) {
-        handlers.handleConfirmAttack(ws, msg);
+      errorLabel: 'handleDeprecatedBattleProtocol',
+      run(ws) {
+        deprecated(ws);
       },
     },
     roll_defense: {
-      errorLabel: 'handleRollDefense',
+      errorLabel: 'handleDeprecatedBattleProtocol',
       run(ws) {
-        handlers.handleRollDefense(ws);
+        deprecated(ws);
       },
     },
     confirm_defense_selection: {
-      errorLabel: 'handleConfirmDefense',
+      errorLabel: 'handleDeprecatedBattleProtocol',
+      run(ws) {
+        deprecated(ws);
+      },
+    },
+    submit_battle_action: {
+      errorLabel: 'handleSubmitBattleAction',
       run(ws, msg) {
-        handlers.handleConfirmDefense(ws, msg);
+        handlers.handleSubmitBattleAction(ws, msg);
       },
     },
     export_replay: {

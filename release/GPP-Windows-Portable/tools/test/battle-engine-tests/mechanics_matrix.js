@@ -1,4 +1,4 @@
-﻿const { CHARACTER_RULES } = require('../../../src/core/battle-engine/rules/characters');
+const { CHARACTER_RULES } = require('../../../src/core/battle-engine/rules/characters');
 const { AURORA_RULES } = require('../../../src/core/battle-engine/rules/auroras');
 const {
   assert,
@@ -7,7 +7,6 @@ const {
   PHASE_DEFENSE_SELECT,
   setRollBuffer,
   createStartedLegacyRoom,
-  makeLegacyDie,
 } = require('./common');
 
 const coreMechanicsCases = [
@@ -199,6 +198,157 @@ const coreMechanicsCases = [
       assert.strictEqual(xilianState.xilianCumulative[0], 23);
       assert.strictEqual(xilianState.xilianAscensionActive[0], 0);
       assert.strictEqual(xilianState.attackLevel[0], 3);
+    },
+  },
+  {
+    id: 'MCH-003A',
+    title: 'fengjin power accumulation compounds from the current final attack value',
+    tags: [
+      'group:mechanics_matrix',
+      'phase:attack_reroll_or_select',
+      'phase:defense_select',
+      'character:fengjin',
+      'character:baie',
+      'aurora:prime',
+      'mechanism:power',
+    ],
+    arrange: 'Run two low-defense fengjin attacks with the same base dice.',
+    act: 'Confirm attack/defense twice while forcing fengjin to attack both times.',
+    assert: 'Power grows from 4 after the first 8-attack to 10 after the second 12-attack.',
+    run() {
+      const state = engine.createBattle({
+        players: [
+          { characterId: 'fengjin', auroraDiceId: 'prime' },
+          { characterId: 'baie', auroraDiceId: 'prime' },
+        ],
+      }, 782, { startingAttacker: 0 });
+
+      state.phase = PHASE_ATTACK_REROLL_OR_SELECT;
+      setRollBuffer(state.attackRoll, [
+        { value: 4, maxValue: 8 },
+        { value: 4, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+      ]);
+
+      let result = engine.applyActionInPlace(
+        state,
+        engine.encodeAction(engine.OPCODES.CONFIRM_ATTACK, engine.indicesToMask([0, 1], state.attackRoll.count)),
+      );
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(state.attackValue, 8);
+
+      state.phase = PHASE_DEFENSE_SELECT;
+      setRollBuffer(state.defenseRoll, [
+        { value: 1, maxValue: 8 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+      ]);
+
+      result = engine.applyActionInPlace(
+        state,
+        engine.encodeAction(engine.OPCODES.CONFIRM_DEFENSE, engine.indicesToMask([0, 1], state.defenseRoll.count)),
+      );
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(state.power[0], 4);
+
+      state.attacker = 0;
+      state.defender = 1;
+      state.phase = PHASE_ATTACK_REROLL_OR_SELECT;
+      setRollBuffer(state.attackRoll, [
+        { value: 4, maxValue: 8 },
+        { value: 4, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+      ]);
+
+      result = engine.applyActionInPlace(
+        state,
+        engine.encodeAction(engine.OPCODES.CONFIRM_ATTACK, engine.indicesToMask([0, 1], state.attackRoll.count)),
+      );
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(state.attackValue, 12);
+
+      state.phase = PHASE_DEFENSE_SELECT;
+      setRollBuffer(state.defenseRoll, [
+        { value: 1, maxValue: 8 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+        { value: 1, maxValue: 6 },
+      ]);
+
+      result = engine.applyActionInPlace(
+        state,
+        engine.encodeAction(engine.OPCODES.CONFIRM_DEFENSE, engine.indicesToMask([0, 1], state.defenseRoll.count)),
+      );
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(state.power[0], 10);
+    },
+  },
+  {
+    id: 'MCH-003B',
+    title: 'fengjin six-six trigger adds full current attack value instead of replacing power',
+    tags: [
+      'group:mechanics_matrix',
+      'phase:attack_reroll_or_select',
+      'phase:defense_select',
+      'character:fengjin',
+      'character:baie',
+      'aurora:oath',
+      'mechanism:power',
+      'mechanism:heal',
+    ],
+    arrange: 'Start with existing power, then confirm a two-six attack selection.',
+    act: 'Confirm attack [3,4] then low defense to resolve damage.',
+    assert: 'Power stacks from 12 to 36 and six-six heal applies 6 hp.',
+    run() {
+      const state = engine.createBattle({
+        players: [
+          { characterId: 'fengjin', auroraDiceId: 'oath' },
+          { characterId: 'baie', auroraDiceId: 'prime' },
+        ],
+      }, 783, { startingAttacker: 0 });
+
+      state.phase = PHASE_ATTACK_REROLL_OR_SELECT;
+      state.power[0] = 12;
+      state.hp[0] = 20;
+
+      setRollBuffer(state.attackRoll, [
+        { value: 2, maxValue: 8 },
+        { value: 5, maxValue: 6 },
+        { value: 5, maxValue: 6 },
+        { value: 6, maxValue: 6 },
+        { value: 6, maxValue: 6 },
+      ]);
+
+      let result = engine.applyActionInPlace(
+        state,
+        engine.encodeAction(engine.OPCODES.CONFIRM_ATTACK, engine.indicesToMask([3, 4], state.attackRoll.count)),
+      );
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(state.attackValue, 24);
+
+      state.phase = PHASE_DEFENSE_SELECT;
+      setRollBuffer(state.defenseRoll, [
+        { value: 1, maxValue: 8 },
+        { value: 1, maxValue: 6 },
+        { value: 2, maxValue: 6 },
+        { value: 2, maxValue: 6 },
+        { value: 3, maxValue: 6 },
+      ]);
+
+      result = engine.applyActionInPlace(
+        state,
+        engine.encodeAction(engine.OPCODES.CONFIRM_DEFENSE, engine.indicesToMask([0, 1], state.defenseRoll.count)),
+      );
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(state.power[0], 36);
+      assert.strictEqual(state.hp[0], 26);
     },
   },
   {

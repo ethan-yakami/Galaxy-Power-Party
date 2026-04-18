@@ -1,4 +1,4 @@
-﻿const {
+const {
   assert,
   createHandlers,
   engine,
@@ -11,6 +11,9 @@
   PHASE_DEFENSE_SELECT,
   withImmediateTimers,
 } = require('./common');
+const { CharacterRegistry } = require('../../../src/server/services/registry');
+const { RESTRICTED_AI_LOADOUTS } = require('../../../src/server/ai/config');
+const { createAIPlayer, reRandomizeAIPlayer } = require('../../../src/server/ai');
 
 module.exports = [
   {
@@ -164,9 +167,7 @@ module.exports = [
 
       const attackNeed = room.game.attackLevel[room.game.attackerId];
       handlers.handleConfirmAttack(attackerWs, { indices: highestIndices(room.game.attackDice, attackNeed) });
-      assert.strictEqual(room.game.phase, 'defense_roll');
-
-      handlers.handleRollDefense(defenderWs);
+      assert.strictEqual(room.game.phase, 'defense_select');
       const defenseNeed = room.game.defenseLevel[room.game.defenderId];
       handlers.handleConfirmDefense(defenderWs, { indices: highestIndices(room.game.defenseDice, defenseNeed) });
       assert.strictEqual(room.game.phase, 'attack_roll');
@@ -264,7 +265,7 @@ module.exports = [
         scheduleAIAction(room, rooms, handlers);
       });
 
-      assert.strictEqual(room.game.phase, 'defense_roll');
+      assert.strictEqual(room.game.phase, 'defense_select');
       assert(room.game.attackSelection && room.game.attackSelection.length > 0, 'AI should confirm an attack selection');
     },
   },
@@ -310,7 +311,10 @@ module.exports = [
         scheduleAIAction(room, rooms, handlers);
       });
 
-      assert.notStrictEqual(room.game.phase, 'defense_select');
+      assert(
+        room.game.phase !== 'defense_select' || room.game.round > 1,
+        'AI defense selection should advance state or enter next round',
+      );
       assert(room.game.round >= 1, 'room should still have a valid round after defense resolution');
     },
   },
@@ -424,6 +428,102 @@ module.exports = [
         global.setTimeout = originalSetTimeout;
         global.clearTimeout = originalClearTimeout;
       }
+    },
+  },
+  {
+    id: 'GEN-011',
+    title: 'defense live selection updates defense preview for first room player',
+    tags: ['group:general_rules', 'phase:defense_select', 'character:baie', 'character:huangquan', 'aurora:legacy'],
+    arrange: 'Create a started room and force P1 to be defender at defense_select.',
+    act: 'Send update_live_selection from P1.',
+    assert: 'selection is persisted into defense preview, not attack preview.',
+    run() {
+      const rooms = new Map();
+      const handlers = createHandlers(rooms);
+      const a = makeWs('P1');
+      const b = makeWs('P2');
+
+      handlers.handleCreateRoom(a, { name: 'A' });
+      handlers.handleJoinRoom(b, { name: 'B', code: a.playerRoomCode });
+      handlers.handleApplyPreset(a, { characterId: 'baie', auroraDiceId: 'legacy' });
+      handlers.handleApplyPreset(b, { characterId: 'huangquan', auroraDiceId: 'prime' });
+
+      const room = rooms.get(a.playerRoomCode);
+      room.engineState.phase = PHASE_DEFENSE_SELECT;
+      room.engineState.attacker = 1;
+      room.engineState.defender = 0;
+      setRollBuffer(room.engineState.defenseRoll, [
+        { value: 4, maxValue: 8, slotIndex: 0 },
+        { value: 5, maxValue: 6, slotIndex: 1 },
+        { value: 6, maxValue: 6, slotIndex: 2 },
+      ]);
+      room.engineUi.attackPreviewMask = 0;
+      room.engineUi.defensePreviewMask = 0;
+      room.game = engine.projectStateToLegacyRoom(room.engineState, room.engineUi);
+
+      handlers.handleUpdateLiveSelection(a, { indices: [0, 2] });
+
+      assert.strictEqual(room.engineUi.attackPreviewMask, 0);
+      assert.strictEqual(room.engineUi.defensePreviewMask, engine.indicesToMask([0, 2]));
+      assert.deepStrictEqual(room.game.defensePreviewSelection, [0, 2]);
+    },
+  },
+  {
+    id: 'GEN-012',
+    title: 'AI zhigengniao loadout never equips aurora die',
+    tags: ['group:general_rules', 'phase:setup', 'character:zhigengniao'],
+    arrange: 'Force AI random character pick to zhigengniao.',
+    act: 'Create and rerandomize AI player with deterministic random.',
+    assert: 'auroraDiceId remains null for zhigengniao.',
+    run() {
+      const loadoutPool = RESTRICTED_AI_LOADOUTS
+        .filter((loadout) => CharacterRegistry[loadout.characterId]);
+      const zhigengniaoIndex = loadoutPool.findIndex((loadout) => loadout.characterId === 'zhigengniao');
+      assert(zhigengniaoIndex >= 0, 'zhigengniao should exist in AI pool');
+
+      const originalRandom = Math.random;
+      Math.random = () => ((zhigengniaoIndex + 0.01) / loadoutPool.length);
+
+      try {
+        const aiPlayer = createAIPlayer('9000');
+        assert.strictEqual(aiPlayer.characterId, 'zhigengniao');
+        assert.strictEqual(aiPlayer.auroraDiceId, null);
+        assert.strictEqual(aiPlayer.auroraSelectionConfirmed, true);
+
+        reRandomizeAIPlayer(aiPlayer);
+        assert.strictEqual(aiPlayer.characterId, 'zhigengniao');
+        assert.strictEqual(aiPlayer.auroraDiceId, null);
+        assert.strictEqual(aiPlayer.auroraSelectionConfirmed, true);
+      } finally {
+        Math.random = originalRandom;
+      }
+    },
+  },
+  {
+    id: 'GEN-013',
+    title: 'zhigengniao preset starts AI room without aurora crash',
+    tags: ['group:general_rules', 'phase:setup', 'character:zhigengniao'],
+    arrange: 'Create an AI room and apply a zhigengniao preset without auroraDiceId.',
+    act: 'Start game via handleApplyPreset.',
+    assert: 'Room enters in_game and engine state is created without server error.',
+    run() {
+      const rooms = new Map();
+      const handlers = createHandlers(rooms);
+      const human = makeWs('P1');
+
+      handlers.handleCreateAIRoom(human, { name: 'Human' });
+      const room = rooms.get(human.playerRoomCode);
+      assert(room, 'room should exist');
+
+      handlers.handleApplyPreset(human, { characterId: 'zhigengniao' });
+
+      assert.strictEqual(room.status, 'in_game');
+      assert(room.engineState, 'engineState should be created');
+      assert(room.game && room.game.phase, 'projected game should exist');
+
+      const humanIndex = room.engineUi.indexToPlayerId.indexOf('P1');
+      assert(humanIndex >= 0, 'human index should exist in engine ui');
+      assert.strictEqual(room.engineState.auroraUsesRemaining[humanIndex], 0);
     },
   },
 ];

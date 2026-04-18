@@ -1,4 +1,4 @@
-﻿const assert = require('assert');
+const assert = require('assert');
 const WebSocket = require('ws');
 
 const createHandlers = require('../../../src/server/app/handlers');

@@ -23,6 +23,7 @@
     replayId: 'replayId',
     version: 'version',
     engineMode: 'engineMode',
+    protocolModel: 'protocolModel',
     seed: 'seed',
     roomMeta: 'roomMeta',
     playersLoadout: 'playersLoadout',
@@ -81,6 +82,10 @@
         actionMask: normalizeNumber(item.actionMask, 0),
         indices: Array.isArray(item.indices) ? item.indices.filter((idx) => Number.isInteger(idx)) : [],
         encodedAction: normalizeNumber(item.encodedAction, 0),
+        turnId: normalizeNullableNumber(item.turnId),
+        actionId: typeof item.actionId === 'string' ? item.actionId : '',
+        actionSnapshotHash: typeof item.actionSnapshotHash === 'string' ? item.actionSnapshotHash : '',
+        mutationLog: isPlainObject(item.mutationLog) ? cloneDeep(item.mutationLog) : null,
         timestamp: normalizeNumber(item.timestamp, 0),
       }));
   }
@@ -168,6 +173,7 @@
     replay.replayId = typeof replay.replayId === 'string' ? replay.replayId : '';
     replay.version = version;
     replay.engineMode = typeof replay.engineMode === 'string' ? replay.engineMode : 'pure';
+    replay.protocolModel = typeof replay.protocolModel === 'string' ? replay.protocolModel : 'action_ticket';
     replay.seed = typeof replay.seed === 'string' ? replay.seed : String(replay.seed || '');
     replay.roomMeta = normalizeRoomMeta(replay.roomMeta);
     replay.playersLoadout = normalizePlayersLoadout(replay.playersLoadout);

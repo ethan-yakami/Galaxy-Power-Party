@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   id: 'cactus', name: '仙人球',
   faces: [
     { value: 4, hasA: true },{ value: 5, hasA: true },{ value: 6, hasA: true },
