@@ -36,6 +36,7 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%PORT% .*LISTENING"')
 )
 
 echo Starting Galaxy Power Party...
+echo Local startup uses Express static hosting and does not require npm run build:client.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPTS_DIR%\launch_server.ps1" -Mode node -Root "%ROOT%" -BindHost "%HOST%" -Port %PORT% -NodeExe "%NODE_EXE%" -OutLog "%LOG_FILE%" -ErrLog "%ERR_FILE%" >nul
 if errorlevel 1 (
   echo [ERROR] Failed to launch server process.

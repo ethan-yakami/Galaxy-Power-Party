@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LEGACY_RUNTIME_SCRIPTS, loadLegacyBattleRuntime } from './load-legacy-battle-runtime.js';
+import { clearRuntimeSourceCache } from './runtime-source-loader.js';
+import { BATTLE_RUNTIME_SCRIPTS, loadBattleRuntime } from './load-battle-runtime.js';
 
-describe('loadLegacyBattleRuntime', () => {
+describe('loadBattleRuntime', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     delete window.GPP;
+    clearRuntimeSourceCache();
   });
 
-  it('evaluates the critical battle runtime from the bundle and installs deferred feature loaders', async () => {
-    const fetchMock = vi.fn();
+  it('fetches and evaluates the critical battle runtime and installs deferred feature loaders', async () => {
+    const fetchMock = vi.fn(async (input) => ({
+      ok: true,
+      status: 200,
+      async text() {
+        return `window.__runtimeLoads = (window.__runtimeLoads || []); window.__runtimeLoads.push(${JSON.stringify(String(input))});`;
+      },
+    }));
     const evalMock = vi.fn();
     Object.defineProperty(document, 'baseURI', {
       configurable: true,
@@ -21,7 +29,7 @@ describe('loadLegacyBattleRuntime', () => {
       eval: evalMock,
     });
 
-    const metrics = await loadLegacyBattleRuntime({
+    const metrics = await loadBattleRuntime({
       document,
       launchMode: 'ai',
       logger: {
@@ -29,10 +37,10 @@ describe('loadLegacyBattleRuntime', () => {
       },
     });
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(metrics.loaderMode).toBe('bundle_eval');
+    expect(fetchMock).toHaveBeenCalled();
+    expect(metrics.loaderMode).toBe('runtime_fetch_eval');
     expect(metrics.scriptCount).toBeGreaterThan(0);
-    expect(metrics.scriptCount).toBeLessThan(LEGACY_RUNTIME_SCRIPTS.length);
+    expect(metrics.scriptCount).toBeLessThan(BATTLE_RUNTIME_SCRIPTS.length);
     expect(evalMock).toHaveBeenCalledTimes(metrics.scriptCount);
     expect(evalMock.mock.calls[0][0]).toContain('sourceURL=http://localhost:3000/shared/replay-schema.js');
     expect(typeof window.GPP.ensureBattleFeatureSet).toBe('function');

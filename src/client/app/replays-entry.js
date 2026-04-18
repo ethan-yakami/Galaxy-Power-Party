@@ -1,20 +1,6 @@
-import urlUtilsSource from '../js/url-utils.js?raw';
-import replaySchemaSource from '../js/replay-schema.js?raw';
-import authSource from '../js/auth.js?raw';
-import replayHistorySource from '../js/replay-history.js?raw';
-import replaysSource from '../js/replays.js?raw';
-import replaysCloudSource from '../js/replays-cloud.js?raw';
-import { evalLegacySource } from './eval-legacy-source.js';
+import { evaluateRuntimeSources, loadRuntimeSources } from './runtime-source-loader.js';
+import { REPLAYS_RUNTIME_SCRIPTS } from './runtime-source-manifest.js';
 import { installRuntimeConfig } from './install-runtime-config.js';
-
-const REPLAYS_RUNTIME_SOURCES = Object.freeze([
-  { src: 'js/url-utils.js', code: urlUtilsSource },
-  { src: 'shared/replay-schema.js', code: replaySchemaSource },
-  { src: 'js/auth.js', code: authSource },
-  { src: 'js/replay-history.js', code: replayHistorySource },
-  { src: 'js/replays.js', code: replaysSource },
-  { src: 'js/replays-cloud.js', code: replaysCloudSource },
-]);
 
 function createDiagnostics(windowRef) {
   const htmlLoadedAt = Number(windowRef.performance && typeof windowRef.performance.timeOrigin === 'number')
@@ -46,15 +32,36 @@ function logDiagnostics(windowRef, diagnostics) {
   };
 }
 
-const windowRef = /** @type {any} */ (globalThis);
-installRuntimeConfig(windowRef);
-const diagnostics = createDiagnostics(windowRef);
-
-markDiagnostics(diagnostics, 'app_bootstrap_started_at');
-for (const source of REPLAYS_RUNTIME_SOURCES) {
-  const url = new URL(source.src, windowRef.document.baseURI).toString();
-  evalLegacySource(windowRef, url, source.code);
+function renderBootstrapFailure(documentRef, message) {
+  const subtitleEl = documentRef.getElementById('detailSubtitle');
+  if (subtitleEl) {
+    subtitleEl.textContent = message;
+  }
+  const cloudHint = documentRef.getElementById('cloudHint');
+  if (cloudHint) {
+    cloudHint.textContent = '启动失败';
+  }
 }
-markDiagnostics(diagnostics, 'app_runtime_ready_at');
-markDiagnostics(diagnostics, 'first_interactive_render_at');
-logDiagnostics(windowRef, diagnostics);
+
+async function bootstrapReplaysApp(windowRef) {
+  installRuntimeConfig(windowRef);
+  const diagnostics = createDiagnostics(windowRef);
+
+  markDiagnostics(diagnostics, 'app_bootstrap_started_at');
+  const loaded = await loadRuntimeSources({
+    documentRef: windowRef.document,
+    sources: REPLAYS_RUNTIME_SCRIPTS,
+  });
+  evaluateRuntimeSources(windowRef, loaded.sources);
+  markDiagnostics(diagnostics, 'app_runtime_ready_at');
+  markDiagnostics(diagnostics, 'first_interactive_render_at');
+  logDiagnostics(windowRef, diagnostics);
+}
+
+const windowRef = /** @type {any} */ (globalThis);
+
+bootstrapReplaysApp(windowRef).catch((error) => {
+  const reason = error instanceof Error ? error.message : String(error);
+  console.error('[replays-entry] Failed to bootstrap replays app:', reason);
+  renderBootstrapFailure(windowRef.document, `回放页初始化失败：${reason}`);
+});

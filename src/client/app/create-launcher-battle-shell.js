@@ -51,6 +51,7 @@ export function createLauncherBattleShell(options) {
   };
   const launcherShell = documentRef.querySelector('.launcherShell');
   const launcherBg = documentRef.querySelector('.launcherBg');
+  const launcherMessage = /** @type {HTMLParagraphElement | null} */ (documentRef.getElementById('launcherMessage'));
   const appRoot = windowRef.__GPP_APP__ && typeof windowRef.__GPP_APP__ === 'object'
     ? windowRef.__GPP_APP__
     : {};
@@ -126,6 +127,12 @@ export function createLauncherBattleShell(options) {
     setTimeField(diagnostics, key);
   }
 
+  function setLauncherStatus(text, isError = false) {
+    if (!launcherMessage) return;
+    launcherMessage.textContent = text || '';
+    launcherMessage.classList.toggle('error', !!isError);
+  }
+
   function getEmbeddedShell() {
     try {
       const shell = frame.contentWindow && frame.contentWindow.GPPEmbeddedShell;
@@ -176,6 +183,14 @@ export function createLauncherBattleShell(options) {
     clearReadyTimeout();
     readyTimer = windowRef.setTimeout(() => {
       const fallbackIntent = intent || pendingIntent || lastIntent;
+      if (!ready && !visible) {
+        const slowMessage = fallbackIntent
+          ? '战斗壳层启动较慢，已返回启动页。你可以重试，或直接刷新后再试。'
+          : '战斗壳层启动较慢，请刷新页面后重试。';
+        navigateToLauncher({ fromEmbeddedShell: true, preserveMessage: true });
+        setLauncherStatus(slowMessage, true);
+        return;
+      }
       showOverlay(
         '战斗壳层启动较慢',
         fallbackIntent
@@ -189,8 +204,8 @@ export function createLauncherBattleShell(options) {
   function showBattleHost() {
     visible = true;
     host.classList.remove('hidden');
-    launcherShell && launcherShell.classList.add('hidden');
-    launcherBg && launcherBg.classList.add('hidden');
+    if (launcherShell) launcherShell.classList.add('hidden');
+    if (launcherBg) launcherBg.classList.add('hidden');
     frame.setAttribute('aria-hidden', 'false');
     markTiming('battle_shell_visible_at');
   }
@@ -198,32 +213,35 @@ export function createLauncherBattleShell(options) {
   function showLauncherShell() {
     visible = false;
     host.classList.add('hidden');
-    launcherShell && launcherShell.classList.remove('hidden');
-    launcherBg && launcherBg.classList.remove('hidden');
+    if (launcherShell) launcherShell.classList.remove('hidden');
+    if (launcherBg) launcherBg.classList.remove('hidden');
     frame.setAttribute('aria-hidden', 'true');
-    clearReadyTimeout();
-    pendingIntent = null;
     hideOverlay();
   }
 
   function startIntent(intent) {
     if (!intent || typeof intent !== 'object' || !intent.mode) return false;
-    showBattleHost();
     const copy = buildIntentCopy(intent);
-    showOverlay(copy.title, copy.text, false);
     const shell = getEmbeddedShell();
-    if (!shell || typeof shell.start !== 'function') {
+    if (!ready || !shell || typeof shell.start !== 'function') {
       pendingIntent = { ...intent };
+      setLauncherStatus(copy.text, false);
       armReadyTimeout(intent);
       return false;
     }
+
+    showBattleHost();
+    showOverlay(copy.title, copy.text, false);
     const started = shell.start(intent);
     if (!started) {
       pendingIntent = { ...intent };
+      showLauncherShell();
+      setLauncherStatus('战斗壳层尚未准备好，请稍后重试。', true);
       armReadyTimeout(intent);
       return false;
     }
     pendingIntent = null;
+    setLauncherStatus('正在打开战斗房间...', false);
     armReadyTimeout(intent);
     return true;
   }
@@ -258,7 +276,12 @@ export function createLauncherBattleShell(options) {
       resetEmbeddedShell();
     }
     windowRef.history.pushState({ gppView: 'launcher' }, '', urls.getBasePath(windowRef.location));
+    clearReadyTimeout();
+    pendingIntent = null;
     showLauncherShell();
+    if (!options.preserveMessage) {
+      setLauncherStatus('选择一个操作后，会直接进入对应页面。', false);
+    }
     return true;
   }
 
@@ -270,7 +293,7 @@ export function createLauncherBattleShell(options) {
     if (lastIntent) {
       pendingIntent = { ...lastIntent };
       const copy = buildIntentCopy(lastIntent);
-      showOverlay(copy.title, copy.text, false);
+      setLauncherStatus(copy.text, false);
       armReadyTimeout(lastIntent);
     }
   }
@@ -278,7 +301,7 @@ export function createLauncherBattleShell(options) {
   function syncRoute() {
     const isBattleRoute = /\/battle\.html$/i.test(windowRef.location.pathname);
     if (!isBattleRoute) {
-      showLauncherShell();
+      navigateToLauncher({ fromEmbeddedShell: true, preserveMessage: true });
       return;
     }
     const routeIntent = parseBattleIntentFromLocation(windowRef) || pendingIntent || lastIntent;
@@ -324,6 +347,7 @@ export function createLauncherBattleShell(options) {
     if (payload.type === 'gpp:battle-shell-show') {
       clearReadyTimeout();
       hideOverlay();
+      showBattleHost();
       return;
     }
     if (payload.type === 'gpp:battle-shell-request-launcher') {
@@ -338,7 +362,6 @@ export function createLauncherBattleShell(options) {
   const initialIntent = parseBattleIntentFromLocation(windowRef);
   if (initialIntent) {
     lastIntent = { ...initialIntent };
-    showBattleHost();
     startIntent(initialIntent);
   } else {
     showLauncherShell();

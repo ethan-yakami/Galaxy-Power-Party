@@ -70,6 +70,46 @@ function collectLegacyToolPathReferences() {
   return findings;
 }
 
+function collectRuntimeCompatReferences() {
+  const findings = [];
+  const scanTargets = [
+    path.join(ROOT, 'server.js'),
+    path.join(ROOT, 'src', 'server'),
+    path.join(ROOT, 'src', 'core'),
+    path.join(ROOT, 'src', 'client'),
+  ];
+  const ignoredFiles = new Set([
+    'src/client/app/load-legacy-battle-runtime.js',
+  ]);
+  const patterns = [
+    /load-legacy-battle-runtime\.js/,
+    /['"`](?:\.\.\/|\.\/)+(?:server\/(?:ai|dice|handlers|match-record|message-router|registry|replay|rooms|skillRegistry|skills|weather|battle-engine|message-routes|protocol))/,
+    /['"`](?:\.\.\/|\.\/)+(?:content\/(?:dice|registry|rooms|skills|weather)(?:\.js)?|core\/(?:registry|weather)(?:\.js)?)/,
+    /['"`](?:\.\.\/|\.\/)+(?:public\/(?:js\/|[^'"`]+\.(?:html|css)))/,
+    /['"`](?:\.\.\/|\.\/)+release\/GPP-Windows-Portable\//,
+    /handlers_orig/,
+  ];
+  for (const scanTarget of scanTargets) {
+    const filePaths = fs.existsSync(scanTarget) && fs.statSync(scanTarget).isFile()
+      ? [scanTarget]
+      : listFiles(scanTarget);
+    for (const filePath of filePaths) {
+      const relativePath = rel(filePath);
+      if (ignoredFiles.has(relativePath)) continue;
+      if (/\.test\.js$/i.test(relativePath)) continue;
+      const content = fs.readFileSync(filePath, 'utf8');
+      const lines = content.split(/\r?\n/);
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (patterns.some((pattern) => pattern.test(line))) {
+          findings.push(`${relativePath}:${index + 1}: ${line.trim()}`);
+        }
+      }
+    }
+  }
+  return findings;
+}
+
 function collectPortableBattleRuntimeDrift() {
   const findings = [];
   const portableRoot = path.join(ROOT, 'release', 'GPP-Windows-Portable');
@@ -180,6 +220,7 @@ for (const filePath of listFiles(path.join(ROOT, 'server'))) {
 }
 
 const legacyToolPathReferences = collectLegacyToolPathReferences();
+const runtimeCompatReferences = collectRuntimeCompatReferences();
 const legacyDocumentationReferences = collectLegacyDocumentationReferences();
 const portableBattleRuntimeDrift = collectPortableBattleRuntimeDrift();
 
@@ -188,5 +229,10 @@ printSection('Compat Shim', compatShims);
 printSection('Stale Mirror', staleMirrors);
 printSection('Server Shim Violations', serverShimViolations);
 printSection('Legacy Tool Path References', legacyToolPathReferences);
+printSection('Runtime Compat References', runtimeCompatReferences);
 printSection('Legacy Documentation References', legacyDocumentationReferences);
 printSection('Portable Battle Runtime Drift', portableBattleRuntimeDrift);
+
+if (runtimeCompatReferences.length) {
+  process.exitCode = 1;
+}

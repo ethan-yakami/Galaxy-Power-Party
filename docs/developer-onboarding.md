@@ -39,3 +39,10 @@ npm run test:client
 - 实际服务启动：[src/server/app/bootstrap.js](../src/server/app/bootstrap.js)
 - battle 页入口：[src/client/battle.html](../src/client/battle.html)
 - battle 页模块壳：[src/client/app/battle-entry.js](../src/client/app/battle-entry.js)
+
+## Local Startup Contract
+
+- `npm start` is the standard local startup path and works without running `vite build` first.
+- `start_game.bat` uses the same Express static hosting path and does not require `npm run build:client`.
+- `npm run build:client` is only for release/static build verification and deployment packaging.
+

@@ -2,6 +2,13 @@
 
 2-player WebSocket dice battle game built with Node.js, Express, and vanilla JS.
 
+## Required Reading Before Any Change
+
+- Before changing code, docs, tests, build scripts, compat shims, or release copies, read [`docs/repo-maintenance-handbook.md`](./docs/repo-maintenance-handbook.md).
+- Then read [`docs/path-truth-table.md`](./docs/path-truth-table.md) to identify whether the target path is current source, compat, derived, or archive.
+- Then read [`docs/module-manual.md`](./docs/module-manual.md) to identify which subsystem actually owns the behavior.
+- If the change affects paths, entrypoints, protocol/replay versions, compat layers, or release flow, update the relevant docs in the same change.
+
 ## Runtime Source of Truth
 
 ### Server
@@ -15,7 +22,8 @@
 - `src/client/battle.html` -> battle page
 - `src/client/replays.html` -> replay page
 - `src/client/workshop.html` -> workshop page
-- `src/client/js/**` -> browser-side scripts loaded by the pages above
+- `src/client/app/**` -> entry shells, runtime loaders, battle/launcher bootstrap
+- `src/client/js/**` -> browser-side runtime modules loaded by the pages above
 - `src/client/*.css` -> browser-side stylesheets
 
 ### Static Assets
@@ -34,7 +42,8 @@
 ## Architecture
 - Server-authoritative: all game state lives on the server and clients render room snapshots.
 - Pure engine runtime: gameplay logic is driven by `src/core/battle-engine/**`.
-- Client modules share state through `window.GPP` and are loaded via ordered `<script>` tags.
+- Battle page boots from `src/client/app/**`; legacy runtime modules in `src/client/js/**` are still loaded through the shell.
+- `window.GPP` is a compatibility surface, not the preferred home for new state ownership.
 - WebSocket messages use JSON envelopes like `{ type, ...payload }`.
 
 ## Game Flow
@@ -49,6 +58,7 @@
 ## Dev Commands
 ```bash
 npm start
+npm run audit:docs
 npm run audit:paths
 npm test
 ```

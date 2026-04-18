@@ -95,7 +95,7 @@ async function attachAuthUser(req, _res, next) {
   next();
 }
 
-function registerPlatformHttpRoutes(app, { platform, logger }) {
+function registerPlatformHttpRoutes(app, { platform, frontendRuntime, logger }) {
   const requireAdmin = createRequireAdminMiddleware(platform);
   const authRateLimit = createAuthRateLimitMiddleware(platform);
   app.use((req, _res, next) => {
@@ -117,9 +117,21 @@ function registerPlatformHttpRoutes(app, { platform, logger }) {
 
   app.get('/api/readyz', async (_req, res) => {
     const ready = await platform.store.ready();
-    res.status(ready.ok ? 200 : 503).json({
-      ok: ready.ok === true,
+    const frontend = frontendRuntime || { ok: true, expectedMode: 'unknown', servedMode: 'unknown' };
+    const ok = ready.ok === true && frontend.ok === true;
+    res.status(ok ? 200 : 503).json({
+      ok,
       store: ready,
+      frontend,
+      generatedAt: Date.now(),
+    });
+  });
+
+  app.get('/api/frontend-diagnostics', (_req, res) => {
+    const frontend = frontendRuntime || { ok: true, expectedMode: 'unknown', servedMode: 'unknown' };
+    res.status(frontend.ok ? 200 : 503).json({
+      ok: frontend.ok === true,
+      frontend,
       generatedAt: Date.now(),
     });
   });

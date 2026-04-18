@@ -4,6 +4,12 @@
 
 ## 文档导航
 
+开始改代码、改路径、改协议、做打包前，请先读：
+
+- [仓库维护总手册](./docs/repo-maintenance-handbook.md)
+- [路径与版本状态附表](./docs/path-truth-table.md)
+- [模块职责附表](./docs/module-manual.md)
+
 - [架构总览](./docs/architecture-overview.md)
 - [开发入门](./docs/developer-onboarding.md)
 - [协议总览](./docs/protocol-overview.md)
@@ -13,8 +19,6 @@
 - [排障手册](./docs/troubleshooting.md)
 - [扩展开发手册](./docs/extension-handbook.md)
 - [引擎流程文档](./docs/engine-process.md)
-- [模块职责手册](./docs/module-manual.md)
-- [路径真相表](./docs/path-truth-table.md)
 - [工作区边界说明](./docs/workspace-boundaries.md)
 - [协议生成链路说明](./docs/protocol-codegen.md)
 
@@ -46,6 +50,8 @@ npm test
 
 这会串联执行：
 
+- `audit:docs`
+- `audit:paths`
 - `audit:encoding`
 - `lint`
 - `typecheck`
@@ -81,3 +87,8 @@ npm test
 - 改运行时行为，请改 `src/`
 - `server/` 目录只保留 compat shim
 - `public/` 只放静态资源，不再放运行时 HTML / CSS / JS
+## Local Startup Contract
+
+- `npm start` is the standard local startup path and does not require `vite build` or `npm run build:client`.
+- `start_game.bat` follows the same contract and should work without any prebuild step.
+- `npm run build:client` is only for release/static build output validation and deployment packaging.

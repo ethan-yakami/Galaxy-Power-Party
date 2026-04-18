@@ -142,6 +142,13 @@ async function run() {
     const ready = await request(baseUrl, 'GET', '/api/readyz');
     assert.strictEqual(ready.status, 200);
     assert.strictEqual(ready.json.ok, true);
+    assert.strictEqual(ready.json.frontend.ok, true);
+    assert.strictEqual(ready.json.frontend.servedMode, 'src-client');
+
+    const frontendDiagnostics = await request(baseUrl, 'GET', '/api/frontend-diagnostics');
+    assert.strictEqual(frontendDiagnostics.status, 200);
+    assert.strictEqual(frontendDiagnostics.json.ok, true);
+    assert.strictEqual(frontendDiagnostics.json.frontend.servedMode, 'src-client');
 
     const catalog = await request(baseUrl, 'GET', '/api/catalog');
     assert.strictEqual(catalog.status, 200);

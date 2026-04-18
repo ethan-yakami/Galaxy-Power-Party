@@ -1,12 +1,6 @@
-import urlUtilsSource from '../js/url-utils.js?raw';
-import workshopSource from '../js/workshop.js?raw';
-import { evalLegacySource } from './eval-legacy-source.js';
+import { evaluateRuntimeSources, loadRuntimeSources } from './runtime-source-loader.js';
+import { WORKSHOP_RUNTIME_SCRIPTS } from './runtime-source-manifest.js';
 import { installRuntimeConfig } from './install-runtime-config.js';
-
-const WORKSHOP_RUNTIME_SOURCES = Object.freeze([
-  { src: 'js/url-utils.js', code: urlUtilsSource },
-  { src: 'js/workshop.js', code: workshopSource },
-]);
 
 function createDiagnostics(windowRef) {
   const htmlLoadedAt = Number(windowRef.performance && typeof windowRef.performance.timeOrigin === 'number')
@@ -38,15 +32,37 @@ function logDiagnostics(windowRef, diagnostics) {
   };
 }
 
-const windowRef = /** @type {any} */ (globalThis);
-installRuntimeConfig(windowRef);
-const diagnostics = createDiagnostics(windowRef);
-
-markDiagnostics(diagnostics, 'app_bootstrap_started_at');
-for (const source of WORKSHOP_RUNTIME_SOURCES) {
-  const url = new URL(source.src, windowRef.document.baseURI).toString();
-  evalLegacySource(windowRef, url, source.code);
+function renderBootstrapFailure(documentRef, message) {
+  const messageEl = documentRef.getElementById('workshopMessage');
+  if (messageEl) {
+    messageEl.textContent = message;
+  }
+  for (const control of documentRef.querySelectorAll('button, input, select')) {
+    if ('disabled' in control) {
+      control.disabled = true;
+    }
+  }
 }
-markDiagnostics(diagnostics, 'app_runtime_ready_at');
-markDiagnostics(diagnostics, 'first_interactive_render_at');
-logDiagnostics(windowRef, diagnostics);
+
+async function bootstrapWorkshopApp(windowRef) {
+  installRuntimeConfig(windowRef);
+  const diagnostics = createDiagnostics(windowRef);
+
+  markDiagnostics(diagnostics, 'app_bootstrap_started_at');
+  const loaded = await loadRuntimeSources({
+    documentRef: windowRef.document,
+    sources: WORKSHOP_RUNTIME_SCRIPTS,
+  });
+  evaluateRuntimeSources(windowRef, loaded.sources);
+  markDiagnostics(diagnostics, 'app_runtime_ready_at');
+  markDiagnostics(diagnostics, 'first_interactive_render_at');
+  logDiagnostics(windowRef, diagnostics);
+}
+
+const windowRef = /** @type {any} */ (globalThis);
+
+bootstrapWorkshopApp(windowRef).catch((error) => {
+  const reason = error instanceof Error ? error.message : String(error);
+  console.error('[workshop-entry] Failed to bootstrap workshop app:', reason);
+  renderBootstrapFailure(windowRef.document, `工坊页初始化失败：${reason}`);
+});

@@ -43,6 +43,11 @@ async function run() {
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   try {
+    const indexResponse = await fetchText(`${baseUrl}/`);
+    assert.strictEqual(indexResponse.status, 200);
+    assert(indexResponse.text.includes('/assets/'), 'production / should serve built asset html');
+    assert(!indexResponse.text.includes('app/launcher-entry.js'), 'production / must not serve source launcher html');
+
     const htmlResponse = await fetchText(`${baseUrl}/cache-test.html`);
     assert.strictEqual(htmlResponse.status, 200);
     assert.strictEqual(htmlResponse.headers.get('cache-control'), 'no-cache');
@@ -52,6 +57,13 @@ async function run() {
     assert.strictEqual(assetResponse.status, 200);
     assert.strictEqual(assetResponse.headers.get('cache-control'), 'public, max-age=31536000, immutable');
     assert(assetResponse.text.includes('cache test asset'));
+
+    const versionResponse = await fetch(`${baseUrl}/api/version`);
+    const versionPayload = await versionResponse.json();
+    assert.strictEqual(versionResponse.status, 200);
+    assert.strictEqual(versionPayload.app.version, require('../../package.json').version);
+    assert.strictEqual(versionPayload.frontend.servedMode, 'build-client');
+    assert.strictEqual(versionPayload.frontend.buildIndexEntryKind, 'built-html');
 
     console.log('static-asset-headers test passed');
   } finally {

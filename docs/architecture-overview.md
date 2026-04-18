@@ -17,7 +17,7 @@ battle 页现在采用“**单入口模块 + 兼容桥**”：
 - `src/client/app/battle-entry.js` 是 battle 页唯一 HTML 入口
 - `src/client/app/create-battle-app.js` 负责创建 app context
 - `window.GPP` 只作为旧运行时兼容桥，不再是主状态源
-- 旧 `src/client/js/*.js` 由 `load-legacy-battle-runtime.js` 统一装载
+- 当前 `src/client/js/*.js` 由 `load-battle-runtime.js` 统一装载
 
 这一步的目标不是一次性重写所有旧渲染代码，而是先把 HTML 顺序依赖收口到单入口壳层里。
 

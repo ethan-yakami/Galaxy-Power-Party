@@ -81,6 +81,51 @@ function safeNow() {
   return Date.now();
 }
 
+function listBuiltFrontendEntries(buildClientDir) {
+  const assetsDir = path.join(buildClientDir, 'assets');
+  if (!fs.existsSync(assetsDir)) return [];
+  return fs.readdirSync(assetsDir)
+    .filter((name) => /\.(?:js|mjs|css)$/i.test(name))
+    .sort();
+}
+
+function inspectFrontendRuntime({ nodeEnv, clientDir, buildClientDir }) {
+  const isProduction = String(nodeEnv || '').toLowerCase() === 'production';
+  const buildIndexPath = path.join(buildClientDir, 'index.html');
+  const buildIndexExists = fs.existsSync(buildIndexPath);
+  const buildIndexHtml = buildIndexExists ? fs.readFileSync(buildIndexPath, 'utf8') : '';
+  const entryAssets = Array.from(
+    buildIndexHtml.matchAll(/(?:src|href)="(\/?assets\/[^"]+\.(?:js|mjs|css))"/gi),
+    (match) => String(match[1] || '').replace(/^\//, ''),
+  );
+  const builtAssetEntries = listBuiltFrontendEntries(buildClientDir);
+  const hasBuiltHtmlEntry = entryAssets.some((entry) => /\.(?:js|mjs)$/i.test(entry));
+  const ok = !isProduction || (buildIndexExists && hasBuiltHtmlEntry && builtAssetEntries.length > 0);
+  const failureReason = !ok
+    ? (!buildIndexExists
+        ? 'missing_build_index'
+        : (!hasBuiltHtmlEntry ? 'missing_hashed_asset_references' : 'missing_built_assets'))
+    : '';
+
+  return Object.freeze({
+    ok,
+    nodeEnv,
+    expectedMode: isProduction ? 'build-client' : 'src-client',
+    servedMode: isProduction ? 'build-client' : 'src-client',
+    servedDir: isProduction ? buildClientDir : clientDir,
+    sourceDir: clientDir,
+    buildDir: buildClientDir,
+    buildIndexPath,
+    buildIndexExists,
+    buildIndexEntryKind: buildIndexHtml.includes('app/launcher-entry.js')
+      ? 'source-html'
+      : (hasBuiltHtmlEntry ? 'built-html' : 'unknown'),
+    entryAssets,
+    builtAssetEntries,
+    failureReason,
+  });
+}
+
 function startServer(options = {}) {
   const logger = createLogger('server.bootstrap');
   process.on('uncaughtException', (err) => {
@@ -111,8 +156,18 @@ function startServer(options = {}) {
   const SHARED_DIR = path.join(ROOT_DIR, 'src', 'core', 'shared');
   const PICTURE_DIR = path.join(ROOT_DIR, 'picture');
   const isProductionStatic = NODE_ENV === 'production';
-  const hasBuiltClient = fs.existsSync(BUILD_CLIENT_DIR);
-  const staticClientDir = isProductionStatic && hasBuiltClient ? BUILD_CLIENT_DIR : CLIENT_DIR;
+  const frontendRuntime = inspectFrontendRuntime({
+    nodeEnv: NODE_ENV,
+    clientDir: CLIENT_DIR,
+    buildClientDir: BUILD_CLIENT_DIR,
+  });
+  const staticClientDir = frontendRuntime.servedDir;
+  if (isProductionStatic && !frontendRuntime.ok) {
+    throw new Error(
+      `Production frontend build is missing or incomplete (${frontendRuntime.failureReason}). `
+      + `Expected ${frontendRuntime.buildIndexPath} and hashed assets under ${BUILD_CLIENT_DIR}\\assets.`,
+    );
+  }
 
   const app = express();
   app.set('trust proxy', 1);
@@ -145,13 +200,15 @@ function startServer(options = {}) {
       }
     },
   };
-  if (isProductionStatic && !hasBuiltClient) {
-    logger.warn('built_client_missing_fallback', {
-      expectedDir: BUILD_CLIENT_DIR,
-      fallbackDir: CLIENT_DIR,
-    });
-  }
-  // Production serves built frontend assets. Development falls back to `src/client`.
+  logger.info('frontend_static_runtime_selected', {
+    expectedMode: frontendRuntime.expectedMode,
+    servedMode: frontendRuntime.servedMode,
+    servedDir: frontendRuntime.servedDir,
+    buildIndexPath: frontendRuntime.buildIndexPath,
+    buildIndexEntryKind: frontendRuntime.buildIndexEntryKind,
+    entryAssets: frontendRuntime.entryAssets.slice(0, 5),
+  });
+  // Production serves built frontend assets. Development serves `src/client`.
   app.use(express.static(staticClientDir, staticOptions));
   app.use('/portraits', express.static(PUBLIC_PORTRAITS_DIR, { maxAge: '24h', etag: true }));
   app.use('/shared', express.static(SHARED_DIR, {
@@ -294,6 +351,13 @@ function startServer(options = {}) {
         name: packageMeta.name || 'galaxy-power-party',
         version: platform.versionInfo.appVersion || packageMeta.version || '0.0.0',
       },
+      frontend: {
+        ok: frontendRuntime.ok,
+        expectedMode: frontendRuntime.expectedMode,
+        servedMode: frontendRuntime.servedMode,
+        buildIndexEntryKind: frontendRuntime.buildIndexEntryKind,
+        entryAssets: frontendRuntime.entryAssets,
+      },
       protocol: {
         current: PROTOCOL_VERSION,
         supported: protocolVersioning.SUPPORTED_PROTOCOL_VERSIONS,
@@ -332,6 +396,7 @@ function startServer(options = {}) {
   });
   registerPlatformHttpRoutes(app, {
     platform,
+    frontendRuntime,
     logger,
   });
 
@@ -542,6 +607,8 @@ function startServer(options = {}) {
       localUrl,
       nodeEnv: platform.config.nodeEnv,
       storeProvider: platform.config.database.provider,
+      frontendMode: frontendRuntime.servedMode,
+      frontendEntry: frontendRuntime.entryAssets[0] || null,
       characterCount,
       auroraCount,
     });
@@ -561,7 +628,7 @@ function startServer(options = {}) {
     }
   });
 
-  return { app, server, wss, rooms, handlers, platform };
+  return { app, server, wss, rooms, handlers, platform, frontendRuntime };
 }
 
 module.exports = {

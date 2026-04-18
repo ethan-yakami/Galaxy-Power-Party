@@ -62,7 +62,7 @@ export async function createBattleApp(options) {
     launchMode: launch.intent ? launch.intent.mode : null,
   });
 
-  const resolvedRuntimeLoader = runtimeLoader || (await import('./load-legacy-battle-runtime.js')).loadLegacyBattleRuntime;
+  const resolvedRuntimeLoader = runtimeLoader || (await import('./load-battle-runtime.js')).loadBattleRuntime;
   const runtimeMetrics = await resolvedRuntimeLoader({
     document,
     launchMode: launch.intent ? launch.intent.mode : '',

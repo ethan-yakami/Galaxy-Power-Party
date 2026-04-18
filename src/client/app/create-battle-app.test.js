@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('./load-legacy-battle-runtime.js', () => ({
-  loadLegacyBattleRuntime: vi.fn(async () => ({
-    loaderMode: 'bundle_eval',
+vi.mock('./load-battle-runtime.js', () => ({
+  loadBattleRuntime: vi.fn(async () => ({
+    loaderMode: 'runtime_fetch_eval',
     scriptCount: 15,
     startedAt: 100,
     fetchStartedAt: 0,
@@ -12,7 +12,7 @@ vi.mock('./load-legacy-battle-runtime.js', () => ({
 }));
 
 import { createBattleApp } from './create-battle-app.js';
-import { loadLegacyBattleRuntime } from './load-legacy-battle-runtime.js';
+import { loadBattleRuntime } from './load-battle-runtime.js';
 
 describe('createBattleApp', () => {
   beforeEach(() => {
@@ -39,8 +39,8 @@ describe('createBattleApp', () => {
     expect(globalThis.__GPP_BATTLE_APP__).toBe(app);
     expect(app.startupTiming.battle_bootstrap_started_at).toBeGreaterThan(0);
     expect(app.startupTiming.battle_runtime_ready_at).toBeGreaterThan(0);
-    expect(app.startupTiming.loader_mode).toBe('bundle_eval');
-    expect(loadLegacyBattleRuntime).toHaveBeenCalledWith(expect.objectContaining({
+    expect(app.startupTiming.loader_mode).toBe('runtime_fetch_eval');
+    expect(loadBattleRuntime).toHaveBeenCalledWith(expect.objectContaining({
       launchMode: 'ai',
     }));
   });

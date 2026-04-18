@@ -44,3 +44,11 @@
 - 正式文本文件必须是 UTF-8（无 BOM）
 - 提交前运行 `npm run audit:encoding`
 - 如果某个文件再次出现乱码，优先用编辑器重新按 UTF-8 保存，再重新运行审计
+## Launcher Buttons Do Nothing
+
+Check these items first:
+
+1. Open `/api/version` and confirm the deployed app version matches the current repo version.
+2. Open `/api/frontend-diagnostics` and confirm `servedMode` is `build-client` in production.
+3. View the homepage HTML source. If it still references `app/launcher-entry.js`, the server is serving source HTML instead of the built frontend.
+4. Check the browser console for `launcher-entry` or `runtime source` errors. Those errors should now identify which runtime source failed to load.
