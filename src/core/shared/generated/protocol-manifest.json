@@ -528,6 +528,16 @@
       ]
     },
     {
+      "type": "disband_room",
+      "direction": "client_to_server",
+      "protoMessage": "DisbandRoomPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 42
+      },
+      "fields": []
+    },
+    {
       "type": "error",
       "direction": "server_to_client",
       "protoMessage": "ErrorPayload",
@@ -681,6 +691,16 @@
       ]
     },
     {
+      "type": "leave_room",
+      "direction": "client_to_server",
+      "protoMessage": "LeaveRoomPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 30
+      },
+      "fields": []
+    },
+    {
       "type": "left_room",
       "direction": "server_to_client",
       "protoMessage": "LeftRoomPayload",
@@ -705,6 +725,26 @@
           }
         }
       ]
+    },
+    {
+      "type": "list_custom_characters",
+      "direction": "client_to_server",
+      "protoMessage": "ListCustomCharactersPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 23
+      },
+      "fields": []
+    },
+    {
+      "type": "play_again",
+      "direction": "client_to_server",
+      "protoMessage": "PlayAgainPayload",
+      "source": {
+        "file": "proto/room.proto",
+        "line": 39
+      },
+      "fields": []
     },
     {
       "type": "player_presence_changed",
@@ -940,6 +980,26 @@
           }
         }
       ]
+    },
+    {
+      "type": "roll_attack",
+      "direction": "client_to_server",
+      "protoMessage": "RollAttackPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 42
+      },
+      "fields": []
+    },
+    {
+      "type": "roll_defense",
+      "direction": "client_to_server",
+      "protoMessage": "RollDefensePayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 63
+      },
+      "fields": []
     },
     {
       "type": "room_state",
@@ -1212,6 +1272,16 @@
           }
         }
       ]
+    },
+    {
+      "type": "use_aurora_die",
+      "direction": "client_to_server",
+      "protoMessage": "UseAuroraDiePayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 45
+      },
+      "fields": []
     },
     {
       "type": "weather_changed",

@@ -83,6 +83,21 @@ function normalizeFieldDescriptor(field, currentMessage) {
   };
 }
 
+function finalizeMessageDescriptor(currentMessage, messages, warnings) {
+  if (!currentMessage) return;
+  if (currentMessage.annotations && currentMessage.annotations.type) {
+    messages.push({
+      runtimeType: currentMessage.annotations.type,
+      direction: currentMessage.annotations.direction || 'server_to_client',
+      source: currentMessage.source,
+      protoMessage: currentMessage.name,
+      fields: currentMessage.fields,
+    });
+  } else if (currentMessage.name.endsWith('Payload')) {
+    warnings.push(`proto message missing @gpp-message annotation: ${currentMessage.source.file}:${currentMessage.source.line} ${currentMessage.name}`);
+  }
+}
+
 function parseProtoSource() {
   const files = listProtoFiles();
   const messages = [];
@@ -120,6 +135,11 @@ function parseProtoSource() {
           fields: [],
         };
         pendingMessageMeta = null;
+        if (/\{\s*\}/.test(line)) {
+          finalizeMessageDescriptor(currentMessage, messages, warnings);
+          currentMessage = null;
+          pendingFieldMeta = null;
+        }
         continue;
       }
 
@@ -143,17 +163,7 @@ function parseProtoSource() {
         }
 
         if (/^\s*\}/.test(line)) {
-          if (currentMessage.annotations && currentMessage.annotations.type) {
-            messages.push({
-              runtimeType: currentMessage.annotations.type,
-              direction: currentMessage.annotations.direction || 'server_to_client',
-              source: currentMessage.source,
-              protoMessage: currentMessage.name,
-              fields: currentMessage.fields,
-            });
-          } else if (currentMessage.name.endsWith('Payload')) {
-            warnings.push(`proto message missing @gpp-message annotation: ${rel}:${currentMessage.source.line} ${currentMessage.name}`);
-          }
+          finalizeMessageDescriptor(currentMessage, messages, warnings);
           currentMessage = null;
           pendingFieldMeta = null;
         }

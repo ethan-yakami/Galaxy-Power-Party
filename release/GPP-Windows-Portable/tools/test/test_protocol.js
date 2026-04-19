@@ -158,6 +158,15 @@ function testAuthenticatePayload() {
   assert.strictEqual(badResult.errorCode, ERROR_CODES.INVALID_PAYLOAD);
 }
 
+function testEmptyPayloadMessages() {
+  for (const type of ['leave_room', 'play_again', 'disband_room', 'list_custom_characters', 'roll_attack', 'roll_defense']) {
+    const result = normalizeIncomingMessage(JSON.stringify({ type }));
+    assert.strictEqual(result.ok, true, `${type} should normalize as an empty payload message`);
+    assert.strictEqual(result.envelope.type, type);
+    assert.deepStrictEqual(result.envelope.payload, {});
+  }
+}
+
 function testErrorPayload() {
   const payload = buildErrorPayload(ERROR_CODES.INVALID_SELECTION, 'Invalid selection.', {
     meta: { requestId: 'req-2', protocolVersion: '2' },
@@ -191,6 +200,7 @@ function run() {
   testSubmitBattleActionPayload();
   testCreateResumeRoomPayload();
   testAuthenticatePayload();
+  testEmptyPayloadMessages();
   testErrorPayload();
   testDefaultInvalidPayloadMessage();
   console.log('test_protocol passed');

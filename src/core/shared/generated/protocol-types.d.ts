@@ -2,7 +2,7 @@
 // Source of truth: proto/*.proto
 
 export type ProtocolMessageType =
-  'apply_preset' | 'auth_state' | 'authenticate' | 'battle_actions' | 'characters_updated' | 'choose_aurora_die' | 'choose_character' | 'confirm_attack_selection' | 'confirm_defense_selection' | 'create_ai_room' | 'create_custom_character' | 'create_resume_room' | 'create_room' | 'delete_custom_character' | 'error' | 'export_replay' | 'join_room' | 'left_room' | 'player_presence_changed' | 'preview_preset' | 'replay_export' | 'reroll_attack' | 'resume_session' | 'room_state' | 'session_resume_failed' | 'session_resumed' | 'submit_battle_action' | 'toggle_custom_character' | 'update_custom_character' | 'update_live_selection' | 'weather_changed' | 'welcome';
+  'apply_preset' | 'auth_state' | 'authenticate' | 'battle_actions' | 'characters_updated' | 'choose_aurora_die' | 'choose_character' | 'confirm_attack_selection' | 'confirm_defense_selection' | 'create_ai_room' | 'create_custom_character' | 'create_resume_room' | 'create_room' | 'delete_custom_character' | 'disband_room' | 'error' | 'export_replay' | 'join_room' | 'leave_room' | 'left_room' | 'list_custom_characters' | 'play_again' | 'player_presence_changed' | 'preview_preset' | 'replay_export' | 'reroll_attack' | 'resume_session' | 'roll_attack' | 'roll_defense' | 'room_state' | 'session_resume_failed' | 'session_resumed' | 'submit_battle_action' | 'toggle_custom_character' | 'update_custom_character' | 'update_live_selection' | 'use_aurora_die' | 'weather_changed' | 'welcome';
 
 export type ProtocolDirection = 'client_to_server' | 'server_to_client';
 
@@ -87,6 +87,7 @@ export interface ProtocolPayloadByType {
   'delete_custom_character': {
     characterId: string;
   };
+  'disband_room': Record<string, never>;
   'error': {
     code: string;
     message: string;
@@ -101,9 +102,12 @@ export interface ProtocolPayloadByType {
     name: string;
     code: string | number;
   };
+  'leave_room': Record<string, never>;
   'left_room': {
     reason?: string;
   };
+  'list_custom_characters': Record<string, never>;
+  'play_again': Record<string, never>;
   'player_presence_changed': {
     roomCode: string;
     playerId: string;
@@ -126,6 +130,8 @@ export interface ProtocolPayloadByType {
     roomCode: string;
     reconnectToken: string;
   };
+  'roll_attack': Record<string, never>;
+  'roll_defense': Record<string, never>;
   'room_state': {
     room: ProtocolObject;
   };
@@ -153,6 +159,7 @@ export interface ProtocolPayloadByType {
   'update_live_selection': {
     indices: number[];
   };
+  'use_aurora_die': Record<string, never>;
   'weather_changed': {
     weather?: ProtocolObject;
     round?: number;
@@ -188,15 +195,21 @@ export type ProtocolDirectionByType = {
   'create_resume_room': 'client_to_server';
   'create_room': 'client_to_server';
   'delete_custom_character': 'client_to_server';
+  'disband_room': 'client_to_server';
   'error': 'server_to_client';
   'export_replay': 'client_to_server';
   'join_room': 'client_to_server';
+  'leave_room': 'client_to_server';
   'left_room': 'server_to_client';
+  'list_custom_characters': 'client_to_server';
+  'play_again': 'client_to_server';
   'player_presence_changed': 'server_to_client';
   'preview_preset': 'client_to_server';
   'replay_export': 'server_to_client';
   'reroll_attack': 'client_to_server';
   'resume_session': 'client_to_server';
+  'roll_attack': 'client_to_server';
+  'roll_defense': 'client_to_server';
   'room_state': 'server_to_client';
   'session_resume_failed': 'server_to_client';
   'session_resumed': 'server_to_client';
@@ -204,6 +217,7 @@ export type ProtocolDirectionByType = {
   'toggle_custom_character': 'client_to_server';
   'update_custom_character': 'client_to_server';
   'update_live_selection': 'client_to_server';
+  'use_aurora_die': 'client_to_server';
   'weather_changed': 'server_to_client';
   'welcome': 'server_to_client';
 };
