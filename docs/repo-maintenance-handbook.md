@@ -4,7 +4,7 @@
 > Audience: 所有 AI、贡献者、维护者 / All AI agents, contributors, and maintainers
 > Must Read Before: 任何代码、文档、测试、构建脚本、兼容层、发布副本改动；任何构建、打包、发布前检查
 > Update When: 路径迁移、入口变更、协议或回放版本变更、兼容层新增/删除、发布流程变更、文档维护规则变更
-> Last Verified Against Code: 2026-04-18
+> Last Verified Against Code: 2026-04-19
 > Related Checks: `npm run audit:docs`, `npm run audit:paths`, `npm run audit:boundaries`, `npm run audit:encoding`
 
 本手册是这个仓库的唯一维护入口。任何 AI 或贡献者在改动前，都应先读这份手册，再读对应附表：
@@ -196,7 +196,128 @@
 - 对应最少验证已经跑过
 - 发现的 release 副本漂移是否已经说明清楚
 
-## 9. 附表导航 / Appendix Index
+## 9. 改动同步流程 / Change Synchronization Flow
+
+这一节回答“改完以后还要同步到哪里”。
+
+总原则：
+
+1. 永远先改 `src/**`、根配置、工具脚本、文档真相源。
+2. 不手改 `build/**`、`release/**`、`server/**` compat shim 去“补同步”。
+3. 同步的意思是“由真相源重新生成或重新部署”，不是在多个副本里重复手工改同一份逻辑。
+
+### 9.1 前端改动怎么同步
+
+如果你改了这些位置：
+
+- `src/client/*.html`
+- `src/client/*.css`
+- `src/client/app/**`
+- `src/client/js/**`
+
+必须按下面顺序同步：
+
+1. 先在 `src/client/**` 完成修改。
+2. 运行前端相关验证，至少 `npm run test:client`。
+3. 如果要给生产环境或 Render 用，运行 `npm run build:client`，把前端同步成 `build/client/**`。
+4. 如果要给 Windows 便携版用，再运行 `npm run build:portable`，把最新前端连同服务端一起复制进 `release/GPP-Windows-Portable/**`。
+5. 最后推送并部署，线上验收 `/api/version`、`/api/readyz`、`/api/frontend-diagnostics`。
+
+明确禁止：
+
+- 不要直接改 `build/client/**`。
+- 不要直接改 `release/GPP-Windows-Portable/src/client/**`。
+
+### 9.2 后端与服务端改动怎么同步
+
+如果你改了这些位置：
+
+- `src/server/**`
+- `src/core/**`
+- `src/content/entities/**`
+- `prisma/**`
+
+必须按下面顺序同步：
+
+1. 先改真实源码目录。
+2. 运行服务端相关验证，至少 `npm run test:node`；涉及数据库或总入口时优先跑 `npm test`。
+3. 如果这次改动会进入便携版，运行 `npm run build:portable`，重新生成发布副本。
+4. 推送到远端并触发部署；Render 或其他服务器会基于最新源码重新启动服务。
+5. 部署后检查接口和行为是否已更新。
+
+明确禁止：
+
+- 不要把逻辑补写到 `server/**` compat shim，当作“同步服务端”。
+- 不要只改 `release/**` 里的副本，以为线上或本地源码会自动跟着变。
+
+### 9.3 文档与规则改动怎么同步
+
+如果你改了这些位置：
+
+- `docs/**`
+- `README.md`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `CONTRIBUTING.md`
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- `tools/dev/audit_*.js`
+
+必须按下面顺序同步：
+
+1. 先更新总手册或对应附表中的事实描述。
+2. 再同步更新入口文档、检查脚本、PR 模板、引用链接。
+3. 至少运行 `npm run audit:docs`；如果涉及路径边界，再补 `npm run audit:paths` 和 `npm run audit:boundaries`。
+
+### 9.4 便携版与派生产物怎么同步
+
+`release/**` 不是源码，它只能由主线重新生成。
+
+标准动作：
+
+1. 完成 `src/**`、根配置、文档的真实修改。
+2. 运行 `npm run build:portable`。
+3. 运行 `npm run audit:portable`，确认便携版没有漂移。
+4. 只有在这一步完成后，`release/GPP-Windows-Portable/**` 才算与当前代码同步。
+
+### 9.5 线上服务器怎么同步
+
+代码改完并不等于线上已经同步。
+
+标准顺序：
+
+1. 本地改 `src/**` 与文档。
+2. 跑对应验证。
+3. 提交并 `git push`。
+4. 让部署平台基于最新 `main` 重新构建。
+5. 生产环境必须使用 `build/client/**` 启动，不允许回退到 `src/client/**`。
+6. 上线后检查：
+   - `/api/version`
+   - `/api/readyz`
+   - `/api/frontend-diagnostics`
+   - 首页 HTML 是否为 `/assets/*.js` 构建入口
+
+### 9.6 一次完整同步的最小命令序列
+
+```bash
+npm run test:client
+npm run test:node
+npm run build:client
+npm run build:portable
+npm run audit:portable
+git add .
+git commit -m "..."
+git push origin main
+```
+
+如果这次还改了文档、路径边界、CI 或入口规则，再补：
+
+```bash
+npm run audit:docs
+npm run audit:paths
+npm run audit:boundaries
+```
+
+## 10. 附表导航 / Appendix Index
 
 - [`./path-truth-table.md`](./path-truth-table.md)：路径和目录状态附表，回答“改这里会不会生效”。
 - [`./module-manual.md`](./module-manual.md)：模块职责附表，回答“这个功能究竟归谁负责”。
@@ -209,3 +330,4 @@
 - If `NODE_ENV=production` and `build/client/index.html` or hashed `assets/*.js` entries are missing, startup must fail.
 - Before redeploy validation, check `/api/version`, `/api/readyz`, and `/api/frontend-diagnostics`.
 - If the homepage HTML still references `app/launcher-entry.js`, treat it as a deployment regression and stop release verification.
+- Battle page maintenance boundary: `src/client/app/battle-entry.js` is the module entry and shell bridge, but live battle rendering, socket handling, and dice interaction still run from `src/client/js/**`. When the page already opens and the bug is inside the running battle UI, fix `src/client/js/**` first.

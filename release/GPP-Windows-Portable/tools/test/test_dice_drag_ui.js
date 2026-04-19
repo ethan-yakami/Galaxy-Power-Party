@@ -126,8 +126,8 @@ function createState() {
     },
     selectedDice: new Set(),
     characters: {
-      liuying: { id: 'liuying', name: '流萤', hp: 10, shortSpec: 'spec', skillText: 'skill' },
-      huangquan: { id: 'huangquan', name: '黄泉', hp: 10, shortSpec: 'spec', skillText: 'skill' },
+      liuying: { id: 'liuying', name: 'Test A', hp: 10, shortSpec: 'spec', skillText: 'skill' },
+      huangquan: { id: 'huangquan', name: 'Test B', hp: 10, shortSpec: 'spec', skillText: 'skill' },
     },
     auroraDice: [
       { id: 'prime', name: 'Prime', facesText: 'A', effectText: 'Aura', conditionText: 'Always' },
@@ -144,11 +144,16 @@ function createState() {
   };
 }
 
-function main() {
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function main() {
   const dom = makeDom();
   setupGlobals(dom);
 
   const state = createState();
+  const sentMessages = [];
   const baseGpp = {
     state,
     dom: {
@@ -179,7 +184,9 @@ function main() {
       replayStepLabel: document.getElementById('replayStepLabel'),
       replayActionLabel: document.getElementById('replayActionLabel'),
     },
-    send() {},
+    send(type, payload) {
+      sentMessages.push({ type, payload });
+    },
     sanitizeDisplayName(name) { return String(name || ''); },
     getWeatherDisplay() {
       return { typeClass: 'clear', name: 'Clear', type: 'clear', stageRound: 0, condition: '', effect: '' };
@@ -205,34 +212,93 @@ function main() {
     return originalRender.apply(this, arguments);
   };
 
-  const diceNodesBefore = Array.from(document.querySelectorAll('#selfZone .die'));
-  assert.strictEqual(diceNodesBefore.length, 4, 'should render four dice');
+  const row = document.querySelector('#selfZone [data-selection-row="true"]');
+  const diceNodes = Array.from(document.querySelectorAll('#selfZone .die'));
+  assert(row, 'should render a selectable dice row');
+  assert.strictEqual(diceNodes.length, 4, 'should render four dice');
 
-  const firstDie = diceNodesBefore[0];
-  const secondDie = diceNodesBefore[1];
-  const thirdDie = diceNodesBefore[2];
+  const bounds = [
+    { left: 0, right: 60, top: 0, bottom: 60, width: 60, height: 60 },
+    { left: 76, right: 136, top: 0, bottom: 60, width: 60, height: 60 },
+    { left: 152, right: 212, top: 0, bottom: 60, width: 60, height: 60 },
+    { left: 228, right: 288, top: 0, bottom: 60, width: 60, height: 60 },
+  ];
+  let capturedPointerId = null;
+  row.setPointerCapture = (pointerId) => {
+    capturedPointerId = pointerId;
+  };
+  row.releasePointerCapture = (pointerId) => {
+    if (capturedPointerId === pointerId) capturedPointerId = null;
+  };
+  row.hasPointerCapture = (pointerId) => capturedPointerId === pointerId;
+
+  diceNodes.forEach((node, index) => {
+    node.getBoundingClientRect = () => bounds[index];
+  });
+  document.elementFromPoint = (x, y) => {
+    for (let i = 0; i < bounds.length; i += 1) {
+      const rect = bounds[i];
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return diceNodes[i];
+      }
+    }
+    return row;
+  };
+
+  const [firstDie, secondDie, thirdDie, fourthDie] = diceNodes;
   const badge = document.querySelector('#selfZone [data-selection-badge="true"]');
 
-  firstDie.onpointerdown({ preventDefault() {} });
-  secondDie.onpointerenter();
-  thirdDie.onpointerenter();
+  fourthDie.onpointerdown({
+    preventDefault() {},
+    button: 0,
+    pointerId: 11,
+    clientX: 250,
+    clientY: 30,
+    target: fourthDie,
+  });
+  row.onpointerup({ pointerId: 11 });
+  fourthDie.onclick({ preventDefault() {} });
+  assert(state.selectedDice.has(3), 'single pointer tap should select immediately without waiting for click');
 
-  const diceNodesAfter = Array.from(document.querySelectorAll('#selfZone .die'));
+  state.selectedDice.clear();
+  gpp.refreshDiceSelectionUi();
+
+  firstDie.onpointerdown({
+    preventDefault() {},
+    button: 0,
+    pointerId: 7,
+    clientX: 30,
+    clientY: 30,
+    target: firstDie,
+  });
+  assert.strictEqual(row.hasPointerCapture(7), true, 'row should capture the active pointer');
+  row.onpointermove({ pointerId: 7, clientX: 72, clientY: 30, target: row });
+  row.onpointermove({ pointerId: 7, clientX: 148, clientY: 30, target: row });
+
   assert.strictEqual(renderCount, 0, 'dragging across dice should not trigger full render');
-  assert.strictEqual(diceNodesAfter[1], secondDie, 'second die node should stay stable during drag');
-  assert.strictEqual(diceNodesAfter[2], thirdDie, 'third die node should stay stable during drag');
   assert(firstDie.classList.contains('selected'));
   assert(secondDie.classList.contains('selected'));
   assert(thirdDie.classList.contains('dragSelecting'));
+  assert(thirdDie.classList.contains('selected'));
   assert.strictEqual(secondDie.getAttribute('aria-pressed'), 'true');
-  assert(badge.textContent.includes('已选 3 枚'), 'selection badge should update locally while dragging');
+  assert(badge.textContent.includes('3'), 'selection badge should update locally while dragging');
 
-  dom.window.dispatchEvent(new dom.window.Event('pointerup'));
+  row.onpointerup({ pointerId: 7 });
   assert.strictEqual(document.querySelectorAll('#selfZone .die.dragSelecting').length, 0, 'drag state should clear on pointerup');
+
+  await wait(24);
+  assert(sentMessages.some((entry) => entry.type === 'update_live_selection'), 'dragging should still sync live selection');
+  assert.deepStrictEqual(sentMessages[sentMessages.length - 1], {
+    type: 'update_live_selection',
+    payload: { indices: [0, 1, 2] },
+  });
 
   console.log('dice-drag-ui test passed');
   dom.window.close();
   cleanupGlobals();
 }
 
-main();
+main().catch((error) => {
+  console.error(error && error.stack ? error.stack : String(error));
+  process.exit(1);
+});

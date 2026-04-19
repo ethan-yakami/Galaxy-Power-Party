@@ -253,19 +253,25 @@ function createBattleHandlers({ rooms, shared, platform }) {
   function handleExportReplay(ws, _payload, envelope) {
     const room = getPlayerRoom(ws, rooms);
     if (!room || !room.engineState) return;
-    const replay = exportReplay(room);
-    send(ws, {
-      type: 'replay_export',
-      content: replay,
-      meta: envelope.meta,
-    });
-    if (platform && ws && ws.authUser && ws.authUser.id) {
-      Promise.resolve(platform.persistReplayExport({
-        userId: ws.authUser.id,
-        room,
-        replay,
-        requestId: envelope && envelope.meta ? envelope.meta.requestId : null,
-      })).catch(() => {});
+    try {
+      const replay = exportReplay(room);
+      send(ws, {
+        type: 'replay_export',
+        content: replay,
+        meta: envelope.meta,
+      });
+      if (platform && ws && ws.authUser && ws.authUser.id) {
+        Promise.resolve(platform.persistReplayExport({
+          userId: ws.authUser.id,
+          room,
+          replay,
+          requestId: envelope && envelope.meta ? envelope.meta.requestId : null,
+        })).catch(() => {});
+      }
+    } catch {
+      sendError(ws, ERROR_CODES.INTERNAL_ERROR, '鍥炴斁瀵煎嚭澶辫触锛岃绋嶅悗閲嶈瘯銆?', {
+        meta: envelope && envelope.meta,
+      });
     }
   }
 

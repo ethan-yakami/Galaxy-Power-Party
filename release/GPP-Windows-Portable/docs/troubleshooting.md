@@ -52,3 +52,17 @@ Check these items first:
 2. Open `/api/frontend-diagnostics` and confirm `servedMode` is `build-client` in production.
 3. View the homepage HTML source. If it still references `app/launcher-entry.js`, the server is serving source HTML instead of the built frontend.
 4. Check the browser console for `launcher-entry` or `runtime source` errors. Those errors should now identify which runtime source failed to load.
+
+## Render Build Fails With `vite: not found`
+
+Check these items first:
+
+1. Open the Render service settings and confirm the build command is `npm ci --include=dev && npm run build:client`.
+2. Confirm the service is still tracking the `main` branch from this repository, because blueprint-managed settings can drift from manual dashboard edits.
+3. Confirm the service environment includes `NODE_ENV=production` and `NPM_CONFIG_PRODUCTION=false`.
+4. Trigger `Manual Deploy -> Clear build cache & deploy` after fixing the command or environment values.
+
+Why this happens:
+
+- `vite` lives in `devDependencies`, but Render can omit dev dependencies during build when production-oriented npm settings leak into the install step.
+- In this repository, production startup must still use the built frontend under `build/client/**`, so a missing `vite` install causes the whole deployment to fail before the server starts.

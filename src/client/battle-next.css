@@ -947,34 +947,31 @@ body[data-battle-theme='nova'] .die:focus-visible {
 }
 
 body[data-battle-theme='nova'] .die.selected {
-  border-color: rgba(255, 216, 101, 0.72);
+  border-color: rgba(255, 216, 101, 0.82);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent),
-    linear-gradient(145deg, rgba(255, 220, 117, 0.96), rgba(255, 142, 84, 0.94));
-  transform: translateY(-5px) scale(1.06);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(145deg, rgba(255, 225, 118, 0.97), rgba(240, 194, 76, 0.96));
+  transform: translateY(-3px) scale(1.03);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 22px 34px rgba(2, 7, 20, 0.4),
-    0 0 0 1px rgba(255, 216, 101, 0.18),
-    0 0 34px rgba(255, 210, 96, 0.24);
+    0 14px 22px rgba(2, 7, 20, 0.28);
 }
 
 body[data-battle-theme='nova'] .die.selected::after {
-  border-color: rgba(255, 238, 181, 0.92);
-  box-shadow: 0 0 0 3px rgba(255, 216, 101, 0.14);
+  border-color: rgba(255, 238, 181, 0.78);
+  box-shadow: none;
 }
 
 body[data-battle-theme='nova'] .die.dragSelecting:not(.selected) {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 18px 30px rgba(2, 7, 20, 0.38),
-    0 0 0 1px rgba(95, 211, 255, 0.16),
-    0 0 24px rgba(95, 211, 255, 0.18);
+    0 14px 22px rgba(2, 7, 20, 0.28),
+    0 0 0 1px rgba(255, 220, 123, 0.14);
 }
 
 body[data-battle-theme='nova'] .die.dragSelecting::after {
-  border-color: rgba(95, 211, 255, 0.86);
-  box-shadow: 0 0 0 2px rgba(95, 211, 255, 0.12);
+  border-color: rgba(255, 220, 123, 0.78);
+  box-shadow: none;
 }
 
 body[data-battle-theme='nova'] .dieLabel {

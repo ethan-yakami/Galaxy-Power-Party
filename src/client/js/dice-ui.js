@@ -1,16 +1,17 @@
 (function() {
   const { state, send } = GPP;
-  const LIVE_SELECTION_SYNC_MS = 20;
-  const POINTER_CLICK_SUPPRESS_MS = 120;
+  const LIVE_SELECTION_SYNC_MS = 16;
+  const DRAG_ACTIVATION_PX = 6;
 
   let liveSelectionTimeout = null;
   let dragSelection = null;
-  let lastSelectionInputAt = 0;
+  let clickSuppressionTimeout = null;
+  let suppressNextClick = false;
 
   function refreshSelectionUi() {
     if (typeof GPP.refreshDiceSelectionUi === 'function') {
       GPP.refreshDiceSelectionUi({
-        dragIndices: dragSelection ? [...dragSelection.visited] : [],
+        dragIndices: dragSelection && dragSelection.moved ? [...dragSelection.visited] : [],
       });
       return;
     }
@@ -115,6 +116,19 @@
     return getNeedCountForPhase(game, phase);
   }
 
+  function clearClickSuppressionTimer() {
+    if (clickSuppressionTimeout) clearTimeout(clickSuppressionTimeout);
+    clickSuppressionTimeout = null;
+  }
+
+  function scheduleClickSuppressionClear() {
+    clearClickSuppressionTimer();
+    clickSuppressionTimeout = setTimeout(() => {
+      suppressNextClick = false;
+      clickSuppressionTimeout = null;
+    }, 0);
+  }
+
   function toggleDie(index, maxSelectable) {
     if (state.selectedDice.has(index)) {
       state.selectedDice.delete(index);
@@ -145,16 +159,92 @@
     }, LIVE_SELECTION_SYNC_MS);
   }
 
-  function beginDragSelection(index, maxSelectable) {
-    lastSelectionInputAt = Date.now();
+  function getEventPoint(event) {
+    if (!event || !Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return null;
+    return {
+      x: Number(event.clientX),
+      y: Number(event.clientY),
+    };
+  }
+
+  function hasDragActivation(session, event) {
+    const point = getEventPoint(event);
+    if (!session || !point || !session.startPoint) return false;
+    return Math.hypot(point.x - session.startPoint.x, point.y - session.startPoint.y) >= DRAG_ACTIVATION_PX;
+  }
+
+  function parseDieIndex(node) {
+    if (!node || !node.dataset) return -1;
+    const value = Number(node.dataset.dieIndex);
+    return Number.isInteger(value) && value >= 0 ? value : -1;
+  }
+
+  function getDieNodeFromPoint(row, event) {
+    const point = getEventPoint(event);
+    if (!row || !point) return null;
+
+    if (typeof document.elementFromPoint === 'function') {
+      const candidate = document.elementFromPoint(point.x, point.y);
+      const directHit = candidate && typeof candidate.closest === 'function'
+        ? candidate.closest('.die[data-die-index]')
+        : null;
+      if (directHit && row.contains(directHit)) return directHit;
+    }
+
+    const dieNodes = Array.from(row.querySelectorAll('.die[data-die-index]'));
+    let nearest = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (let i = 0; i < dieNodes.length; i += 1) {
+      const node = dieNodes[i];
+      if (!node || typeof node.getBoundingClientRect !== 'function') continue;
+      const rect = node.getBoundingClientRect();
+      if (!(rect.width > 0 && rect.height > 0)) continue;
+      if (point.y < rect.top - 28 || point.y > rect.bottom + 28) continue;
+      const distance = point.x < rect.left
+        ? (rect.left - point.x)
+        : (point.x > rect.right ? (point.x - rect.right) : 0);
+      if (distance < nearestDistance) {
+        nearest = node;
+        nearestDistance = distance;
+      }
+    }
+
+    return nearest;
+  }
+
+  function getDieNodeFromPointer(row, event) {
+    const hit = getDieNodeFromPoint(row, event);
+    if (hit) return hit;
+    const target = event && event.target && typeof event.target.closest === 'function'
+      ? event.target.closest('.die[data-die-index]')
+      : null;
+    if (target && row && row.contains(target)) return target;
+    return null;
+  }
+
+  function beginDragSelection(index, maxSelectable, row, event) {
+    const point = getEventPoint(event);
+    suppressNextClick = true;
+    clearClickSuppressionTimer();
     const mode = state.selectedDice.has(index) ? 'remove' : 'add';
     dragSelection = {
+      row,
+      pointerId: event && Number.isFinite(event.pointerId) ? Number(event.pointerId) : null,
       mode,
       maxSelectable,
+      anchorIndex: index,
       visited: new Set(),
+      startPoint: point,
+      moved: false,
     };
     dragSelection.visited.add(index);
     applySelectionMode(index, maxSelectable, mode);
+    if (row && typeof row.setPointerCapture === 'function' && dragSelection.pointerId !== null) {
+      try {
+        row.setPointerCapture(dragSelection.pointerId);
+      } catch {}
+    }
     syncLiveSelection();
     refreshSelectionUi();
   }
@@ -168,10 +258,37 @@
     refreshSelectionUi();
   }
 
-  function endDragSelection() {
+  function moveDragSelectionFromPointer(event) {
     if (!dragSelection) return;
+    if (dragSelection.pointerId !== null && event && Number.isFinite(event.pointerId) && Number(event.pointerId) !== dragSelection.pointerId) {
+      return;
+    }
+    const row = dragSelection.row;
+    if (!row) return;
+    const node = getDieNodeFromPointer(row, event);
+    const index = parseDieIndex(node);
+    if (index < 0 || index === dragSelection.anchorIndex) return;
+    if (!dragSelection.moved && !hasDragActivation(dragSelection, event)) return;
+    dragSelection.moved = true;
+    moveDragSelection(index);
+  }
+
+  function endDragSelection(event) {
+    if (!dragSelection) return;
+    if (dragSelection.pointerId !== null && event && Number.isFinite(event.pointerId) && Number(event.pointerId) !== dragSelection.pointerId) {
+      return;
+    }
+    const row = dragSelection.row;
+    if (row && typeof row.releasePointerCapture === 'function' && dragSelection.pointerId !== null) {
+      try {
+        if (!row.hasPointerCapture || row.hasPointerCapture(dragSelection.pointerId)) {
+          row.releasePointerCapture(dragSelection.pointerId);
+        }
+      } catch {}
+    }
     dragSelection = null;
     refreshSelectionUi();
+    scheduleClickSuppressionClear();
   }
 
   function getDieShapeClass(die) {
@@ -190,6 +307,27 @@
     row.dataset.playerId = options.playerId || '';
     row.dataset.lane = options.lane || '';
     row.dataset.clickable = clickable ? 'true' : 'false';
+    row.style.touchAction = clickable ? 'none' : '';
+
+    if (clickable) {
+      row.onpointermove = (event) => {
+        moveDragSelectionFromPointer(event);
+      };
+      row.onpointerup = (event) => {
+        endDragSelection(event);
+      };
+      row.onpointercancel = (event) => {
+        endDragSelection(event);
+      };
+      row.onlostpointercapture = () => {
+        endDragSelection();
+      };
+    } else {
+      row.onpointermove = null;
+      row.onpointerup = null;
+      row.onpointercancel = null;
+      row.onlostpointercapture = null;
+    }
 
     dice.forEach((die, index) => {
       const node = document.createElement('div');
@@ -207,30 +345,22 @@
         node.setAttribute('role', 'button');
         node.setAttribute('aria-pressed', selectedSet && selectedSet.has(index) ? 'true' : 'false');
         node.onpointerdown = (event) => {
+          if (event && event.button !== undefined && event.button !== 0) return;
           event.preventDefault();
-          beginDragSelection(index, maxSelectable);
-        };
-        node.onpointerenter = () => {
-          moveDragSelection(index);
-        };
-        node.onpointerup = () => {
-          endDragSelection();
-        };
-        node.onpointercancel = () => {
-          endDragSelection();
-        };
-        node.onmouseleave = () => {
-          if (!dragSelection) return;
+          beginDragSelection(index, maxSelectable, row, event);
         };
         node.onclick = (event) => {
-          if (Date.now() - lastSelectionInputAt < POINTER_CLICK_SUPPRESS_MS) return;
+          if (suppressNextClick) {
+            suppressNextClick = false;
+            event.preventDefault();
+            return;
+          }
           event.preventDefault();
           toggleDie(index, maxSelectable);
         };
         node.onkeydown = (event) => {
           if (event.key !== 'Enter' && event.key !== ' ') return;
           event.preventDefault();
-          lastSelectionInputAt = Date.now();
           toggleDie(index, maxSelectable);
         };
       } else {
@@ -238,9 +368,6 @@
         node.removeAttribute('role');
         node.removeAttribute('aria-pressed');
         node.onpointerdown = null;
-        node.onpointerenter = null;
-        node.onpointerup = null;
-        node.onpointercancel = null;
         node.onclick = null;
         node.onkeydown = null;
       }

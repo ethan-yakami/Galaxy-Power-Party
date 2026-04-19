@@ -4,7 +4,7 @@
 > Audience: 所有 AI、贡献者、维护者 / All AI agents, contributors, and maintainers
 > Must Read Before: 判断某个功能由谁负责；排查 battle 壳层、旧运行时、服务端、引擎、协议职责时
 > Update When: 模块职责迁移、入口变更、新旧运行时分工变化、测试入口变化、工具链职责变化
-> Last Verified Against Code: 2026-04-18
+> Last Verified Against Code: 2026-04-19
 > Related Checks: `npm run audit:docs`, `npm run audit:paths`, `npm run test:node`, `npm run test:client`
 
 这份附表按“功能由谁负责”整理仓库，帮助新手和 AI 快速定位真实实现，而不是掉进旧路径、compat shim 或派生产物。
@@ -100,6 +100,7 @@
 - 页面已经启动，但渲染、交互、Socket、状态更新不对：先看 `src/client/js/**`
 - 需要对旧运行时暴露桥接接口：改 `install-battle-compat-bridge.js`
 - 需要真正修改游戏规则：不要在 bridge 里改，去 `src/core/battle-engine/**`
+- Battle boundary reminder: `src/client/battle.html` and `src/client/app/battle-entry.js` decide how the page boots, but once battle UI is already visible, dice selection, winner overlay, replay export handling, and leave/disband flows are maintained in `src/client/js/**`.
 
 ### 明确禁止的误判
 

@@ -4,7 +4,7 @@
 > Audience: 所有 AI、贡献者、维护者 / All AI agents, contributors, and maintainers
 > Must Read Before: 判断改动路径是否真实生效；处理多版本目录、compat shim、发布副本、归档资料前
 > Update When: 目录职责变化、入口变更、compat 层变化、派生产物规则变化、归档范围变化
-> Last Verified Against Code: 2026-04-18
+> Last Verified Against Code: 2026-04-19
 > Related Checks: `npm run audit:docs`, `npm run audit:paths`, `npm run audit:boundaries`, `npm run audit:portable`
 
 这份附表回答一件事：你准备修改的路径，到底属于哪种状态，改了以后会不会影响当前程序。
