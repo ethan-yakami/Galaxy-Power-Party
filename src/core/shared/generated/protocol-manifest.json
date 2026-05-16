@@ -737,6 +737,122 @@
       "fields": []
     },
     {
+      "type": "live_selection_updated",
+      "direction": "server_to_client",
+      "protoMessage": "LiveSelectionUpdatedPayload",
+      "source": {
+        "file": "proto/battle.proto",
+        "line": 99
+      },
+      "fields": [
+        {
+          "name": "roomCode",
+          "protoName": "room_code",
+          "protoType": "string",
+          "fieldNumber": 1,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 100,
+            "message": "LiveSelectionUpdatedPayload"
+          }
+        },
+        {
+          "name": "playerId",
+          "protoName": "player_id",
+          "protoType": "string",
+          "fieldNumber": 2,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 101,
+            "message": "LiveSelectionUpdatedPayload"
+          }
+        },
+        {
+          "name": "lane",
+          "protoName": "lane",
+          "protoType": "string",
+          "fieldNumber": 3,
+          "type": "string",
+          "required": true,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 102,
+            "message": "LiveSelectionUpdatedPayload"
+          }
+        },
+        {
+          "name": "indices",
+          "protoName": "indices",
+          "protoType": "int32",
+          "fieldNumber": 4,
+          "type": "integer_array",
+          "required": true,
+          "repeated": true,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 103,
+            "message": "LiveSelectionUpdatedPayload"
+          }
+        },
+        {
+          "name": "previewValue",
+          "protoName": "preview_value",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 5,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "live_preview",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 104,
+            "message": "LiveSelectionUpdatedPayload"
+          }
+        },
+        {
+          "name": "timing",
+          "protoName": "timing",
+          "protoType": "google.protobuf.Struct",
+          "fieldNumber": 6,
+          "type": "object",
+          "required": false,
+          "repeated": false,
+          "transitional": "latency_observation",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 105,
+            "message": "LiveSelectionUpdatedPayload"
+          }
+        },
+        {
+          "name": "requestId",
+          "protoName": "request_id",
+          "protoType": "string",
+          "fieldNumber": 7,
+          "type": "string",
+          "required": false,
+          "repeated": false,
+          "transitional": "",
+          "source": {
+            "file": "proto/battle.proto",
+            "line": 106,
+            "message": "LiveSelectionUpdatedPayload"
+          }
+        }
+      ]
+    },
+    {
       "type": "play_again",
       "direction": "client_to_server",
       "protoMessage": "PlayAgainPayload",
@@ -1289,7 +1405,7 @@
       "protoMessage": "WeatherChangedPayload",
       "source": {
         "file": "proto/battle.proto",
-        "line": 99
+        "line": 110
       },
       "fields": [
         {
@@ -1303,7 +1419,7 @@
           "transitional": "weather_projection",
           "source": {
             "file": "proto/battle.proto",
-            "line": 100,
+            "line": 111,
             "message": "WeatherChangedPayload"
           }
         },
@@ -1318,7 +1434,7 @@
           "transitional": "",
           "source": {
             "file": "proto/battle.proto",
-            "line": 101,
+            "line": 112,
             "message": "WeatherChangedPayload"
           }
         }

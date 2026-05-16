@@ -123,6 +123,27 @@ function broadcastRoom(room) {
   }
 }
 
+function broadcastLiveSelection(room, payload) {
+  if (!room || !Array.isArray(room.players) || !payload) return;
+  const serverSentAt = Date.now();
+  for (const player of room.players) {
+    send(player.ws, {
+      type: 'live_selection_updated',
+      roomCode: room.code,
+      playerId: payload.playerId,
+      lane: payload.lane,
+      indices: payload.indices,
+      previewValue: payload.previewValue || null,
+      timing: {
+        clientSentAt: payload.clientSentAt || null,
+        serverReceivedAt: payload.serverReceivedAt || null,
+        serverSentAt,
+      },
+      requestId: payload.requestId || null,
+    });
+  }
+}
+
 function buildPublicRoomSummary(room) {
   if (!room || room.isPublic !== true) return null;
   const players = Array.isArray(room.players) ? room.players : [];
@@ -259,6 +280,7 @@ module.exports = {
   hasReservedHumanSlot,
   sanitizeRoom,
   broadcastRoom,
+  broadcastLiveSelection,
   buildPublicRoomSummary,
   newRoomCode,
   getPlayerRoom,

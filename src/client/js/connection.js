@@ -115,6 +115,38 @@
     ROOM_ENDED: '房间已结束，请重新创建或加入其他房间。',
   });
 
+  let renderFrame = null;
+  const afterRenderQueue = [];
+
+  function scheduleRender(afterRender) {
+    if (typeof afterRender === 'function') {
+      afterRenderQueue.push(afterRender);
+    }
+    if (renderFrame) return;
+    const schedule = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : (callback) => setTimeout(callback, 0);
+    renderFrame = schedule(() => {
+      renderFrame = null;
+      try {
+        GPP.render();
+      } catch (error) {
+        const reason = `界面渲染失败：${error && error.message ? error.message : String(error)}`;
+        setMessage(reason);
+        if (dom.connectionError) {
+          dom.connectionError.textContent = reason;
+          dom.connectionError.classList.remove('hidden');
+        }
+      }
+      const callbacks = afterRenderQueue.splice(0, afterRenderQueue.length);
+      callbacks.forEach((callback) => {
+        try {
+          callback();
+        } catch {}
+      });
+    });
+  }
+
   const STATUS_META = {
     idle: { text: '未连接', className: 'statusIdle' },
     connecting: { text: '连接中', className: 'statusConnecting' },
@@ -692,7 +724,33 @@
   const routeLowRiskMessages = messageRouterApi.createMessageRouter({
     battle_actions(msg) {
       state.battleActions = msg;
-      GPP.render();
+      scheduleRender();
+      return true;
+    },
+    live_selection_updated(msg) {
+      if (!state.room || !state.room.game || state.room.code !== msg.roomCode) return true;
+      const game = state.room.game;
+      const indices = Array.isArray(msg.indices) ? msg.indices.filter((index) => Number.isInteger(index)) : [];
+      if (msg.lane === 'attack') {
+        game.attackPreviewSelection = indices;
+      } else if (msg.lane === 'defense') {
+        game.defensePreviewSelection = indices;
+      } else {
+        return true;
+      }
+      const timing = msg.timing || {};
+      if (timing.clientSentAt && timing.serverSentAt) {
+        logger.debug('live_selection_latency', {
+          requestId: msg.requestId || null,
+          networkRttMs: Date.now() - Number(timing.clientSentAt),
+          serverQueueMs: Number(timing.serverSentAt) - Number(timing.serverReceivedAt || timing.serverSentAt),
+        });
+      }
+      if (msg.playerId === state.me && typeof GPP.refreshDiceSelectionUi === 'function') {
+        GPP.refreshDiceSelectionUi();
+        return true;
+      }
+      scheduleRender();
       return true;
     },
     player_presence_changed(msg) {
@@ -702,7 +760,7 @@
           target.isOnline = msg.isOnline !== false;
           target.disconnectedAt = msg.disconnectedAt || null;
           target.graceDeadline = msg.graceDeadline || null;
-          GPP.render();
+          scheduleRender();
         }
       }
       return true;
@@ -720,7 +778,7 @@
     },
     characters_updated(msg) {
       applyCatalogPayload(msg);
-      GPP.render();
+      scheduleRender();
       return true;
     },
   }, {
@@ -1371,27 +1429,18 @@
 
         notifyShell('gpp:battle-shell-show');
 
-        try {
-          GPP.render();
-        } catch (error) {
-          const reason = `界面渲染失败：${error && error.message ? error.message : String(error)}`;
-          setMessage(reason);
-          if (dom.connectionError) {
-            dom.connectionError.textContent = reason;
-            dom.connectionError.classList.remove('hidden');
+        scheduleRender(() => {
+          if (typeof GPP.processEffectEvents === 'function') {
+            GPP.processEffectEvents(state.room.game || {}, prevRoomCode === state.room.code && prevHadGame);
           }
-        }
-
-        if (typeof GPP.processEffectEvents === 'function') {
-          GPP.processEffectEvents(state.room.game || {}, prevRoomCode === state.room.code && prevHadGame);
-        }
-        if (typeof GPP.preloadDeferredBattleFeatures === 'function') {
-          GPP.preloadDeferredBattleFeatures();
-        }
-        markAppTiming('room_reconciled_at');
-        maybeLogStartupTiming('room_state_received', {
-          roomCode: state.room && state.room.code ? state.room.code : null,
-          roomMode: state.room && state.room.roomMode ? state.room.roomMode : null,
+          if (typeof GPP.preloadDeferredBattleFeatures === 'function') {
+            GPP.preloadDeferredBattleFeatures();
+          }
+          markAppTiming('room_reconciled_at');
+          maybeLogStartupTiming('room_state_received', {
+            roomCode: state.room && state.room.code ? state.room.code : null,
+            roomMode: state.room && state.room.roomMode ? state.room.roomMode : null,
+          });
         });
         return;
       }

@@ -1,9 +1,10 @@
 (function() {
   const { state, send } = GPP;
-  const LIVE_SELECTION_SYNC_MS = 16;
+  const LIVE_SELECTION_SYNC_MS = 75;
   const DRAG_ACTIVATION_PX = 6;
 
   let liveSelectionTimeout = null;
+  let lastLiveSelectionKey = '';
   let dragSelection = null;
   let clickSuppressionTimeout = null;
   let suppressNextClick = false;
@@ -135,10 +136,7 @@
     } else if (maxSelectable === null || maxSelectable === undefined || state.selectedDice.size < maxSelectable) {
       state.selectedDice.add(index);
     }
-    clearTimeout(liveSelectionTimeout);
-    liveSelectionTimeout = setTimeout(() => {
-      send('update_live_selection', { indices: [...state.selectedDice] });
-    }, LIVE_SELECTION_SYNC_MS);
+    syncLiveSelection();
     refreshSelectionUi();
   }
 
@@ -155,7 +153,11 @@
   function syncLiveSelection() {
     clearTimeout(liveSelectionTimeout);
     liveSelectionTimeout = setTimeout(() => {
-      send('update_live_selection', { indices: [...state.selectedDice] });
+      const indices = [...state.selectedDice].sort((a, b) => a - b);
+      const key = indices.join(',');
+      if (key === lastLiveSelectionKey) return;
+      lastLiveSelectionKey = key;
+      send('update_live_selection', { indices });
     }, LIVE_SELECTION_SYNC_MS);
   }
 

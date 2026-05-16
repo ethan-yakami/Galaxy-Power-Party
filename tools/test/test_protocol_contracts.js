@@ -24,14 +24,18 @@ function testProtoManifestMetadata() {
 
 function testHighValueStructuredPayloads() {
   const battleActions = findMessage('battle_actions');
+  const liveSelection = findMessage('live_selection_updated');
   const resumeRoom = findMessage('create_resume_room');
   const replayExport = findMessage('replay_export');
 
   assert.ok(battleActions);
+  assert.ok(liveSelection);
   assert.ok(resumeRoom);
   assert.ok(replayExport);
 
   assert.strictEqual(battleActions.fields.find((field) => field.name === 'actions').type, 'object_array');
+  assert.strictEqual(liveSelection.fields.find((field) => field.name === 'indices').type, 'integer_array');
+  assert.strictEqual(liveSelection.fields.find((field) => field.name === 'timing').required, false);
   assert.strictEqual(resumeRoom.fields.find((field) => field.name === 'replay').type, 'object');
   assert.strictEqual(replayExport.fields.find((field) => field.name === 'content').type, 'object');
 }

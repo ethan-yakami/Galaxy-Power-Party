@@ -286,12 +286,16 @@ async function main() {
   row.onpointerup({ pointerId: 7 });
   assert.strictEqual(document.querySelectorAll('#selfZone .die.dragSelecting').length, 0, 'drag state should clear on pointerup');
 
-  await wait(24);
+  await wait(95);
   assert(sentMessages.some((entry) => entry.type === 'update_live_selection'), 'dragging should still sync live selection');
   assert.deepStrictEqual(sentMessages[sentMessages.length - 1], {
     type: 'update_live_selection',
     payload: { indices: [0, 1, 2] },
   });
+  const sentCountAfterDrag = sentMessages.length;
+  gpp.refreshDiceSelectionUi();
+  await wait(95);
+  assert.strictEqual(sentMessages.length, sentCountAfterDrag, 'unchanged live selection should not send a duplicate sync');
 
   console.log('dice-drag-ui test passed');
   dom.window.close();

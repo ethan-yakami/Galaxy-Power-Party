@@ -1,4 +1,4 @@
-const { getPlayerRoom, send } = require('../../services/rooms');
+const { getPlayerRoom, send, broadcastLiveSelection } = require('../../services/rooms');
 const {
   buildPendingActionSet,
   consumePendingAction,
@@ -14,6 +14,36 @@ const { recordPureActionReplay, finalizeReplay, exportReplay } = require('../../
 const { sendError, ERROR_CODES } = require('../../transport/protocol/errors');
 
 function createBattleHandlers({ rooms, shared, platform }) {
+  function indicesFromMask(mask, count) {
+    const indices = [];
+    for (let i = 0; i < count; i += 1) {
+      if ((mask & (1 << i)) !== 0) indices.push(i);
+    }
+    return indices;
+  }
+
+  function getLiveSelectionKey(playerId, lane, mask) {
+    return `${playerId || ''}:${lane || ''}:${mask}`;
+  }
+
+  function getLiveSelectionPreview(game, lane, playerId, indices) {
+    if (!game || !Array.isArray(indices)) return null;
+    const dice = lane === 'attack' ? game.attackDice : game.defenseDice;
+    if (!Array.isArray(dice)) return null;
+    let baseSum = 0;
+    let selectedCount = 0;
+    for (const index of indices) {
+      const die = dice[index];
+      if (!die || !Number.isFinite(Number(die.value))) continue;
+      baseSum += Number(die.value);
+      selectedCount += 1;
+    }
+    return {
+      baseSum,
+      selectedCount,
+    };
+  }
+
   function runAutoDefenseRollIfNeeded(room) {
     if (!room || !room.engineState || room.status !== 'in_game') return;
     if (room.engineState.phase !== 2) return;
@@ -185,6 +215,7 @@ function createBattleHandlers({ rooms, shared, platform }) {
 
     room.engineUi.attackPreviewMask = 0;
     room.engineUi.defensePreviewMask = 0;
+    room.lastLiveSelectionKey = '';
     shared.getBroadcastRoom(room);
   }
 
@@ -218,18 +249,35 @@ function createBattleHandlers({ rooms, shared, platform }) {
     const rollCount = phase === 1 ? room.engineState.attackRoll.count : room.engineState.defenseRoll.count;
     const mask = indicesToMask(payload && payload.indices, rollCount);
     if (mask < 0) return;
+    let lane = '';
     if (room.engineState.phase === 1) {
       const attackerId = room.engineUi.indexToPlayerId[room.engineState.attacker];
       if (attackerId !== ws.playerId) return;
       room.engineUi.attackPreviewMask = mask;
+      lane = 'attack';
     } else if (room.engineState.phase === 3) {
       const defenderId = room.engineUi.indexToPlayerId[room.engineState.defender];
       if (defenderId !== ws.playerId) return;
       room.engineUi.defensePreviewMask = mask;
+      lane = 'defense';
     } else {
       return;
     }
-    shared.getBroadcastRoom(room);
+    const liveKey = getLiveSelectionKey(ws.playerId, lane, mask);
+    if (room.lastLiveSelectionKey === liveKey) return;
+    room.lastLiveSelectionKey = liveKey;
+    room.lastActiveAt = Date.now();
+    shared.refreshRoomProjection(room);
+    const indices = indicesFromMask(mask, rollCount);
+    broadcastLiveSelection(room, {
+      playerId: ws.playerId,
+      lane,
+      indices,
+      previewValue: getLiveSelectionPreview(room.game, lane, ws.playerId, indices),
+      clientSentAt: payload && Number.isFinite(Number(payload.clientSentAt)) ? Number(payload.clientSentAt) : null,
+      requestId: payload && typeof payload.requestId === 'string' ? payload.requestId : '',
+      serverReceivedAt: Date.now(),
+    });
   }
 
   function handleConfirmAttack(ws, payload) {

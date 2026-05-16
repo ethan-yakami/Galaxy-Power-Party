@@ -2,7 +2,7 @@
 // Source of truth: proto/*.proto
 
 export type ProtocolMessageType =
-  'apply_preset' | 'auth_state' | 'authenticate' | 'battle_actions' | 'characters_updated' | 'choose_aurora_die' | 'choose_character' | 'confirm_attack_selection' | 'confirm_defense_selection' | 'create_ai_room' | 'create_custom_character' | 'create_resume_room' | 'create_room' | 'delete_custom_character' | 'disband_room' | 'error' | 'export_replay' | 'join_room' | 'leave_room' | 'left_room' | 'list_custom_characters' | 'play_again' | 'player_presence_changed' | 'preview_preset' | 'replay_export' | 'reroll_attack' | 'resume_session' | 'roll_attack' | 'roll_defense' | 'room_state' | 'session_resume_failed' | 'session_resumed' | 'submit_battle_action' | 'toggle_custom_character' | 'update_custom_character' | 'update_live_selection' | 'use_aurora_die' | 'weather_changed' | 'welcome';
+  'apply_preset' | 'auth_state' | 'authenticate' | 'battle_actions' | 'characters_updated' | 'choose_aurora_die' | 'choose_character' | 'confirm_attack_selection' | 'confirm_defense_selection' | 'create_ai_room' | 'create_custom_character' | 'create_resume_room' | 'create_room' | 'delete_custom_character' | 'disband_room' | 'error' | 'export_replay' | 'join_room' | 'leave_room' | 'left_room' | 'list_custom_characters' | 'live_selection_updated' | 'play_again' | 'player_presence_changed' | 'preview_preset' | 'replay_export' | 'reroll_attack' | 'resume_session' | 'roll_attack' | 'roll_defense' | 'room_state' | 'session_resume_failed' | 'session_resumed' | 'submit_battle_action' | 'toggle_custom_character' | 'update_custom_character' | 'update_live_selection' | 'use_aurora_die' | 'weather_changed' | 'welcome';
 
 export type ProtocolDirection = 'client_to_server' | 'server_to_client';
 
@@ -107,6 +107,15 @@ export interface ProtocolPayloadByType {
     reason?: string;
   };
   'list_custom_characters': Record<string, never>;
+  'live_selection_updated': {
+    roomCode: string;
+    playerId: string;
+    lane: string;
+    indices: number[];
+    previewValue?: ProtocolObject;
+    timing?: ProtocolObject;
+    requestId?: string;
+  };
   'play_again': Record<string, never>;
   'player_presence_changed': {
     roomCode: string;
@@ -202,6 +211,7 @@ export type ProtocolDirectionByType = {
   'leave_room': 'client_to_server';
   'left_room': 'server_to_client';
   'list_custom_characters': 'client_to_server';
+  'live_selection_updated': 'server_to_client';
   'play_again': 'client_to_server';
   'player_presence_changed': 'server_to_client';
   'preview_preset': 'client_to_server';

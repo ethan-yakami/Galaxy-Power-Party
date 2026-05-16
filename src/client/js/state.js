@@ -90,7 +90,13 @@ const dom = {
 
 function send(type, payload) {
   if (GPP.ws && GPP.ws.readyState === WebSocket.OPEN) {
-    GPP.ws.send(JSON.stringify({ type, ...payload }));
+    const body = { ...(payload || {}) };
+    if (type === 'update_live_selection') {
+      const now = Date.now();
+      body.clientSentAt = now;
+      body.requestId = `live_${now}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+    GPP.ws.send(JSON.stringify({ type, ...body }));
   }
 }
 

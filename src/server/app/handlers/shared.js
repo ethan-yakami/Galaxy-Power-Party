@@ -29,7 +29,8 @@ function createSharedHandlers({ rooms, getHandlers }) {
     };
   }
 
-  function getBroadcastRoom(room) {
+  function refreshRoomProjection(room) {
+    if (!room) return;
     if (room) {
       room.lastActiveAt = Date.now();
     }
@@ -48,6 +49,10 @@ function createSharedHandlers({ rooms, getHandlers }) {
       clearPendingActionSet(room);
       room.game = null;
     }
+  }
+
+  function getBroadcastRoom(room) {
+    refreshRoomProjection(room);
     broadcastRoom(room);
   }
 
@@ -95,6 +100,7 @@ function createSharedHandlers({ rooms, getHandlers }) {
 
   return {
     buildPendingBattleAction,
+    refreshRoomProjection,
     getBroadcastRoom,
     buildRuntime,
     findPendingActionByOpcodeAndMask,

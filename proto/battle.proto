@@ -95,6 +95,17 @@ message BattleActionsPayload {
   int32 round = 5;
 }
 
+// @gpp-message type=live_selection_updated direction=server_to_client
+message LiveSelectionUpdatedPayload {
+  string room_code = 1;
+  string player_id = 2;
+  string lane = 3;
+  repeated int32 indices = 4;
+  google.protobuf.Struct preview_value = 5; // @gpp-field type=object required=false transitional=live_preview
+  google.protobuf.Struct timing = 6; // @gpp-field type=object required=false transitional=latency_observation
+  string request_id = 7; // @gpp-field required=false
+}
+
 // @gpp-message type=weather_changed direction=server_to_client
 message WeatherChangedPayload {
   google.protobuf.Struct weather = 1; // @gpp-field type=object required=false transitional=weather_projection
